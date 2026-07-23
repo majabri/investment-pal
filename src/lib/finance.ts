@@ -1,0 +1,119 @@
+// Financial helpers: formatting, CAGR, probability model.
+
+export const fmtUSD = (v: number | null | undefined, digits = 0) => {
+  if (v == null || Number.isNaN(v)) return "—";
+  return v.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+};
+
+export const fmtPct = (v: number | null | undefined, digits = 1) => {
+  if (v == null || Number.isNaN(v)) return "—";
+  return `${(v * 100).toFixed(digits)}%`;
+};
+
+export const fmtNumber = (v: number | null | undefined, digits = 2) => {
+  if (v == null || Number.isNaN(v)) return "—";
+  return v.toLocaleString("en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+};
+
+export const yearsBetween = (from: Date, to: Date) => {
+  const ms = to.getTime() - from.getTime();
+  return ms / (1000 * 60 * 60 * 24 * 365.25);
+};
+
+export const requiredCAGR = (start: number, target: number, years: number) => {
+  if (start <= 0 || years <= 0) return 0;
+  return Math.pow(target / start, 1 / years) - 1;
+};
+
+export const periodicGrowth = (
+  start: number,
+  target: number,
+  years: number,
+  periodsPerYear: number,
+) => {
+  if (start <= 0 || years <= 0) return 0;
+  const n = years * periodsPerYear;
+  return Math.pow(target / start, 1 / n) - 1;
+};
+
+// Erf approximation (Abramowitz & Stegun 7.1.26)
+const erf = (x: number) => {
+  const sign = Math.sign(x);
+  const ax = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * ax);
+  const y =
+    1 -
+    (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) *
+      t +
+      0.254829592) *
+      t *
+      Math.exp(-ax * ax);
+  return sign * y;
+};
+
+const normCdf = (z: number) => 0.5 * (1 + erf(z / Math.SQRT2));
+
+// Risk preference → assumed annualized volatility (equity portfolio proxy)
+export const riskToVol = (risk: string) => {
+  switch (risk) {
+    case "conservative":
+      return 0.12;
+    case "aggressive":
+      return 0.28;
+    case "moderate":
+    default:
+      return 0.2;
+  }
+};
+
+// Assumed expected return by risk preference
+export const riskToExpectedReturn = (risk: string) => {
+  switch (risk) {
+    case "conservative":
+      return 0.07;
+    case "aggressive":
+      return 0.14;
+    case "moderate":
+    default:
+      return 0.1;
+  }
+};
+
+/**
+ * Log-normal probability that terminal value ≥ target.
+ * P(V_T >= target) where log(V_T/V_0) ~ N((mu-vol^2/2)*T, vol^2*T)
+ */
+export const probabilityOfReachingTarget = (
+  current: number,
+  target: number,
+  years: number,
+  expectedReturn: number,
+  vol: number,
+) => {
+  if (current <= 0 || years <= 0) return 0;
+  if (current >= target) return 1;
+  const mu = expectedReturn;
+  const sigma = vol;
+  const drift = (mu - (sigma * sigma) / 2) * years;
+  const stdev = sigma * Math.sqrt(years);
+  const z = (Math.log(target / current) - drift) / stdev;
+  return 1 - normCdf(z);
+};
+
+export type MarginStatus = "ok" | "elevated" | "high";
+
+export const marginStatus = (used: number, limit: number): MarginStatus => {
+  if (limit <= 0) return "ok";
+  const ratio = used / limit;
+  if (ratio >= 0.75) return "high";
+  if (ratio >= 0.4) return "elevated";
+  return "ok";
+};
