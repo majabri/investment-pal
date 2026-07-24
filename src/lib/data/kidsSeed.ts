@@ -11,7 +11,8 @@ const base = (over: Partial<Record<string, [number, number, number]>>): KidHoldi
     ARE: [5, 50.43, 49.22], GLD: [1, 373.73, 359.13], AVGO: [0.29, 387.02, 372.21],
     TSLA: [2, 381.27, 314.88], SLV: [7, 53.245, 46.80], CLSK: [5.507, 15.535, 18.18],
   };
-  return Object.entries({ ...std, ...over }).map(([symbol, [shares, price, avgCost]]) => ({ symbol, shares, price, avgCost }));
+  const merged = { ...std, ...over } as Record<string, [number, number, number]>;
+  return Object.entries(merged).map(([symbol, [shares, price, avgCost]]) => ({ symbol, shares, price, avgCost }));
 };
 
 export const KIDS_SEED: KidAccount[] = [
