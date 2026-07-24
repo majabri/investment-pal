@@ -184,9 +184,6 @@ function ImportPage() {
               onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
             <Button onClick={() => fileRef.current?.click()}>Upload CSV file</Button>
             <Button onClick={preview} variant="secondary">Parse pasted text</Button>
-            {parsed && (
-              <Button onClick={() => void save()} disabled={busy || mapped.length === 0}>{saveLabel}</Button>
-            )}
           </div>
           {parsed && (
             <div className="space-y-4">
@@ -235,7 +232,12 @@ function ImportPage() {
                   </div>
                 );
               })}
-              <Button className="w-full" onClick={() => void save()} disabled={busy || mapped.length === 0}>{saveLabel}</Button>
+              <Button className="w-full" size="lg" onClick={() => void save()} disabled={busy || mapped.length === 0}>
+                {saveLabel}
+              </Button>
+              <p className="text-center text-[11px] text-muted-foreground">
+                Review each account&apos;s destination above, then save everything in one step. Skipped accounts are not touched.
+              </p>
             </div>
           )}
           <p className="text-xs text-muted-foreground">
