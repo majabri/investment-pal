@@ -22,6 +22,7 @@ import {
   riskToExpectedReturn,
 } from "@/lib/finance";
 import { buildMorningPrompt, buildEODPrompt, type PromptContext } from "@/lib/prompts";
+import { CommitteeChat } from "@/components/app/CommitteeChat";
 
 export const Route = createFileRoute("/_authenticated/prompt-center")({
   head: () => ({
@@ -160,6 +161,9 @@ function PromptCenter() {
           />
         </TabsContent>
       </Tabs>
+          <div className="mt-6">
+        <CommitteeChat systemPrompt={prompt} title={tab === "morning" ? "Investment Committee Chat — Morning" : "Investment Committee Chat — End of Day"} />
+      </div>
     </AppShell>
   );
 }
