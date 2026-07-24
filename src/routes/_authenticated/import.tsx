@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
@@ -27,7 +27,27 @@ function ImportPage() {
   const [raw, setRaw] = useState("");
   const [parsed, setParsed] = useState<ParsedHolding[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
+
+  function onFile(file: File | undefined) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? "");
+      setRaw(text);
+      const res = parsePositionsCsv(text);
+      if (!res.rows.length) {
+        toast.error(`"${file.name}" parsed but no positions recognized — is it the Positions export?`);
+        setParsed(null);
+        return;
+      }
+      setParsed(res.rows);
+      toast.success(`${file.name}: ${res.rows.length} positions ready to save.`);
+    };
+    reader.onerror = () => toast.error("Could not read the file.");
+    reader.readAsText(file);
+  }
 
   function preview() {
     const res = parsePositionsCsv(raw);
@@ -97,14 +117,17 @@ function ImportPage() {
   const total = parsed?.reduce((s, h) => s + (h.currentValue ?? h.quantity * h.current_price), 0) ?? 0;
 
   return (
-    <AppShell title="Fidelity Import" subtitle="Read-only. Paste the Positions CSV export — kids' accounts are detected by name.">
+    <AppShell title="Fidelity Import" subtitle="Read-only. Upload the Positions CSV export (Fidelity → Positions → Download) or paste its text — kids' accounts are detected by name.">
       <Card>
         <CardHeader><CardTitle className="text-base">Paste positions</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <Textarea value={raw} onChange={(e) => setRaw(e.target.value)} rows={10}
             placeholder="Account Number,Account Name,Symbol,Description,Quantity,Last Price,Current Value,..." />
-          <div className="flex items-center gap-3">
-            <Button onClick={preview} variant={parsed ? "secondary" : "default"}>Parse & preview</Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <input ref={fileRef} type="file" accept=".csv,text/csv,text/plain" className="hidden"
+              onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+            <Button onClick={() => fileRef.current?.click()}>Upload CSV file</Button>
+            <Button onClick={preview} variant="secondary">Parse pasted text</Button>
             {parsed && (
               <Button onClick={() => void save()} disabled={busy}>
                 {busy ? "Saving…" : `Save ${parsed.length} positions (${fmtUSD(total)})`}
