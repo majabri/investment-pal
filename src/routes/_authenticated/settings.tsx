@@ -57,7 +57,7 @@ function SettingsPage() {
   const { data: priorities = [], add: addPriority, dismiss: dismissP } = usePriorities();
   const { data: actions = [], add: addAction, dismiss: dismissA } = useRecommendedActions();
   const { data: syncs = [] } = useSyncLog();
-  const logSync = useLogSync();
+  useLogSync;
   const { data: accounts = [], create: createAccount } = useAccounts();
 
   const [pLabel, setPLabel] = useState("");
