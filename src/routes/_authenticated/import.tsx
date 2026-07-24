@@ -23,19 +23,22 @@ const DESTINATIONS = [
   { value: "__skip__", label: "Skip this account" },
 ] as const;
 
-/** Smart default destination from the Fidelity label (user can override). */
+/** Exact-name defaults only; anything unrecognized defaults to Skip.
+ *  ("Jude Crypto" / "Jude 529" must NOT auto-merge into Jude's brokerage.) */
 function defaultDestination(label: string | undefined): string {
-  const l = (label ?? "").toLowerCase();
-  for (const kid of ["karim", "zain", "jude"]) {
-    if (l.includes(kid)) return kid[0].toUpperCase() + kid.slice(1);
-  }
-  return "Amir - TOD";
+  const l = (label ?? "").trim().toLowerCase();
+  if (l === "karim") return "Karim";
+  if (l === "zain") return "Zain";
+  if (l === "jude") return "Jude";
+  if (l === "amir - tod" || l === "amir-tod") return "Amir - TOD";
+  return "__skip__";
 }
 
 function ImportPage() {
   const [raw, setRaw] = useState("");
   const [parsed, setParsed] = useState<ParsedHolding[] | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [cashByAccount, setCashByAccount] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
@@ -53,6 +56,7 @@ function ImportPage() {
         return;
       }
       setParsed(res.rows);
+      setCashByAccount(res.cashByAccount);
       initMapping(res.rows);
       toast.success(`${file.name}: ${res.rows.length} positions ready — choose destinations below.`);
     };
@@ -67,6 +71,7 @@ function ImportPage() {
       return;
     }
     setParsed(res.rows);
+    setCashByAccount(res.cashByAccount);
     initMapping(res.rows);
   }
 
@@ -119,11 +124,18 @@ function ImportPage() {
             current_price: h.current_price || (h.quantity ? (h.currentValue ?? 0) / h.quantity : 0),
             last_price_at: new Date().toISOString(),
           }));
+        // Replace-mode: this import becomes the account's whole truth,
+        // so a corrected re-import heals any earlier bad mapping.
+        const { error: delErr } = await supabase.from("holdings")
+          .delete().eq("account_id", acct!.id).eq("user_id", userId);
+        if (delErr) throw delErr;
         const { error: upErr } = await supabase.from("holdings")
           .upsert(rows, { onConflict: "user_id,account_id,symbol" });
         if (upErr) throw upErr;
+        const sourceLabels = [...new Set(holdings.map((h) => h.accountName ?? "Unlabeled account"))];
+        const cash = sourceLabels.reduce((c, label) => c + (cashByAccount[label] ?? 0), 0);
         await supabase.from("accounts")
-          .update({ last_synced_at: new Date().toISOString() })
+          .update({ cash, last_synced_at: new Date().toISOString() })
           .eq("id", acct!.id);
         saved += rows.length;
       }
@@ -205,6 +217,9 @@ function ImportPage() {
                   </div>
                 );
               })}
+              <Button className="w-full" onClick={() => void save()} disabled={busy}>
+                {busy ? "Saving…" : "Save mapped accounts"}
+              </Button>
             </div>
           )}
           <p className="text-xs text-muted-foreground">
