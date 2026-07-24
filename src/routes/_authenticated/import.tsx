@@ -113,25 +113,37 @@ function ImportPage() {
           if (error) throw error;
           acct = created;
         }
-        const rows = holdings
-          .filter((h) => h.symbol && h.quantity != null)
-          .map((h) => ({
-            user_id: userId,
-            account_id: acct!.id,
-            symbol: h.symbol.toUpperCase(),
-            quantity: h.quantity ?? 0,
-            cost_basis: h.cost_basis ?? 0,
-            current_price: h.current_price || (h.quantity ? (h.currentValue ?? 0) / h.quantity : 0),
-            last_price_at: new Date().toISOString(),
-          }));
+        // Aggregate multiple lots of the same symbol (sum qty, weighted avg cost)
+        const bySymbol = new Map<string, { qty: number; cost: number; px: number }>();
+        for (const h of holdings) {
+          if (!h.symbol || h.quantity == null) continue;
+          const sym = h.symbol.toUpperCase();
+          const px = h.current_price || (h.quantity ? (h.currentValue ?? 0) / h.quantity : 0);
+          const prev = bySymbol.get(sym) ?? { qty: 0, cost: 0, px };
+          bySymbol.set(sym, {
+            qty: prev.qty + h.quantity,
+            cost: prev.cost + (h.cost_basis ?? 0) * h.quantity,
+            px,
+          });
+        }
+        const rows = [...bySymbol.entries()].map(([symbol, x]) => ({
+          user_id: userId,
+          account_id: acct!.id,
+          symbol,
+          quantity: x.qty,
+          cost_basis: x.qty > 0 ? x.cost / x.qty : 0,
+          current_price: x.px,
+          last_price_at: new Date().toISOString(),
+        }));
         // Replace-mode: this import becomes the account's whole truth,
         // so a corrected re-import heals any earlier bad mapping.
         const { error: delErr } = await supabase.from("holdings")
           .delete().eq("account_id", acct!.id).eq("user_id", userId);
         if (delErr) throw delErr;
-        const { error: upErr } = await supabase.from("holdings")
-          .upsert(rows, { onConflict: "user_id,account_id,symbol" });
-        if (upErr) throw upErr;
+        // Plain insert — replace-mode deleted this account's holdings above,
+        // and the partial unique index cannot serve as an upsert arbiter.
+        const { error: insErr } = await supabase.from("holdings").insert(rows);
+        if (insErr) throw insErr;
         const sourceLabels = [...new Set(holdings.map((h) => h.accountName ?? "Unlabeled account"))];
         const cash = sourceLabels.reduce((c, label) => c + (cashByAccount[label] ?? 0), 0);
         await supabase.from("accounts")
@@ -150,7 +162,15 @@ function ImportPage() {
     }
   }
 
-  const total = parsed?.reduce((s, h) => s + (h.currentValue ?? h.quantity * h.current_price), 0) ?? 0;
+  const mapped = (parsed ?? []).filter((h) => {
+    const dest = mapping[h.accountName ?? "Unlabeled account"];
+    return dest && dest !== "__skip__";
+  });
+  const mappedTotal = mapped.reduce((s, h) => s + (h.currentValue ?? h.quantity * h.current_price), 0);
+  const mappedAccounts = new Set(mapped.map((h) => mapping[h.accountName ?? "Unlabeled account"])).size;
+  const saveLabel = busy ? "Saving…" : mapped.length
+    ? `Save ${mapped.length} positions → ${mappedAccounts} account${mappedAccounts === 1 ? "" : "s"} (${fmtUSD(mappedTotal)})`
+    : "Nothing mapped — choose destinations";
 
   return (
     <AppShell title="Fidelity Import" subtitle="Read-only. Upload the Positions CSV or paste its text, then choose where each Fidelity account imports to.">
@@ -165,9 +185,7 @@ function ImportPage() {
             <Button onClick={() => fileRef.current?.click()}>Upload CSV file</Button>
             <Button onClick={preview} variant="secondary">Parse pasted text</Button>
             {parsed && (
-              <Button onClick={() => void save()} disabled={busy}>
-                {busy ? "Saving…" : `Save ${parsed.length} positions (${fmtUSD(total)})`}
-              </Button>
+              <Button onClick={() => void save()} disabled={busy || mapped.length === 0}>{saveLabel}</Button>
             )}
           </div>
           {parsed && (
@@ -217,9 +235,7 @@ function ImportPage() {
                   </div>
                 );
               })}
-              <Button className="w-full" onClick={() => void save()} disabled={busy}>
-                {busy ? "Saving…" : "Save mapped accounts"}
-              </Button>
+              <Button className="w-full" onClick={() => void save()} disabled={busy || mapped.length === 0}>{saveLabel}</Button>
             </div>
           )}
           <p className="text-xs text-muted-foreground">
