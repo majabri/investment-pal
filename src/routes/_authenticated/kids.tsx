@@ -4,15 +4,41 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { fmtUSD, fmtPct, yearsBetween } from "@/lib/finance";
 import { FAMILY_POLICY, approvedSymbols, nextContributionDate, requiredCagrWithContributions, fvWithContributions } from "@/lib/data/familyPolicy";
-import { KIDS_SEED } from "@/lib/data/kidsSeed";
+import { KIDS_SEED, type KidAccount } from "@/lib/data/kidsSeed";
+import { useAccounts, useHoldings } from "@/hooks/useAppData";
 
 export const Route = createFileRoute("/_authenticated/kids")({ component: KidsPage });
 
+const KID_NAMES = ["Karim", "Zain", "Jude"];
+
 function KidsPage() {
+  const { data: accounts = [] } = useAccounts();
+  const { data: allHoldings = [] } = useHoldings();
+  const dbKidAccounts = accounts.filter((a) => KID_NAMES.includes(a.name));
+
+  // Database-first: imported kid accounts win; seed is the pre-import fallback.
+  const kidsData: KidAccount[] = dbKidAccounts.length
+    ? dbKidAccounts.map((a) => ({
+        key: a.name.toLowerCase(),
+        name: a.name,
+        accountNumber: "",
+        cash: Number(a.cash ?? 0),
+        holdings: allHoldings
+          .filter((h) => h.account_id === a.id)
+          .map((h) => ({
+            symbol: h.symbol,
+            shares: Number(h.quantity),
+            price: Number(h.current_price),
+            avgCost: Number(h.cost_basis),
+          })),
+      }))
+    : KIDS_SEED;
+  const liveSource = dbKidAccounts.length > 0;
+
   const years = yearsBetween(new Date(), new Date(FAMILY_POLICY.targetDate));
   const next = nextContributionDate().toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const approved = approvedSymbols();
-  const familyTotal = KIDS_SEED.reduce((s, k) => s + k.cash + k.holdings.reduce((x, h) => x + h.shares * h.price, 0), 0);
+  const familyTotal = kidsData.reduce((s, k) => s + k.cash + k.holdings.reduce((x, h) => x + h.shares * h.price, 0), 0);
 
   return (
     <AppShell title="Kids Dashboard" subtitle={`Family Investment OS v${FAMILY_POLICY.version} · $${FAMILY_POLICY.contribution.amountUsd}/child every other Thursday · next ${next}`}>
@@ -26,7 +52,7 @@ function KidsPage() {
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-3">
-        {KIDS_SEED.map((kid) => {
+        {kidsData.map((kid) => {
           const mv = kid.holdings.reduce((s, h) => s + h.shares * h.price, 0);
           const total = mv + kid.cash;
           const req = requiredCagrWithContributions(total, FAMILY_POLICY.targetPerChild, years, FAMILY_POLICY.contribution.amountUsd);
@@ -70,7 +96,7 @@ function KidsPage() {
                     ))}
                   </tbody>
                 </table>
-                <p className="text-[11px] text-muted-foreground">Top 8 of {kid.holdings.length} · values seeded from the 2026-07-21 Fidelity import.</p>
+                <p className="text-[11px] text-muted-foreground">Top 8 of {kid.holdings.length}{liveSource ? " · live from your Fidelity imports" : " · seeded 2026-07-21 — run a Fidelity Import to go live"}</p>
               </CardContent>
             </Card>
           );

@@ -9,13 +9,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { parsePositionsCsv, type ParsedHolding } from "@/lib/csvImport";
 import { supabase } from "@/integrations/supabase/client";
 import { fmtUSD } from "@/lib/finance";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated/import")({
   component: ImportPage,
 });
 
-/** Map a Fidelity account label to an app account name (kids by keyword). */
-function accountNameFor(label: string | undefined): string {
+const DESTINATIONS = [
+  { value: "Amir - TOD", label: "Amir Portfolio (Amir - TOD)" },
+  { value: "Karim", label: "Kids — Karim" },
+  { value: "Zain", label: "Kids — Zain" },
+  { value: "Jude", label: "Kids — Jude" },
+  { value: "__skip__", label: "Skip this account" },
+] as const;
+
+/** Smart default destination from the Fidelity label (user can override). */
+function defaultDestination(label: string | undefined): string {
   const l = (label ?? "").toLowerCase();
   for (const kid of ["karim", "zain", "jude"]) {
     if (l.includes(kid)) return kid[0].toUpperCase() + kid.slice(1);
@@ -26,6 +35,7 @@ function accountNameFor(label: string | undefined): string {
 function ImportPage() {
   const [raw, setRaw] = useState("");
   const [parsed, setParsed] = useState<ParsedHolding[] | null>(null);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
@@ -43,7 +53,8 @@ function ImportPage() {
         return;
       }
       setParsed(res.rows);
-      toast.success(`${file.name}: ${res.rows.length} positions ready to save.`);
+      initMapping(res.rows);
+      toast.success(`${file.name}: ${res.rows.length} positions ready — choose destinations below.`);
     };
     reader.onerror = () => toast.error("Could not read the file.");
     reader.readAsText(file);
@@ -56,6 +67,16 @@ function ImportPage() {
       return;
     }
     setParsed(res.rows);
+    initMapping(res.rows);
+  }
+
+  function initMapping(rows: ParsedHolding[]) {
+    const m: Record<string, string> = {};
+    for (const h of rows) {
+      const key = h.accountName ?? "Unlabeled account";
+      if (!(key in m)) m[key] = defaultDestination(h.accountName);
+    }
+    setMapping(m);
   }
 
   async function save() {
@@ -66,13 +87,16 @@ function ImportPage() {
       const userId = auth.user?.id;
       if (!userId) throw new Error("Not signed in");
 
-      // Group parsed rows by target account name
+      // Group parsed rows by the user's chosen destination
       const groups = new Map<string, ParsedHolding[]>();
       for (const h of parsed) {
-        const name = accountNameFor(h.accountName);
-        if (!groups.has(name)) groups.set(name, []);
-        groups.get(name)!.push(h);
+        const key = h.accountName ?? "Unlabeled account";
+        const dest = mapping[key] ?? defaultDestination(h.accountName);
+        if (dest === "__skip__") continue;
+        if (!groups.has(dest)) groups.set(dest, []);
+        groups.get(dest)!.push(h);
       }
+      if (groups.size === 0) { toast.error("Every account is set to Skip — nothing to save."); setBusy(false); return; }
 
       const { data: existing } = await supabase.from("accounts").select("id,name").eq("user_id", userId);
       let saved = 0;
@@ -117,7 +141,7 @@ function ImportPage() {
   const total = parsed?.reduce((s, h) => s + (h.currentValue ?? h.quantity * h.current_price), 0) ?? 0;
 
   return (
-    <AppShell title="Fidelity Import" subtitle="Read-only. Upload the Positions CSV export (Fidelity → Positions → Download) or paste its text — kids' accounts are detected by name.">
+    <AppShell title="Fidelity Import" subtitle="Read-only. Upload the Positions CSV or paste its text, then choose where each Fidelity account imports to.">
       <Card>
         <CardHeader><CardTitle className="text-base">Paste positions</CardTitle></CardHeader>
         <CardContent className="space-y-3">
@@ -135,21 +159,52 @@ function ImportPage() {
             )}
           </div>
           {parsed && (
-            <div className="max-h-56 overflow-y-auto rounded-lg border">
-              <table className="w-full text-xs">
-                <thead><tr className="border-b text-left text-muted-foreground">
-                  <th className="p-2">Account</th><th>Symbol</th><th className="text-right">Qty</th><th className="text-right p-2">Value</th></tr></thead>
-                <tbody>
-                  {parsed.map((h, i) => (
-                    <tr key={i} className="border-b last:border-0">
-                      <td className="p-2">{accountNameFor(h.accountName)}</td>
-                      <td className="font-medium">{h.symbol}</td>
-                      <td className="text-right tabular-nums">{h.quantity}</td>
-                      <td className="p-2 text-right tabular-nums">{fmtUSD(h.currentValue ?? h.quantity * h.current_price)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-4">
+              {Object.entries(
+                parsed.reduce<Record<string, ParsedHolding[]>>((acc, h) => {
+                  const k = h.accountName ?? "Unlabeled account";
+                  (acc[k] ??= []).push(h);
+                  return acc;
+                }, {}),
+              ).map(([label, rows]) => {
+                const subtotal = rows.reduce((x, h) => x + (h.currentValue ?? h.quantity * h.current_price), 0);
+                return (
+                  <div key={label} className="rounded-lg border">
+                    <div className="flex flex-wrap items-center gap-3 border-b bg-muted/40 p-3">
+                      <div className="min-w-40 flex-1">
+                        <div className="text-sm font-medium">{label}</div>
+                        <div className="text-xs text-muted-foreground">{rows.length} positions · {fmtUSD(subtotal)}</div>
+                      </div>
+                      <div className="w-64">
+                        <Select value={mapping[label]} onValueChange={(v) => setMapping((m) => ({ ...m, [label]: v }))}>
+                          <SelectTrigger><SelectValue placeholder="Import to…" /></SelectTrigger>
+                          <SelectContent>
+                            {DESTINATIONS.map((d) => (
+                              <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {mapping[label] !== "__skip__" && (
+                      <table className="w-full text-xs">
+                        <tbody>
+                          {rows.slice(0, 6).map((h, i) => (
+                            <tr key={i} className="border-b last:border-0">
+                              <td className="p-2 font-medium">{h.symbol}</td>
+                              <td className="text-right tabular-nums">{h.quantity}</td>
+                              <td className="p-2 text-right tabular-nums">{fmtUSD(h.currentValue ?? h.quantity * h.current_price)}</td>
+                            </tr>
+                          ))}
+                          {rows.length > 6 && (
+                            <tr><td colSpan={3} className="p-2 text-muted-foreground">+ {rows.length - 6} more…</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
           <p className="text-xs text-muted-foreground">
