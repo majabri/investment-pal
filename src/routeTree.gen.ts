@@ -16,7 +16,6 @@ import { Route as AuthenticatedEarningsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedEconomicCalendarRouteImport } from './routes/_authenticated/economic-calendar'
 import { Route as AuthenticatedGeopoliticsRouteImport } from './routes/_authenticated/geopolitics'
 import { Route as AuthenticatedGoalsRouteImport } from './routes/_authenticated/goals'
-import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
 import { Route as AuthenticatedJournalRouteImport } from './routes/_authenticated/journal'
 import { Route as AuthenticatedKidsRouteImport } from './routes/_authenticated/kids'
 import { Route as AuthenticatedKidsPromptCenterRouteImport } from './routes/_authenticated/kids-prompt-center'
@@ -62,11 +61,6 @@ const AuthenticatedGeopoliticsRoute =
 const AuthenticatedGoalsRoute = AuthenticatedGoalsRouteImport.update({
   id: '/goals',
   path: '/goals',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedImportRoute = AuthenticatedImportRouteImport.update({
-  id: '/import',
-  path: '/import',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedJournalRoute = AuthenticatedJournalRouteImport.update({
@@ -131,7 +125,6 @@ export interface FileRoutesByFullPath {
   '/economic-calendar': typeof AuthenticatedEconomicCalendarRoute
   '/geopolitics': typeof AuthenticatedGeopoliticsRoute
   '/goals': typeof AuthenticatedGoalsRoute
-  '/import': typeof AuthenticatedImportRoute
   '/journal': typeof AuthenticatedJournalRoute
   '/kids': typeof AuthenticatedKidsRoute
   '/kids-prompt-center': typeof AuthenticatedKidsPromptCenterRoute
@@ -149,7 +142,6 @@ export interface FileRoutesByTo {
   '/economic-calendar': typeof AuthenticatedEconomicCalendarRoute
   '/geopolitics': typeof AuthenticatedGeopoliticsRoute
   '/goals': typeof AuthenticatedGoalsRoute
-  '/import': typeof AuthenticatedImportRoute
   '/journal': typeof AuthenticatedJournalRoute
   '/kids': typeof AuthenticatedKidsRoute
   '/kids-prompt-center': typeof AuthenticatedKidsPromptCenterRoute
@@ -170,7 +162,6 @@ export interface FileRoutesById {
   '/_authenticated/economic-calendar': typeof AuthenticatedEconomicCalendarRoute
   '/_authenticated/geopolitics': typeof AuthenticatedGeopoliticsRoute
   '/_authenticated/goals': typeof AuthenticatedGoalsRoute
-  '/_authenticated/import': typeof AuthenticatedImportRoute
   '/_authenticated/journal': typeof AuthenticatedJournalRoute
   '/_authenticated/kids': typeof AuthenticatedKidsRoute
   '/_authenticated/kids-prompt-center': typeof AuthenticatedKidsPromptCenterRoute
@@ -192,7 +183,6 @@ export interface FileRouteTypes {
     | '/economic-calendar'
     | '/geopolitics'
     | '/goals'
-    | '/import'
     | '/journal'
     | '/kids'
     | '/kids-prompt-center'
@@ -210,7 +200,6 @@ export interface FileRouteTypes {
     | '/economic-calendar'
     | '/geopolitics'
     | '/goals'
-    | '/import'
     | '/journal'
     | '/kids'
     | '/kids-prompt-center'
@@ -230,7 +219,6 @@ export interface FileRouteTypes {
     | '/_authenticated/economic-calendar'
     | '/_authenticated/geopolitics'
     | '/_authenticated/goals'
-    | '/_authenticated/import'
     | '/_authenticated/journal'
     | '/_authenticated/kids'
     | '/_authenticated/kids-prompt-center'
@@ -298,13 +286,6 @@ declare module '@tanstack/react-router' {
       path: '/goals'
       fullPath: '/goals'
       preLoaderRoute: typeof AuthenticatedGoalsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/import': {
-      id: '/_authenticated/import'
-      path: '/import'
-      fullPath: '/import'
-      preLoaderRoute: typeof AuthenticatedImportRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/journal': {
@@ -385,7 +366,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedEconomicCalendarRoute: typeof AuthenticatedEconomicCalendarRoute
   AuthenticatedGeopoliticsRoute: typeof AuthenticatedGeopoliticsRoute
   AuthenticatedGoalsRoute: typeof AuthenticatedGoalsRoute
-  AuthenticatedImportRoute: typeof AuthenticatedImportRoute
   AuthenticatedJournalRoute: typeof AuthenticatedJournalRoute
   AuthenticatedKidsRoute: typeof AuthenticatedKidsRoute
   AuthenticatedKidsPromptCenterRoute: typeof AuthenticatedKidsPromptCenterRoute
@@ -404,7 +384,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedEconomicCalendarRoute: AuthenticatedEconomicCalendarRoute,
   AuthenticatedGeopoliticsRoute: AuthenticatedGeopoliticsRoute,
   AuthenticatedGoalsRoute: AuthenticatedGoalsRoute,
-  AuthenticatedImportRoute: AuthenticatedImportRoute,
   AuthenticatedJournalRoute: AuthenticatedJournalRoute,
   AuthenticatedKidsRoute: AuthenticatedKidsRoute,
   AuthenticatedKidsPromptCenterRoute: AuthenticatedKidsPromptCenterRoute,

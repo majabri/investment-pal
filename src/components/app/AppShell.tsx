@@ -15,7 +15,6 @@ import {
   CalendarClock,
   CalendarDays,
   Globe,
-  Upload,
 } from "lucide-react";
 import { MarketTape } from "./MarketTape";
 
@@ -54,7 +53,6 @@ const navGroups: NavGroup[] = [
       { to: "/earnings", label: "Earnings", icon: CalendarClock },
       { to: "/economic-calendar", label: "Economic Calendar", icon: CalendarDays },
       { to: "/geopolitics", label: "Geopolitics", icon: Globe },
-      { to: "/import", label: "Fidelity Import", icon: Upload },
       { to: "/settings", label: "Settings", icon: SettingsIcon },
     ],
   },

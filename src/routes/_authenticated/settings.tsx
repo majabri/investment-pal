@@ -1,10 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Plus, Upload, LogOut, Trash2, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
 import { AppShell } from "@/components/app/AppShell";
+import { PortfolioCsvImport } from "@/components/app/PortfolioCsvImport";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -395,16 +396,8 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
         </div>
       )}
 
-      <div className="mt-4 flex items-center justify-between rounded-lg border bg-card/50 p-3">
-        <div>
-          <div className="text-xs font-medium">Importing positions</div>
-          <p className="text-[11px] text-muted-foreground">
-            All data comes in through the Fidelity Import page — upload the full export and map each account.
-          </p>
-        </div>
-        <Button size="sm" variant="secondary" asChild>
-          <Link to="/import">Open Fidelity Import →</Link>
-        </Button>
+      <div className="mt-4">
+        <PortfolioCsvImport />
       </div>
     </div>
   );

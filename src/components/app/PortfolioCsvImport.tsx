@@ -1,8 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +10,6 @@ import { fmtUSD } from "@/lib/finance";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-
-export const Route = createFileRoute("/_authenticated/import")({
-  component: ImportPage,
-});
 
 const DESTINATIONS = [
   { value: "Amir - TOD", label: "Amir Portfolio (Amir - TOD)" },
@@ -36,7 +30,7 @@ function defaultDestination(label: string | undefined): string {
   return "__skip__";
 }
 
-function ImportPage() {
+export function PortfolioCsvImport() {
   const [raw, setRaw] = useState("");
   const [parsed, setParsed] = useState<ParsedHolding[] | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
@@ -184,9 +178,14 @@ function ImportPage() {
     : "Nothing mapped — choose destinations";
 
   return (
-    <AppShell title="Fidelity Import" subtitle="Read-only. Upload the Positions CSV or paste its text, then choose where each Fidelity account imports to.">
       <Card>
-        <CardHeader><CardTitle className="text-base">Paste positions</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Portfolio CSV Import</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Read-only. Upload the brokerage Positions CSV (Fidelity → Positions → Download) or paste its
+            text, then choose where each account imports to.
+          </p>
+        </CardHeader>
         <CardContent className="space-y-3">
           <Textarea value={raw} onChange={(e) => setRaw(e.target.value)} rows={10}
             placeholder="Account Number,Account Name,Symbol,Description,Quantity,Last Price,Current Value,..." />
@@ -266,6 +265,5 @@ function ImportPage() {
           </p>
         </CardContent>
       </Card>
-    </AppShell>
   );
 }
