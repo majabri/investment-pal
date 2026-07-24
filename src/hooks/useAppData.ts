@@ -133,37 +133,88 @@ export function useHoldings() {
   });
 }
 
-export function useAccount() {
+export function useAccounts() {
   const qc = useQueryClient();
   const query = useQuery({
-    queryKey: ["account"],
-    queryFn: async (): Promise<Account | null> => {
+    queryKey: ["accounts"],
+    queryFn: async (): Promise<Account[]> => {
       const { data, error } = await supabase
         .from("accounts")
         .select("*")
-        .limit(1)
-        .maybeSingle();
+        .order("created_at", { ascending: true });
       if (error) throw error;
-      return data as Account | null;
+      return (data ?? []) as Account[];
     },
   });
+  const create = useMutation({
+    mutationFn: async (patch: Partial<Account> & { name: string }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("accounts")
+        .insert({ ...patch, user_id: userData.user!.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as Account;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+  });
+  const update = useMutation({
+    mutationFn: async ({ id, ...patch }: Partial<Account> & { id: string }) => {
+      const { error } = await supabase.from("accounts").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("accounts").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      qc.invalidateQueries({ queryKey: ["holdings"] });
+    },
+  });
+  return { ...query, create, update, remove };
+}
+
+// Aggregated view across all accounts — used by Dashboard/Portfolio/Prompt center.
+export function useAccount() {
+  const qc = useQueryClient();
+  const { data: accounts = [], isLoading } = useAccounts();
+  const aggregate = accounts.length
+    ? {
+        cash: accounts.reduce((s, a) => s + Number(a.cash || 0), 0),
+        margin_used: accounts.reduce((s, a) => s + Number(a.margin_used || 0), 0),
+        margin_limit: accounts.reduce((s, a) => s + Number(a.margin_limit || 0), 0),
+        buying_power: accounts.reduce((s, a) => s + Number(a.buying_power || 0), 0),
+        last_synced_at: accounts
+          .map((a) => a.last_synced_at)
+          .filter(Boolean)
+          .sort()
+          .pop() as string | null | undefined,
+      }
+    : null;
   const upsert = useMutation({
     mutationFn: async (patch: Partial<Account>) => {
-      const { data: existing } = await supabase.from("accounts").select("id").limit(1).maybeSingle();
+      const primary = accounts[0];
       const { data: userData } = await supabase.auth.getUser();
-      const user_id = userData.user!.id;
-      if (existing?.id) {
-        const { error } = await supabase.from("accounts").update(patch).eq("id", existing.id);
+      if (primary?.id) {
+        const { error } = await supabase.from("accounts").update(patch).eq("id", primary.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("accounts").insert({ ...patch, user_id });
+        const { error } = await supabase
+          .from("accounts")
+          .insert({ ...patch, name: patch.name ?? "Main", user_id: userData.user!.id });
         if (error) throw error;
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["account"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
   });
-  return { ...query, upsert };
+  return { data: aggregate, isLoading, upsert };
 }
+
 
 export function usePriorities() {
   const qc = useQueryClient();
