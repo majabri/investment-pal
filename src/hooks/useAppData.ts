@@ -364,7 +364,7 @@ export function useLogSync() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sync_log"] });
-      qc.invalidateQueries({ queryKey: ["account"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
     },
   });
 }
