@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Plus, Upload, LogOut, Trash2, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
@@ -27,7 +27,6 @@ import {
   type Account,
 } from "@/hooks/useAppData";
 import { useQueryClient } from "@tanstack/react-query";
-import { parsePositionsCsv } from "@/lib/csvImport";
 import { fmtUSD } from "@/lib/finance";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -263,9 +262,6 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
     buying_power: account.buying_power ?? 0,
     notes: account.notes ?? "",
   });
-  const [csv, setCsv] = useState("");
-  const [importing, setImporting] = useState(false);
-  const [mode, setMode] = useState<"replace" | "merge">("replace");
 
   const save = () => {
     update.mutate(
@@ -293,68 +289,6 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
     );
   };
 
-  const importCsv = async () => {
-    if (!csv.trim()) return toast.error("Paste CSV data first");
-    setImporting(true);
-    try {
-      const { rows, skipped } = parsePositionsCsv(csv);
-      if (!rows.length) {
-        toast.error(
-          skipped.length
-            ? `No holdings parsed. First skip: ${skipped[0].reason}`
-            : "No holdings parsed",
-        );
-        return;
-      }
-      const { data: userData } = await supabase.auth.getUser();
-      const uid = userData.user!.id;
-
-      if (mode === "replace") {
-        const { error: delErr } = await supabase
-          .from("holdings")
-          .delete()
-          .eq("account_id", account.id);
-        if (delErr) throw delErr;
-      }
-
-      const payload = rows.map((r) => ({
-        user_id: uid,
-        account_id: account.id,
-        symbol: r.symbol,
-        quantity: r.quantity,
-        cost_basis: r.cost_basis,
-        current_price: r.current_price,
-        sector: r.sector,
-        last_price_at: new Date().toISOString(),
-      }));
-
-      const { error: insErr } = await supabase
-        .from("holdings")
-        .upsert(payload, { onConflict: "user_id,account_id,symbol" });
-      if (insErr) throw insErr;
-
-      await supabase
-        .from("accounts")
-        .update({ last_synced_at: new Date().toISOString() })
-        .eq("id", account.id);
-
-      logSync.mutate({
-        detail: `Imported ${rows.length} rows into ${account.name}${skipped.length ? ` (${skipped.length} skipped)` : ""}`,
-        source: "csv",
-      });
-      qc.invalidateQueries({ queryKey: ["holdings"] });
-      qc.invalidateQueries({ queryKey: ["accounts"] });
-      setCsv("");
-      onSynced();
-      toast.success(
-        `Imported ${rows.length} positions${skipped.length ? ` — ${skipped.length} skipped` : ""}`,
-      );
-    } catch (e) {
-      toast.error(`Import failed: ${(e as Error).message}`);
-    } finally {
-      setImporting(false);
-    }
-  };
 
   return (
     <div className="rounded-xl border bg-background/40 p-4">
@@ -461,36 +395,16 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
         </div>
       )}
 
-      <div className="mt-4 rounded-lg border bg-card/50 p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-xs font-medium">Import positions CSV</div>
-          <Select value={mode} onValueChange={(v) => setMode(v as "replace" | "merge")}>
-            <SelectTrigger className="h-7 w-40 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="replace">Replace all in account</SelectItem>
-              <SelectItem value="merge">Merge / update</SelectItem>
-            </SelectContent>
-          </Select>
+      <div className="mt-4 flex items-center justify-between rounded-lg border bg-card/50 p-3">
+        <div>
+          <div className="text-xs font-medium">Importing positions</div>
+          <p className="text-[11px] text-muted-foreground">
+            All data comes in through the Fidelity Import page — upload the full export and map each account.
+          </p>
         </div>
-        <p className="mb-2 text-[11px] text-muted-foreground">
-          Paste the Fidelity Positions export (with header row) or simple <code>symbol,qty,cost,price[,sector]</code> lines.
-        </p>
-        <Textarea
-          rows={5}
-          value={csv}
-          onChange={(e) => setCsv(e.target.value)}
-          placeholder={`Symbol,Description,Quantity,Last Price,Current Value,Cost Basis Total,Average Cost Basis,Type\nAAPL,APPLE INC,50,$225.10,$11255.00,$7512.50,$150.25,Cash`}
-          className="font-mono text-[11px]"
-        />
-        <div className="mt-2 flex items-center gap-2">
-          <Button size="sm" onClick={importCsv} disabled={importing}>
-            <Upload className="mr-2 h-4 w-4" />
-            {importing ? "Importing…" : "Import CSV"}
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            {mode === "replace" ? "Deletes existing holdings in this account first." : "Adds new symbols and updates existing."}
-          </span>
-        </div>
+        <Button size="sm" variant="secondary" asChild>
+          <Link to="/import">Open Fidelity Import →</Link>
+        </Button>
       </div>
     </div>
   );
