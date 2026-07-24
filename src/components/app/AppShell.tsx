@@ -8,20 +8,57 @@ import {
   Target,
   Settings as SettingsIcon,
   LogOut,
+  Eye,
+  Users,
+  Newspaper,
+  TrendingUp,
+  CalendarClock,
+  CalendarDays,
+  Globe,
+  Upload,
 } from "lucide-react";
+import { MarketTape } from "./MarketTape";
 
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 
-const nav = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/portfolio", label: "Portfolio", icon: Briefcase },
-  { to: "/prompt-center", label: "Prompt Center", icon: Sparkles },
-  { to: "/journal", label: "Journal", icon: BookOpen },
-  { to: "/goals", label: "Goals", icon: Target },
-  { to: "/settings", label: "Settings", icon: SettingsIcon },
-] as const;
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
+type NavGroup = { group: string; items: NavItem[] };
+
+const navGroups: NavGroup[] = [
+  {
+    group: "Amir",
+    items: [
+      { to: "/", label: "Amir Dashboard", icon: LayoutDashboard },
+      { to: "/prompt-center", label: "Prompt Center", icon: Sparkles },
+      { to: "/portfolio", label: "Portfolio", icon: Briefcase },
+      { to: "/journal", label: "Trade Journal", icon: BookOpen },
+      { to: "/watchlist", label: "Investment Watchlist", icon: Eye },
+      { to: "/goals", label: "Goals", icon: Target },
+    ],
+  },
+  {
+    group: "Kids",
+    items: [
+      { to: "/kids", label: "Kids Dashboard", icon: Users },
+      { to: "/kids-prompt-center", label: "Kids Prompt Center", icon: Sparkles },
+      { to: "/kids-watchlist", label: "Kids Watchlist", icon: Eye },
+    ],
+  },
+  {
+    group: "General",
+    items: [
+      { to: "/news", label: "News", icon: Newspaper },
+      { to: "/opportunities", label: "Opportunities", icon: TrendingUp },
+      { to: "/earnings", label: "Earnings", icon: CalendarClock },
+      { to: "/economic-calendar", label: "Economic Calendar", icon: CalendarDays },
+      { to: "/geopolitics", label: "Geopolitics", icon: Globe },
+      { to: "/import", label: "Fidelity Import", icon: Upload },
+      { to: "/settings", label: "Settings", icon: SettingsIcon },
+    ],
+  },
+];
 
 export function AppShell({
   title,
@@ -45,26 +82,35 @@ export function AppShell({
           </div>
           <div className="text-sm font-semibold tracking-tight">Investment Companion</div>
         </div>
-        <nav className="flex-1 space-y-0.5 px-3 py-2">
-          {nav.map((item) => {
-            const active =
-              item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                  active
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-2">
+          {navGroups.map((g) => (
+            <div key={g.group}>
+              <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+                {g.group}
+              </div>
+              <div className="space-y-0.5">
+                {g.items.map((item) => {
+                  const active =
+                    item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                        active
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
         <div className="border-t p-3">
           <button
@@ -86,6 +132,7 @@ export function AppShell({
           </Button>
         </div>
 
+        <MarketTape />
         <header className="flex flex-col gap-2 border-b bg-background/80 px-6 py-5 backdrop-blur sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
