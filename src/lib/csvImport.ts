@@ -15,6 +15,8 @@ export type ParsedHolding = {
 export type ParseResult = {
   rows: ParsedHolding[];
   skipped: { line: string; reason: string }[];
+  /** Money-market/core cash per Fidelity account label (e.g. SPAXX**). */
+  cashByAccount: Record<string, number>;
 };
 
 // Split a CSV line respecting quoted fields.
@@ -76,7 +78,8 @@ export function parsePositionsCsv(input: string): ParseResult {
     .filter(Boolean);
   const rows: ParsedHolding[] = [];
   const skipped: { line: string; reason: string }[] = [];
-  if (!lines.length) return { rows, skipped };
+  const cashByAccount: Record<string, number> = {};
+  if (!lines.length) return { rows, skipped, cashByAccount };
 
   const firstCells = splitCsvLine(lines[0]).map((c) => c.toLowerCase());
   const hasHeader = firstCells.some((c) => c.includes("symbol") || c.includes("ticker"));
@@ -93,22 +96,27 @@ export function parsePositionsCsv(input: string): ParseResult {
     const iType = findIdx(headers, "type");
     if (iSym < 0) {
       skipped.push({ line: lines[0], reason: "No Symbol column found" });
-      return { rows, skipped };
+      return { rows, skipped, cashByAccount };
     }
     for (let li = 1; li < lines.length; li++) {
       const raw = lines[li];
       const cells = splitCsvLine(raw);
       const sym = (cells[iSym] || "").toUpperCase().trim();
-      if (!sym || sym.startsWith("PENDING") || sym.includes("**")) {
+      const acctLabel = iAcct >= 0 ? (cells[iAcct]?.trim() || "Unlabeled account") : "Unlabeled account";
+      const desc = (cells[findIdx(headers, "description")] ?? "").toUpperCase();
+      // Money market / core position → account cash, not a holding
+      if (sym.includes("**") || desc.includes("MONEY MARKET") || sym === "SPAXX" || sym === "FCASH" || sym === "FDRXX") {
+        const v = iVal >= 0 ? toNumber(cells[iVal]) : 0;
+        cashByAccount[acctLabel] = (cashByAccount[acctLabel] ?? 0) + v;
+        skipped.push({ line: raw, reason: "Core cash → account cash" });
+        continue;
+      }
+      if (!sym || sym.startsWith("PENDING")) {
         skipped.push({ line: raw, reason: "No symbol / pending activity" });
         continue;
       }
-      // Skip cash / money market rows if present
-      const typ = iType >= 0 ? cells[iType]?.toLowerCase() : "";
-      if (typ && (typ.includes("cash") || typ.includes("money market"))) {
-        skipped.push({ line: raw, reason: `Skipped ${typ}` });
-        continue;
-      }
+      // NOTE: Fidelity's "Type" column is the account registration (Cash/Margin),
+      // NOT the security type — never skip on it.
       const qty = iQty >= 0 ? toNumber(cells[iQty]) : 0;
       const price =
         iPx >= 0
@@ -153,5 +161,5 @@ export function parsePositionsCsv(input: string): ParseResult {
       });
     }
   }
-  return { rows, skipped };
+  return { rows, skipped, cashByAccount };
 }
