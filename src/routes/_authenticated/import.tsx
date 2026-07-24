@@ -10,6 +10,8 @@ import { parsePositionsCsv, type ParsedHolding } from "@/lib/csvImport";
 import { supabase } from "@/integrations/supabase/client";
 import { fmtUSD } from "@/lib/finance";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_authenticated/import")({
   component: ImportPage,
@@ -39,6 +41,7 @@ function ImportPage() {
   const [parsed, setParsed] = useState<ParsedHolding[] | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [cashByAccount, setCashByAccount] = useState<Record<string, number>>({});
+  const [fullOverwrite, setFullOverwrite] = useState(true);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
@@ -102,6 +105,14 @@ function ImportPage() {
         groups.get(dest)!.push(h);
       }
       if (groups.size === 0) { toast.error("Every account is set to Skip — nothing to save."); setBusy(false); return; }
+
+      if (fullOverwrite) {
+        // The Fidelity export is the complete truth: remove ALL existing
+        // holdings (including legacy rows with no account) before saving,
+        // so imports overwrite the portfolio rather than piling onto it.
+        const { error: wipeErr } = await supabase.from("holdings").delete().eq("user_id", userId);
+        if (wipeErr) throw wipeErr;
+      }
 
       const { data: existing } = await supabase.from("accounts").select("id,name").eq("user_id", userId);
       let saved = 0;
@@ -232,6 +243,16 @@ function ImportPage() {
                   </div>
                 );
               })}
+              <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
+                <div>
+                  <Label htmlFor="full-overwrite" className="text-sm">Overwrite entire portfolio</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    This file becomes the complete truth — all previously imported positions are replaced.
+                    Turn off only to update the mapped accounts and leave everything else untouched.
+                  </p>
+                </div>
+                <Switch id="full-overwrite" checked={fullOverwrite} onCheckedChange={setFullOverwrite} />
+              </div>
               <Button className="w-full" size="lg" onClick={() => void save()} disabled={busy || mapped.length === 0}>
                 {saveLabel}
               </Button>
