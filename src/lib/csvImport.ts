@@ -8,6 +8,8 @@ export type ParsedHolding = {
   cost_basis: number; // per-share
   current_price: number;
   sector: string | null;
+  accountName?: string;   // from "Account Name" column when present
+  currentValue?: number;  // from "Current Value" column when present
 };
 
 export type ParseResult = {
@@ -86,6 +88,7 @@ export function parsePositionsCsv(input: string): ParseResult {
     const iPx = findIdx(headers, "price");
     const iVal = findIdx(headers, "value");
     const iCostTot = findIdx(headers, "cost_total");
+    const iAcct = headers.findIndex((h) => h.toLowerCase().includes("account name"));
     const iCostAvg = findIdx(headers, "cost_avg");
     const iType = findIdx(headers, "type");
     if (iSym < 0) {
@@ -127,6 +130,8 @@ export function parsePositionsCsv(input: string): ParseResult {
         cost_basis: costPer,
         current_price: price,
         sector: null,
+        accountName: iAcct >= 0 ? cells[iAcct]?.trim() : undefined,
+        currentValue: iVal >= 0 ? toNumber(cells[iVal]) : undefined,
       });
     }
   } else {
