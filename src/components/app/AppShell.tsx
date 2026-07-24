@@ -147,7 +147,7 @@ export function AppShell({
 
         {/* Mobile bottom nav */}
         <nav className="sticky bottom-0 flex justify-around border-t bg-sidebar/95 px-2 py-1 backdrop-blur md:hidden">
-          {nav.slice(0, 5).map((item) => {
+          {navGroups.flatMap((g) => g.items).slice(0, 5).map((item) => {
             const active =
               item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             return (
