@@ -16,6 +16,8 @@ export type Database = {
     Tables: {
       accounts: {
         Row: {
+          account_type: string
+          broker: string | null
           buying_power: number
           cash: number
           created_at: string
@@ -24,10 +26,16 @@ export type Database = {
           margin_limit: number
           margin_used: number
           name: string
+          notes: string | null
+          starting_value: number
+          target_date: string | null
+          target_value: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          account_type?: string
+          broker?: string | null
           buying_power?: number
           cash?: number
           created_at?: string
@@ -36,10 +44,16 @@ export type Database = {
           margin_limit?: number
           margin_used?: number
           name?: string
+          notes?: string | null
+          starting_value?: number
+          target_date?: string | null
+          target_value?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          account_type?: string
+          broker?: string | null
           buying_power?: number
           cash?: number
           created_at?: string
@@ -48,6 +62,10 @@ export type Database = {
           margin_limit?: number
           margin_used?: number
           name?: string
+          notes?: string | null
+          starting_value?: number
+          target_date?: string | null
+          target_value?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -100,6 +118,7 @@ export type Database = {
       }
       holdings: {
         Row: {
+          account_id: string | null
           cost_basis: number
           created_at: string
           current_price: number
@@ -118,6 +137,7 @@ export type Database = {
           why_own: string | null
         }
         Insert: {
+          account_id?: string | null
           cost_basis?: number
           created_at?: string
           current_price?: number
@@ -136,6 +156,7 @@ export type Database = {
           why_own?: string | null
         }
         Update: {
+          account_id?: string | null
           cost_basis?: number
           created_at?: string
           current_price?: number
@@ -153,7 +174,15 @@ export type Database = {
           user_id?: string
           why_own?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "holdings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       journal_entries: {
         Row: {
