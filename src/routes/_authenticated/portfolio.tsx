@@ -27,6 +27,9 @@ import {
 } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useHoldings, useAccount, useLogSync, type Holding } from "@/hooks/useAppData";
+import { useAccounts } from "@/hooks/useAppData";
+import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -42,7 +45,12 @@ export const Route = createFileRoute("/_authenticated/portfolio")({
 
 function PortfolioPage() {
   const qc = useQueryClient();
-  const { data: holdings = [] } = useHoldings();
+  const { data: allHoldings = [] } = useHoldings();
+  const { data: accountsList = [] } = useAccounts();
+  const [accountFilter, setAccountFilter] = useState<string>("all");
+  const holdings = accountFilter === "all"
+    ? allHoldings
+    : allHoldings.filter((h) => h.account_id === accountFilter);
   const { data: account, upsert } = useAccount();
   const logSync = useLogSync();
   const [selected, setSelected] = useState<Holding | null>(null);
@@ -92,13 +100,28 @@ function PortfolioPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard label="Positions value" value={fmtUSD(positionsValue)} icon={<Wallet className="h-4 w-4" />} />
         <StatCard label="Unrealized P/L" value={fmtUSD(pl)} hint={fmtPct(plPct)} tone={pl >= 0 ? "positive" : "negative"} />
+        <StatCard label="Total Gain/Loss" value={`${fmtUSD(pl)} (${fmtPct(plPct)})`} tone={pl >= 0 ? "positive" : "negative"} />
         <StatCard label="Cash" value={fmtUSD(account?.cash ?? 0)} />
         <StatCard label="Buying power" value={fmtUSD(account?.buying_power ?? 0)} hint={`Margin used ${fmtUSD(account?.margin_used ?? 0)}`} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border bg-card p-5 lg:col-span-2">
-          <div className="mb-3 text-sm font-medium">Holdings</div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-medium">Holdings</span>
+            <span className="flex items-center gap-2">
+              <Select value={accountFilter} onValueChange={setAccountFilter}>
+                <SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All accounts</SelectItem>
+                  {accountsList.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <RefreshPricesButton symbols={holdings.map((h) => h.symbol)} />
+            </span>
+          </div>
           {holdings.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No holdings yet. Click "Add position" or import from Fidelity in Settings.
@@ -133,7 +156,7 @@ function PortfolioPage() {
                       <TableCell className="text-right tabular">{fmtUSD(h.current_price, 2)}</TableCell>
                       <TableCell className="text-right tabular">{fmtUSD(value)}</TableCell>
                       <TableCell className={`text-right tabular ${plRow >= 0 ? "text-success" : "text-destructive"}`}>
-                        {fmtUSD(plRow)}
+                        {fmtUSD(plRow)} ({cost > 0 ? fmtPct(plRow / cost) : "—"})
                       </TableCell>
                       <TableCell className="text-muted-foreground">{h.sector ?? "—"}</TableCell>
                     </TableRow>

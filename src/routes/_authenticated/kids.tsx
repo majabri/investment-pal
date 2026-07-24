@@ -6,6 +6,7 @@ import { fmtUSD, fmtPct, yearsBetween } from "@/lib/finance";
 import { FAMILY_POLICY, approvedSymbols, nextContributionDate, requiredCagrWithContributions, fvWithContributions } from "@/lib/data/familyPolicy";
 import { KIDS_SEED, type KidAccount } from "@/lib/data/kidsSeed";
 import { useAccounts, useHoldings } from "@/hooks/useAppData";
+import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 
 export const Route = createFileRoute("/_authenticated/kids")({ component: KidsPage });
 
@@ -48,6 +49,7 @@ function KidsPage() {
           <span><span className="text-muted-foreground">Family target (2036)</span> <strong className="tabular-nums">{fmtUSD(FAMILY_POLICY.familyTarget)}</strong></span>
           <span className="min-w-40 flex-1"><Progress value={(familyTotal / FAMILY_POLICY.familyTarget) * 100} /></span>
           <span className="tabular-nums text-muted-foreground">{fmtPct(familyTotal / FAMILY_POLICY.familyTarget)}</span>
+          <RefreshPricesButton symbols={kidsData.flatMap((k) => k.holdings.map((h) => h.symbol))} />
         </CardContent>
       </Card>
 
@@ -84,6 +86,18 @@ function KidsPage() {
                   <span className="text-muted-foreground">Largest position</span>
                   <span>{largest?.symbol} ({fmtPct((largest.shares * largest.price) / mv)})</span>
                   <span className="text-muted-foreground">Cash</span><span className="tabular-nums">{fmtUSD(kid.cash, 2)}</span>
+                  {(() => {
+                    const cost = kid.holdings.reduce((c, h) => c + h.shares * h.avgCost, 0);
+                    const gl = mv - cost;
+                    return (
+                      <>
+                        <span className="text-muted-foreground">Gain/Loss</span>
+                        <span className={`tabular-nums ${gl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                          {fmtUSD(gl)} ({cost > 0 ? fmtPct(gl / cost) : "—"})
+                        </span>
+                      </>
+                    );
+                  })()}
                 </div>
                 <table className="w-full text-xs">
                   <tbody>
@@ -91,7 +105,11 @@ function KidsPage() {
                       <tr key={h.symbol} className="border-b last:border-0">
                         <td className="py-1 font-medium">{h.symbol}</td>
                         <td className="py-1 text-right tabular-nums text-muted-foreground">{h.shares}</td>
+                        <td className="py-1 text-right tabular-nums text-muted-foreground">{fmtUSD(h.avgCost, 2)}</td>
                         <td className="py-1 text-right tabular-nums">{fmtUSD(h.shares * h.price)}</td>
+                        <td className={`py-1 text-right tabular-nums ${h.price >= h.avgCost ? "text-emerald-500" : "text-red-500"}`}>
+                          {h.avgCost > 0 ? fmtPct((h.price - h.avgCost) / h.avgCost) : "—"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
