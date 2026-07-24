@@ -20,6 +20,7 @@ export type Goal = {
 export type Holding = {
   id: string;
   user_id: string;
+  account_id: string | null;
   symbol: string;
   quantity: number;
   cost_basis: number;
@@ -39,12 +40,21 @@ export type Account = {
   id: string;
   user_id: string;
   name: string;
+  account_type: string;
+  broker: string | null;
   cash: number;
   margin_used: number;
   margin_limit: number;
   buying_power: number;
+  starting_value: number;
+  target_value: number | null;
+  target_date: string | null;
+  notes: string | null;
   last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
+
 
 export type Priority = {
   id: string;
