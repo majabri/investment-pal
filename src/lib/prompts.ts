@@ -65,7 +65,7 @@ const MORNING_TEMPLATE = String.raw`You are my Investment Committee and Chief In
 Your primary mandate is to maximize the probability of growing my Amir-TOD portfolio from approximately $50,000 to $150,000 by March 31, 2027, while recognizing this is an aggressive objective. Every recommendation should improve the expected probability of reaching that goal, not simply maximize today's return.
 Use today's market data, macroeconomic developments, geopolitical events, earnings news, and my current portfolio. Ground every recommendation only in the portfolio data I provide—do not invent holdings, prices, or trades.
 Assume:
-- Margin interest rate: 12.075% APR.
+- Margin interest rate: 11.825% APR (Fidelity, verified 2026-07-24).
 - I make all final decisions and place every trade myself.
 - Nothing is automated.
 - I am comfortable with above-average risk, but I want disciplined, evidence-based decisions.
@@ -136,7 +136,7 @@ Your job is to determine whether today's information changes my investment strat
 Primary Objective:
 Grow my Amir-TOD portfolio from approximately $50,000 to $150,000 by March 31, 2027.
 Assumptions:
-- Margin interest rate: 12.075% APR.
+- Margin interest rate: 11.825% APR (Fidelity, verified 2026-07-24).
 - I execute all trades myself.
 - Nothing is automated.
 - Use only the portfolio and market data I provide.
