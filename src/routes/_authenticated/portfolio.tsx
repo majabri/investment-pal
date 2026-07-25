@@ -30,7 +30,6 @@ import { useHoldings, useAccount, useLogSync, type Holding } from "@/hooks/useAp
 import { useAccounts } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { ThesisDialog } from "@/components/app/ThesisDialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -48,10 +47,11 @@ function PortfolioPage() {
   const qc = useQueryClient();
   const { data: allHoldings = [] } = useHoldings();
   const { data: accountsList = [] } = useAccounts();
-  const [accountFilter, setAccountFilter] = useState<string>("all");
-  const holdings = accountFilter === "all"
-    ? allHoldings
-    : allHoldings.filter((h) => h.account_id === accountFilter);
+  // This page is Amir's portfolio only — kids live on the Kids Dashboard.
+  const amirAccount = accountsList.find((a) => a.name === "Amir - TOD");
+  const holdings = amirAccount
+    ? allHoldings.filter((h) => h.account_id === amirAccount.id)
+    : allHoldings.filter((h) => h.account_id == null);
   const { data: account, upsert } = useAccount();
   const logSync = useLogSync();
   const [selected, setSelected] = useState<Holding | null>(null);
@@ -111,15 +111,7 @@ function PortfolioPage() {
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium">Holdings</span>
             <span className="flex items-center gap-2">
-              <Select value={accountFilter} onValueChange={setAccountFilter}>
-                <SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All accounts</SelectItem>
-                  {accountsList.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <span className="text-xs text-muted-foreground">Amir - TOD only</span>
               <RefreshPricesButton symbols={holdings.map((h) => h.symbol)} />
             </span>
           </div>

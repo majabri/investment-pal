@@ -197,6 +197,27 @@ function Dashboard() {
       <div className="mb-4">
         <WorkflowButtons symbols={holdings.map((h) => h.symbol)} />
       </div>
+      {accountsList.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-sm">
+          <span className="font-medium">
+            Household {fmtUSD(accountsList.reduce((s, a) => {
+              const pos = allHoldings.filter((h) => h.account_id === a.id)
+                .reduce((x, h) => x + h.quantity * h.current_price, 0);
+              return s + pos + Number(a.cash ?? 0) - Number(a.margin_used ?? 0);
+            }, 0))}
+          </span>
+          {accountsList.map((a) => {
+            const pos = allHoldings.filter((h) => h.account_id === a.id)
+              .reduce((x, h) => x + h.quantity * h.current_price, 0);
+            const net = pos + Number(a.cash ?? 0) - Number(a.margin_used ?? 0);
+            return (
+              <span key={a.id} className="text-muted-foreground">
+                {a.name} <span className="tabular-nums text-foreground">{fmtUSD(net)}</span>
+              </span>
+            );
+          })}
+        </div>
+      )}
       {alerts.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2">
           {alerts.map((a) => (
