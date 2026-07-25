@@ -29,7 +29,7 @@ const navGroups: NavGroup[] = [
   {
     group: "Amir",
     items: [
-      { to: "/", label: "Amir Dashboard", icon: LayoutDashboard },
+      { to: "/", label: "Investment Office", icon: LayoutDashboard },
       { to: "/prompt-center", label: "Prompt Center", icon: Sparkles },
       { to: "/portfolio", label: "Portfolio", icon: Briefcase },
       { to: "/journal", label: "Trade Journal", icon: BookOpen },

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Copy, ExternalLink, Save, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,10 +21,14 @@ import {
   riskToVol,
   riskToExpectedReturn,
 } from "@/lib/finance";
-import { buildMorningPrompt, buildEODPrompt, type PromptContext } from "@/lib/prompts";
+import { buildMorningPrompt, buildEODPrompt, buildWeeklyPrompt, type PromptContext } from "@/lib/prompts";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 
 export const Route = createFileRoute("/_authenticated/prompt-center")({
+  validateSearch: (search: Record<string, unknown>): { tab?: "morning" | "eod" | "weekly" } => ({
+    tab: search.tab === "eod" || search.tab === "weekly" || search.tab === "morning"
+      ? (search.tab as "morning" | "eod" | "weekly") : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Prompt Center — Investment Companion" },
@@ -44,7 +48,9 @@ function PromptCenter() {
   const [userNotes, setUserNotes] = useState("");
   const [tradesToday, setTradesToday] = useState("");
   const [aiResponse, setAiResponse] = useState("");
-  const [tab, setTab] = useState("morning");
+  const { tab: urlTab } = Route.useSearch();
+  const [tab, setTab] = useState<string>(urlTab ?? "morning");
+  useEffect(() => { if (urlTab) setTab(urlTab); }, [urlTab]);
 
   const ctx: PromptContext = useMemo(() => {
     const positionsValue = holdings.reduce((s, h) => s + h.quantity * h.current_price, 0);
@@ -87,7 +93,9 @@ function PromptCenter() {
     };
   }, [holdings, account, goal, priorities, userNotes]);
 
-  const prompt = tab === "morning" ? buildMorningPrompt(ctx) : buildEODPrompt({ ...ctx, tradesToday });
+  const prompt = tab === "morning" ? buildMorningPrompt(ctx)
+    : tab === "weekly" ? buildWeeklyPrompt(ctx)
+    : buildEODPrompt({ ...ctx, tradesToday });
 
   const copy = async () => {
     await navigator.clipboard.writeText(prompt);
@@ -124,6 +132,7 @@ function PromptCenter() {
             <Sparkles className="mr-2 h-4 w-4" /> Morning review
           </TabsTrigger>
           <TabsTrigger value="eod">End-of-day review</TabsTrigger>
+          <TabsTrigger value="weekly">Weekly committee</TabsTrigger>
         </TabsList>
 
         <TabsContent value="morning" className="mt-4 space-y-4">
@@ -160,9 +169,21 @@ function PromptCenter() {
             onSave={saveSummary}
           />
         </TabsContent>
+        <TabsContent value="weekly" className="mt-4 space-y-4">
+          <PromptEditor
+            prompt={prompt}
+            notes={userNotes}
+            setNotes={setUserNotes}
+            aiResponse={aiResponse}
+            setAiResponse={setAiResponse}
+            onCopy={copy}
+            onOpen={openChatGPT}
+            onSave={saveSummary}
+          />
+        </TabsContent>
       </Tabs>
           <div className="mt-6">
-        <CommitteeChat systemPrompt={prompt} title={tab === "morning" ? "Investment Committee Chat — Morning" : "Investment Committee Chat — End of Day"} />
+        <CommitteeChat systemPrompt={prompt} title={tab === "morning" ? "Investment Committee Chat — Morning" : tab === "weekly" ? "Weekly Institutional Committee Chat" : "Investment Committee Chat — End of Day"} />
       </div>
     </AppShell>
   );

@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 /** Yahoo symbol quirks (e.g. BRK.B → BRK-B). */
 const toYahoo = (s: string) => s.replace(".", "-");
 
-export function RefreshPricesButton({ symbols }: { symbols: string[] }) {
+export function useRefreshPrices(symbols: string[]) {
   const [busy, setBusy] = useState(false);
   const qc = useQueryClient();
 
@@ -43,6 +43,11 @@ export function RefreshPricesButton({ symbols }: { symbols: string[] }) {
     }
   }
 
+  return { refresh, busy };
+}
+
+export function RefreshPricesButton({ symbols }: { symbols: string[] }) {
+  const { refresh, busy } = useRefreshPrices(symbols);
   return (
     <Button size="sm" variant="secondary" onClick={() => void refresh()} disabled={busy || !symbols.length}>
       <RefreshCw className={`mr-2 h-4 w-4 ${busy ? "animate-spin" : ""}`} />

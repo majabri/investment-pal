@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { StatCard } from "@/components/app/StatCard";
 import { ProgressChart } from "@/components/app/ProgressChart";
+import { WorkflowButtons } from "@/components/app/WorkflowButtons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -132,7 +133,7 @@ function Dashboard() {
   return (
     <AppShell
       title={`${greeting}, Amir`}
-      subtitle="What changed. What matters. What to do."
+      subtitle="Investment Office · What changed. What matters. What to do."
       actions={
         <>
           <Button
@@ -162,6 +163,9 @@ function Dashboard() {
         </>
       }
     >
+      <div className="mb-4">
+        <WorkflowButtons symbols={holdings.map((h) => h.symbol)} />
+      </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard
           label="Total account value"
