@@ -99,11 +99,25 @@ function PortfolioPage() {
       }
     >
       <div className="grid gap-4 md:grid-cols-4">
-        <StatCard label="Positions value" value={fmtUSD(positionsValue)} icon={<Wallet className="h-4 w-4" />} />
-        <StatCard label="Unrealized P/L" value={fmtUSD(pl)} hint={fmtPct(plPct)} tone={pl >= 0 ? "positive" : "negative"} />
+        <StatCard
+          label="Gross — investments"
+          value={fmtUSD(positionsValue + Number(amirAccount?.cash ?? 0))}
+          hint={`${holdings.length} positions${Number(amirAccount?.cash ?? 0) > 0 ? ` + cash ${fmtUSD(Number(amirAccount?.cash ?? 0))}` : ""}`}
+          icon={<Wallet className="h-4 w-4" />}
+        />
+        <StatCard
+          label="Margin loan"
+          value={fmtUSD(Number(amirAccount?.margin_used ?? 0))}
+          hint={Number(amirAccount?.margin_used ?? 0) > 0 ? "Owed to Fidelity at 11.825% APR" : "Set in Settings → Amir - TOD"}
+          tone={Number(amirAccount?.margin_used ?? 0) > 0 ? "warning" : "default"}
+        />
+        <StatCard
+          label="Net — actual account value"
+          value={fmtUSD(positionsValue + Number(amirAccount?.cash ?? 0) - Number(amirAccount?.margin_used ?? 0))}
+          hint="Gross − margin loan · matches Fidelity's Total account value"
+        />
         <StatCard label="Total Gain/Loss" value={`${fmtUSD(pl)} (${fmtPct(plPct)})`} tone={pl >= 0 ? "positive" : "negative"} />
-        <StatCard label="Cash" value={fmtUSD(account?.cash ?? 0)} />
-        <StatCard label="Buying power" value={fmtUSD(account?.buying_power ?? 0)} hint={`Margin used ${fmtUSD(account?.margin_used ?? 0)}`} />
+        <StatCard label="Buying power" value={fmtUSD(Number(amirAccount?.buying_power ?? account?.buying_power ?? 0))} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
