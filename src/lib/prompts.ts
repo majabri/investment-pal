@@ -21,6 +21,11 @@ export type PromptContext = {
   }>;
   priorities: string[];
   userNotes: string;
+  watchlist?: string[];
+  upcomingEarnings?: string[];
+  upcomingEcon?: string[];
+  topHeadlines?: string[];
+  recentJournal?: string[];
 };
 
 function dataBlock(ctx: PromptContext): string {
@@ -55,7 +60,22 @@ PRIORITIES I ALREADY FLAGGED
 ${ctx.priorities.length ? ctx.priorities.map((p) => `- ${p}`).join("\n") : "- (none)"}
 
 MY NOTES
-${ctx.userNotes || "(none)"}`;
+${ctx.userNotes || "(none)"}
+
+WATCHLIST
+${ctx.watchlist?.length ? ctx.watchlist.join(", ") : "(none)"}
+
+UPCOMING EARNINGS (7 days)
+${ctx.upcomingEarnings?.length ? ctx.upcomingEarnings.map((e) => `- ${e}`).join("\n") : "- (none)"}
+
+UPCOMING ECONOMIC EVENTS (7 days)
+${ctx.upcomingEcon?.length ? ctx.upcomingEcon.map((e) => `- ${e}`).join("\n") : "- (none)"}
+
+TOP HEADLINES RIGHT NOW
+${ctx.topHeadlines?.length ? ctx.topHeadlines.map((h) => `- ${h}`).join("\n") : "- (none)"}
+
+RECENT JOURNAL ENTRIES
+${ctx.recentJournal?.length ? ctx.recentJournal.map((j) => `- ${j}`).join("\n") : "- (none)"}`;
 }
 
 const CONTINUITY = `"Maintain continuity with previous Investment Committee decisions. If today's recommendation differs materially from yesterday's, explain exactly what new information changed the recommendation."`;
@@ -463,4 +483,22 @@ Do not recommend trades simply to be active. If the best decision is to make no 
 
 export function buildWeeklyPrompt(ctx: PromptContext): string {
   return [WEEKLY_TEMPLATE, "", dataBlock(ctx), "", CONTINUITY].join("\n");
+}
+
+// Midday Update — derived companion to the verbatim Morning/EOD/Weekly templates
+// (drafted by Claude per Amir's approval of the Companion constitution, Phase 4).
+const MIDDAY_TEMPLATE = String.raw`You are my Investment Committee and Chief Investment Officer.
+This is a MIDDAY UPDATE, not a full review. Be brief and decisive.
+Primary Objective: grow my Amir-TOD portfolio to $150,000 by March 31, 2027.
+Assumptions: margin rate 11.825% APR; I execute all trades myself; use only the data I provide; compare against this morning's Investment Committee recommendations.
+Analyze, briefly:
+1. What has actually changed since the open? (market, news, my positions)
+2. Do any of this morning's recommendations change? If yes, exactly which and why.
+3. Any intraday opportunity worth acting on TODAY? (max 2, with limit prices)
+4. Margin check: any reason to adjust before the close?
+5. One-paragraph bottom line: act now, act at close, or do nothing.
+If nothing material changed, say exactly that in one sentence and stop.`;
+
+export function buildMiddayPrompt(ctx: PromptContext): string {
+  return [MIDDAY_TEMPLATE, "", dataBlock(ctx), "", CONTINUITY].join("\n");
 }
