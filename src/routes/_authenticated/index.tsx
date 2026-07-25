@@ -32,6 +32,7 @@ import {
   fmtUSD,
   fmtPct,
   requiredCAGR,
+  requiredCAGRWithContrib,
   yearsBetween,
   probabilityOfReachingTarget,
   riskToVol,
@@ -97,7 +98,7 @@ function Dashboard() {
     const targetDate = new Date(goal.target_date);
     const years = Math.max(yearsBetween(today, targetDate), 0.01);
     const startVal = portfolioValue > 0 ? portfolioValue : goal.starting_value;
-    const cagr = requiredCAGR(startVal, goal.target_value, years);
+    const cagr = requiredCAGRWithContrib(startVal, goal.target_value, years, Number(goal.monthly_contribution ?? 0));
     const prob = probabilityOfReachingTarget(
       startVal,
       goal.target_value,

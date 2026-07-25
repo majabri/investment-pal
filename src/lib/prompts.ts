@@ -46,6 +46,7 @@ Portfolio value: ${fmtUSD(ctx.portfolioValue)}
 Today's P/L: ${fmtUSD(ctx.todaysPL)} (${fmtPct(ctx.todaysPLPct)})
 Cash: ${fmtUSD(ctx.cash)} | Margin used: ${fmtUSD(ctx.marginUsed)} | Buying power: ${fmtUSD(ctx.buyingPower)}
 Goal: ${fmtUSD(ctx.goalTarget)} by ${ctx.goalDate} | Required CAGR: ${fmtPct(ctx.requiredCagr)} | Model probability: ${fmtPct(ctx.probability)}
+Required pace: ${fmtPct(Math.pow(1 + ctx.requiredCagr, 1 / 52) - 1)}/week | ${fmtPct(Math.pow(1 + ctx.requiredCagr, 1 / 12) - 1)}/month
 
 HOLDINGS
 ${holdingsBlock}
