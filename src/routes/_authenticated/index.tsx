@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
 import { StatCard } from "@/components/app/StatCard";
+import { ProgressChart } from "@/components/app/ProgressChart";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -209,6 +210,10 @@ function Dashboard() {
           tone={marginTone}
           icon={<ShieldAlert className="h-4 w-4" />}
         />
+      </div>
+
+      <div className="mt-4">
+        <ProgressChart gross={positionsValue + cash} net={portfolioValue} marginUsed={marginUsed} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
