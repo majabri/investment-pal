@@ -161,11 +161,18 @@ function Dashboard() {
         </>
       }
     >
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard
-          label="Account value (net)"
+          label="Gross value"
+          value={fmtUSD(positionsValue + cash)}
+          hint={`Positions ${fmtUSD(positionsValue)}${cash > 0 ? ` + cash ${fmtUSD(cash)}` : ""}`}
+          icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
+        />
+        <StatCard
+          label="Net value (equity)"
           value={fmtUSD(portfolioValue)}
-          hint={`Positions ${fmtUSD(positionsValue)}${marginUsed > 0 ? ` − margin ${fmtUSD(marginUsed)}` : ""}${cash > 0 ? ` + cash ${fmtUSD(cash)}` : ""}${marginUsed === 0 ? " · set margin in Settings for true net" : ""}`}
+          hint={marginUsed > 0 ? `Gross − margin ${fmtUSD(marginUsed)}` : "No margin set — Settings → Amir - TOD"}
+          tone={marginUsed > 0 ? "default" : "warning"}
           icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
         />
         <StatCard
