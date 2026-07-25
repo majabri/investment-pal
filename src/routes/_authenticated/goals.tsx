@@ -15,13 +15,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useGoal, useHoldings, useAccount } from "@/hooks/useAppData";
+import { useGoal, useHoldings, useAccount, useAccounts } from "@/hooks/useAppData";
 import {
   fmtPct,
   fmtUSD,
   periodicGrowth,
   probabilityOfReachingTarget,
   requiredCAGR,
+  requiredCAGRWithContrib,
+  estimatedCompletionDate,
   riskToExpectedReturn,
   riskToVol,
   yearsBetween,
@@ -62,23 +64,33 @@ function GoalsPage() {
     }
   }, [goal]);
 
-  const portfolioValue = useMemo(
-    () =>
-      holdings.reduce((s, h) => s + h.quantity * h.current_price, 0) + (account?.cash ?? 0),
-    [holdings, account],
-  );
+  const { data: accountsList = [] } = useAccounts();
+  const amirAccount = accountsList.find((a) => a.name === "Amir - TOD");
+  const portfolioValue = useMemo(() => {
+    const scoped = amirAccount
+      ? holdings.filter((h) => h.account_id === amirAccount.id)
+      : holdings.filter((h) => h.account_id == null);
+    const positions = scoped.reduce((s, h) => s + h.quantity * h.current_price, 0);
+    const cash = Number(amirAccount?.cash ?? account?.cash ?? 0);
+    const marginUsed = Number(amirAccount?.margin_used ?? 0);
+    return positions + cash - marginUsed; // net equity — same base as the Office
+  }, [holdings, account, amirAccount]);
 
   const metrics = useMemo(() => {
     if (!date) return null;
     const years = Math.max(yearsBetween(new Date(), new Date(date)), 0.01);
     const start = portfolioValue > 0 ? portfolioValue : starting;
-    const cagr = requiredCAGR(start, target, years);
+    const cagr = requiredCAGRWithContrib(start, target, years, monthly);
     const weekly = periodicGrowth(start, target, years, 52);
     const monthlyGrowth = periodicGrowth(start, target, years, 12);
     const prob = probabilityOfReachingTarget(start, target, years, riskToExpectedReturn(risk), riskToVol(risk));
     const progress =
       target > starting ? Math.max(0, Math.min(1, (portfolioValue - starting) / (target - starting))) : 0;
-    return { years, cagr, weekly, monthlyGrowth, prob, progress };
+    const completions = [0.10, 0.15, 0.20].map((r) => ({
+      rate: r,
+      date: estimatedCompletionDate(start, target, r, monthly),
+    }));
+    return { years, cagr, weekly, monthlyGrowth, prob, progress, completions };
   }, [portfolioValue, starting, target, date, risk]);
 
   const save = () => {
@@ -189,6 +201,24 @@ function GoalsPage() {
           label="Time remaining"
           value={metrics ? `${metrics.years.toFixed(2)} yrs` : "—"}
         />
+      </div>
+
+      <div className="mt-4 rounded-2xl border bg-card p-5">
+        <div className="mb-1 text-sm font-medium">Estimated completion — when would you actually get there?</div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          At realistic sustained returns (with your monthly contribution), the target date implied by the math:
+        </p>
+        <div className="grid gap-4 md:grid-cols-3">
+          {metrics?.completions.map((c) => (
+            <StatCard
+              key={c.rate}
+              label={`At ${Math.round(c.rate * 100)}% annual`}
+              value={c.date ? c.date.toLocaleDateString("en-US", { month: "short", year: "numeric" }) : ">40 yrs"}
+              hint={c.date && c.date <= new Date(date) ? "Before your target date" : "After your target date"}
+              tone={c.date && c.date <= new Date(date) ? "positive" : "warning"}
+            />
+          ))}
+        </div>
       </div>
 
       {metrics && metrics.prob < 0.6 ? (
