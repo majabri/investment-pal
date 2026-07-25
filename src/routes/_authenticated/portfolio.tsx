@@ -30,6 +30,8 @@ import { useHoldings, useAccount, useLogSync, type Holding } from "@/hooks/useAp
 import { useAccounts } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { ThesisDialog } from "@/components/app/ThesisDialog";
+import { useQuery } from "@tanstack/react-query";
+import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -59,6 +61,12 @@ function PortfolioPage() {
 
   const positionsValue = holdings.reduce((s, h) => s + h.quantity * h.current_price, 0);
   const costBasis = holdings.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
+  const { data: liveQuotes } = useQuery({
+    queryKey: ["pf-quotes", holdings.map((h) => h.symbol).join(",")],
+    queryFn: () => getQuotesFn({ data: { symbols: holdings.map((h) => h.symbol) } }),
+    enabled: holdings.length > 0,
+    refetchInterval: 5 * 60 * 1000,
+  });
   const pl = positionsValue - costBasis;
   const plPct = costBasis > 0 ? pl / costBasis : 0;
 
@@ -134,46 +142,113 @@ function PortfolioPage() {
               No holdings yet. Click "Add position" or import from Fidelity in Settings.
             </p>
           ) : (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Symbol</TableHead>
+                  <TableHead className="text-right">Last Price</TableHead>
+                  <TableHead className="text-right">Today's G/L</TableHead>
+                  <TableHead className="text-right">Total G/L</TableHead>
+                  <TableHead className="text-right">Current Value</TableHead>
+                  <TableHead className="text-right">% of Acct</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
-                  <TableHead className="text-right">P/L</TableHead>
-                  <TableHead>Sector</TableHead>
+                  <TableHead className="text-right">Avg Cost</TableHead>
+                  <TableHead className="text-right">Total Cost</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {holdings.map((h) => {
-                  const value = h.quantity * h.current_price;
+                {[...holdings]
+                  .sort((a, b) => b.quantity * b.current_price - a.quantity * a.current_price)
+                  .map((h) => {
+                  const q = liveQuotes?.[h.symbol];
+                  const price = q?.price ?? h.current_price;
+                  const value = h.quantity * price;
                   const cost = h.quantity * h.cost_basis;
-                  const plRow = value - cost;
+                  const totalGL = value - cost;
+                  const dayGL = q && q.prevClose > 0 ? h.quantity * (price - q.prevClose) : null;
+                  const dayPct = q && q.prevClose > 0 ? (price - q.prevClose) / q.prevClose : null;
+                  const pctOfAcct = positionsValue > 0 ? value / positionsValue : 0;
+                  const unpriced = !q;
                   return (
-                    <TableRow
-                      key={h.id}
-                      className="cursor-pointer"
-                      onClick={() => setSelected(h)}
-                    >
-                      <TableCell className="font-medium">{h.symbol}</TableCell>
-                      <TableCell className="text-right tabular">{h.quantity}</TableCell>
-                      <TableCell className="text-right tabular">{fmtUSD(h.cost_basis, 2)}</TableCell>
-                      <TableCell className="text-right tabular">{fmtUSD(h.current_price, 2)}</TableCell>
-                      <TableCell className="text-right tabular">{fmtUSD(value)}</TableCell>
-                      <TableCell className={`text-right tabular ${plRow >= 0 ? "text-success" : "text-destructive"}`}>
-                        {fmtUSD(plRow)} ({cost > 0 ? fmtPct(plRow / cost) : "—"})
+                    <TableRow key={h.id} className="cursor-pointer" onClick={() => setSelected(h)}>
+                      <TableCell className="font-medium">
+                        {h.symbol}
+                        {unpriced && <span className="ml-1 align-super text-[9px] text-muted-foreground">t</span>}
                       </TableCell>
-                      <TableCell className="w-8 p-1">
+                      <TableCell className="text-right tabular">
+                        {unpriced ? (h.current_price > 0 ? fmtUSD(h.current_price, 2) : "--") : (
+                          <>
+                            {fmtUSD(price, 2)}
+                            {dayPct != null && (
+                              <div className={`text-[11px] ${dayPct >= 0 ? "text-success" : "text-destructive"}`}>
+                                {dayPct >= 0 ? "+" : ""}{fmtPct(dayPct)}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </TableCell>
+                      <TableCell className={`text-right tabular ${dayGL == null ? "text-muted-foreground" : dayGL >= 0 ? "text-success" : "text-destructive"}`}>
+                        {dayGL == null ? "--" : `${dayGL >= 0 ? "+" : ""}${fmtUSD(dayGL)}`}
+                      </TableCell>
+                      <TableCell className={`text-right tabular ${cost <= 0 ? "text-muted-foreground" : totalGL >= 0 ? "text-success" : "text-destructive"}`}>
+                        {cost > 0 ? `${totalGL >= 0 ? "+" : ""}${fmtUSD(totalGL)} (${fmtPct(totalGL / cost)})` : "--"}
+                      </TableCell>
+                      <TableCell className="text-right tabular">{value > 0.005 ? fmtUSD(value) : value > 0 ? fmtUSD(value, 2) : "--"}</TableCell>
+                      <TableCell className="text-right tabular text-muted-foreground">{fmtPct(pctOfAcct)}</TableCell>
+                      <TableCell className="text-right tabular">{h.quantity.toLocaleString("en-US")}</TableCell>
+                      <TableCell className="text-right tabular">{fmtUSD(h.cost_basis, 2)}</TableCell>
+                      <TableCell className="text-right tabular">{fmtUSD(cost)}</TableCell>
+                      <TableCell className="w-8 p-1" onClick={(e) => e.stopPropagation()}>
                         <ThesisDialog holding={h} />
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{h.sector ?? "—"}</TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
+            {/* Fidelity-style account summary footer */}
+            <div className="mt-3 divide-y border-t text-sm">
+              <div className="flex items-center justify-between py-2">
+                <span className="font-semibold uppercase tracking-wide text-muted-foreground">Total</span>
+                <span className="flex gap-6 tabular">
+                  <span className={pl >= 0 ? "text-success" : "text-destructive"}>{fmtUSD(pl)}</span>
+                  <span className="font-medium">{fmtUSD(positionsValue)}</span>
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="font-semibold uppercase tracking-wide text-muted-foreground">Pending activity</span>
+                <span className="tabular">{fmtUSD(-Number(amirAccount?.margin_used ?? 0))}</span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="font-semibold uppercase tracking-wide">Total account value</span>
+                <span className="tabular font-semibold">
+                  {fmtUSD(positionsValue + Number(amirAccount?.cash ?? 0) - Number(amirAccount?.margin_used ?? 0))}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="font-semibold uppercase tracking-wide text-muted-foreground">Today's change</span>
+                <span className="tabular">
+                  {(() => {
+                    const day = holdings.reduce((sum, h) => {
+                      const q = liveQuotes?.[h.symbol];
+                      return q && q.prevClose > 0 ? sum + h.quantity * (q.price - q.prevClose) : sum;
+                    }, 0);
+                    const net = positionsValue + Number(amirAccount?.cash ?? 0) - Number(amirAccount?.margin_used ?? 0);
+                    return (
+                      <span className={day >= 0 ? "text-success" : "text-destructive"}>
+                        {day >= 0 ? "+" : ""}{fmtUSD(day)} ({net > 0 ? fmtPct(day / net) : "—"})
+                      </span>
+                    );
+                  })()}
+                </span>
+              </div>
+              <p className="pt-2 text-[11px] text-muted-foreground">
+                <span className="align-super text-[9px]">t</span> Not priced today — last known price shown; excluded from Today&apos;s G/L.
+              </p>
+            </div>
+            </>
           )}
         </div>
 
