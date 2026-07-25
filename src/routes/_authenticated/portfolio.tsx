@@ -29,6 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useHoldings, useAccount, useLogSync, type Holding } from "@/hooks/useAppData";
 import { useAccounts } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
+import { ThesisDialog } from "@/components/app/ThesisDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { useQueryClient } from "@tanstack/react-query";
@@ -158,6 +159,9 @@ function PortfolioPage() {
                       <TableCell className={`text-right tabular ${plRow >= 0 ? "text-success" : "text-destructive"}`}>
                         {fmtUSD(plRow)} ({cost > 0 ? fmtPct(plRow / cost) : "—"})
                       </TableCell>
+                      <TableCell className="w-8 p-1">
+                        <ThesisDialog holding={h} />
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{h.sector ?? "—"}</TableCell>
                     </TableRow>
                   );
@@ -235,6 +239,39 @@ function PortfolioPage() {
           )}
         </SheetContent>
       </Sheet>
+          <div className="mt-4 rounded-2xl border bg-card p-5">
+        <div className="mb-3 text-sm font-medium">Sector allocation</div>
+        {(() => {
+          const total = holdings.reduce((s2, h) => s2 + h.quantity * h.current_price, 0);
+          const bySector = new Map<string, number>();
+          for (const h of holdings) {
+            const k = h.sector?.trim() || "Unclassified";
+            bySector.set(k, (bySector.get(k) ?? 0) + h.quantity * h.current_price);
+          }
+          const rows = [...bySector.entries()].sort((a, b) => b[1] - a[1]);
+          if (total <= 0) return <p className="text-sm text-muted-foreground">No positions.</p>;
+          return (
+            <div className="space-y-2">
+              {rows.map(([sector, v]) => (
+                <div key={sector} className="flex items-center gap-3 text-sm">
+                  <span className="w-40 truncate">{sector}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded bg-muted">
+                    <div className="h-full bg-primary" style={{ width: `${Math.max(2, (v / total) * 100)}%` }} />
+                  </div>
+                  <span className="w-28 text-right tabular-nums text-muted-foreground">
+                    {fmtUSD(v)} · {fmtPct(v / total)}
+                  </span>
+                </div>
+              ))}
+              {bySector.has("Unclassified") && (
+                <p className="text-[11px] text-muted-foreground">
+                  Set sectors via the 📄 button on each holding — allocation sharpens as you classify.
+                </p>
+              )}
+            </div>
+          );
+        })()}
+      </div>
     </AppShell>
   );
 }
