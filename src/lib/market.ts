@@ -55,3 +55,13 @@ export async function fetchPrices(symbols: string[]): Promise<Record<string, num
   }));
   return out;
 }
+
+/** Live quotes incl. previous close, keyed by requested symbol. */
+export async function fetchQuotes(symbols: string[]): Promise<Record<string, { price: number; prevClose: number; changePct: number }>> {
+  const out: Record<string, { price: number; prevClose: number; changePct: number }> = {};
+  await Promise.all([...new Set(symbols)].map(async (s) => {
+    const q = await quote(s.replace(".", "-"));
+    if (q) out[s] = { price: q.price, prevClose: q.prevClose, changePct: q.changePct };
+  }));
+  return out;
+}

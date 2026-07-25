@@ -61,6 +61,7 @@ function KidsPage() {
           const at10 = fvWithContributions(total, 0.10, years, FAMILY_POLICY.contribution.amountUsd);
           const approvedShare = kid.holdings.filter((h) => approved.has(h.symbol)).reduce((s, h) => s + h.shares * h.price, 0) / Math.max(1, mv);
           const largest = [...kid.holdings].sort((a, b) => b.shares * b.price - a.shares * a.price)[0];
+          const empty = kid.holdings.length === 0;
           const status = req <= 0.08 ? "Ahead" : req <= 0.12 ? "On Track" : "Behind";
           const age = FAMILY_POLICY.children.find((c) => c.key === kid.key)?.age;
           return (
@@ -84,7 +85,7 @@ function KidsPage() {
                   <span className="text-muted-foreground">Projected @10%</span><span className="tabular-nums">{fmtUSD(at10)}</span>
                   <span className="text-muted-foreground">In approved names</span><span className="tabular-nums">{fmtPct(approvedShare)}</span>
                   <span className="text-muted-foreground">Largest position</span>
-                  <span>{largest?.symbol} ({fmtPct((largest.shares * largest.price) / mv)})</span>
+                  <span>{largest ? `${largest.symbol} (${fmtPct((largest.shares * largest.price) / Math.max(1, mv))})` : "—"}</span>
                   <span className="text-muted-foreground">Cash</span><span className="tabular-nums">{fmtUSD(kid.cash, 2)}</span>
                   {(() => {
                     const cost = kid.holdings.reduce((c, h) => c + h.shares * h.avgCost, 0);
@@ -99,7 +100,21 @@ function KidsPage() {
                     );
                   })()}
                 </div>
+                {empty ? (
+                  <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                    No positions in this account yet — run Settings → Portfolio CSV Import and map this child&apos;s account.
+                  </p>
+                ) : (
                 <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b text-left text-[10px] uppercase text-muted-foreground">
+                      <th className="py-1">Symbol</th>
+                      <th className="text-right">Shares</th>
+                      <th className="text-right">Avg cost</th>
+                      <th className="text-right">Value</th>
+                      <th className="text-right">G/L</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {[...kid.holdings].sort((a, b) => b.shares * b.price - a.shares * a.price).slice(0, 8).map((h) => (
                       <tr key={h.symbol} className="border-b last:border-0">
@@ -114,6 +129,7 @@ function KidsPage() {
                     ))}
                   </tbody>
                 </table>
+                )}
                 <p className="text-[11px] text-muted-foreground">Top 8 of {kid.holdings.length}{liveSource ? " · live from your Fidelity imports" : " · seeded 2026-07-21 — run a Fidelity Import to go live"}</p>
               </CardContent>
             </Card>

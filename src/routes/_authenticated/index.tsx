@@ -17,6 +17,9 @@ import { AppShell } from "@/components/app/AppShell";
 import { StatCard } from "@/components/app/StatCard";
 import { ProgressChart } from "@/components/app/ProgressChart";
 import { WorkflowButtons } from "@/components/app/WorkflowButtons";
+import { useQuery } from "@tanstack/react-query";
+import { getQuotesFn } from "@/lib/marketServer";
+import { ECON_EVENTS, EARNINGS_EVENTS } from "@/lib/data/calendars";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -84,6 +87,33 @@ function Dashboard() {
     () => holdings.reduce((sum, h) => sum + h.quantity * h.cost_basis, 0),
     [holdings],
   );
+  const heldSymbols = useMemo(() => holdings.map((h) => h.symbol), [holdings]);
+  const { data: liveQuotes } = useQuery({
+    queryKey: ["daily-quotes", heldSymbols.join(",")],
+    queryFn: () => getQuotesFn({ data: { symbols: heldSymbols } }),
+    enabled: heldSymbols.length > 0,
+    refetchInterval: 5 * 60 * 1000,
+  });
+  const dailyPL = useMemo(() => {
+    if (!liveQuotes) return null;
+    let sum = 0, covered = 0;
+    for (const h of holdings) {
+      const q = liveQuotes[h.symbol];
+      if (q && q.prevClose > 0) { sum += h.quantity * (q.price - q.prevClose); covered++; }
+    }
+    return covered > 0 ? { sum, covered, total: holdings.length } : null;
+  }, [liveQuotes, holdings]);
+  const week = new Date(); week.setDate(week.getDate() + 7);
+  const weekEnd = week.toISOString().slice(0, 10);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const alerts = useMemo(() => {
+    const held = new Set(holdings.map((h) => h.symbol));
+    const econ = ECON_EVENTS.filter((e) => e.importance === "high" && e.date >= todayStr && e.date <= weekEnd)
+      .map((e) => ({ date: e.date, text: e.name, kind: "econ" as const }));
+    const earn = EARNINGS_EVENTS.filter((e) => e.date >= todayStr && e.date <= weekEnd && (held.has(e.symbol) || e.inPortfolio))
+      .map((e) => ({ date: e.date, text: `${e.symbol} earnings (${e.session === "bmo" ? "pre-market" : "after close"})`, kind: "earnings" as const }));
+    return [...econ, ...earn].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
+  }, [holdings, todayStr, weekEnd]);
   const cash = Number(amirAccount?.cash ?? account?.cash ?? 0);
   const marginUsed = Number(amirAccount?.margin_used ?? 0);
   // Net account value (what Fidelity shows as account value): equity, not gross.
@@ -167,6 +197,16 @@ function Dashboard() {
       <div className="mb-4">
         <WorkflowButtons symbols={holdings.map((h) => h.symbol)} />
       </div>
+      {alerts.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {alerts.map((a) => (
+            <span key={a.text + a.date}
+              className={`rounded-full border px-3 py-1 text-xs ${a.kind === "econ" ? "border-warning/40 bg-warning/10" : "border-primary/30 bg-primary/10"}`}>
+              <span className="font-medium">{a.date.slice(5)}</span> · {a.text}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard
           label="Total account value"
@@ -193,6 +233,12 @@ function Dashboard() {
               <TrendingDown className="h-4 w-4 text-destructive" />
             )
           }
+        />
+        <StatCard
+          label="Today's P/L"
+          value={dailyPL ? fmtUSD(dailyPL.sum) : "—"}
+          hint={dailyPL ? `vs prev close · ${dailyPL.covered}/${dailyPL.total} quoted` : "Awaiting live quotes"}
+          tone={dailyPL ? (dailyPL.sum >= 0 ? "positive" : "negative") : "default"}
         />
         <StatCard
           label="Goal progress"
