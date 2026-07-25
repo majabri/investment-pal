@@ -12,3 +12,13 @@ export const getMarketSnapshotFn = createServerFn({ method: "GET" }).handler(
 export const getPricesFn = createServerFn({ method: "POST" })
   .validator((input: { symbols: string[] }) => input)
   .handler(async ({ data }): Promise<Record<string, number>> => fetchPrices(data.symbols ?? []));
+
+export interface LiveQuote { price: number; prevClose: number; changePct: number; }
+
+/** Full quotes (with previous close) for daily gain/loss computation. */
+export const getQuotesFn = createServerFn({ method: "POST" })
+  .validator((input: { symbols: string[] }) => input)
+  .handler(async ({ data }): Promise<Record<string, LiveQuote>> => {
+    const { fetchQuotes } = await import("./market");
+    return fetchQuotes(data.symbols ?? []);
+  });
