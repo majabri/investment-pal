@@ -112,7 +112,7 @@ function PromptCenter() {
       })(),
       topHeadlines: news.slice(0, 6).map((n) => `${n.title} (${n.source})`),
       recentJournal: journalEntries.slice(0, 3).map((j) =>
-        `${j.created_at.slice(0, 10)}: ${(j.title ?? j.content ?? "").slice(0, 120)}`),
+        `${j.created_at.slice(0, 10)}: ${(j.title ?? j.body ?? "").slice(0, 120)}`),
     };
   }, [holdings, account, goal, priorities, userNotes, news, journalEntries]);
 
