@@ -100,15 +100,30 @@ export function PortfolioCsvImport() {
       }
       if (groups.size === 0) { toast.error("Every account is set to Skip — nothing to save."); setBusy(false); return; }
 
+      let removed = 0;
       if (fullOverwrite) {
         // The Fidelity export is the complete truth: remove ALL existing
         // holdings (including legacy rows with no account) before saving,
         // so imports overwrite the portfolio rather than piling onto it.
+        const { count: before } = await supabase.from("holdings")
+          .select("id", { count: "exact", head: true }).eq("user_id", userId);
         const { error: wipeErr } = await supabase.from("holdings").delete().eq("user_id", userId);
         if (wipeErr) throw wipeErr;
+        const { count: after } = await supabase.from("holdings")
+          .select("id", { count: "exact", head: true }).eq("user_id", userId);
+        removed = (before ?? 0) - (after ?? 0);
+        if ((after ?? 0) > 0) {
+          throw new Error(`Overwrite verification failed: ${after} old positions survived the wipe. Nothing was saved — report this exact message.`);
+        }
       }
 
-      const { data: existing } = await supabase.from("accounts").select("id,name").eq("user_id", userId);
+      const { data: existingRaw } = await supabase.from("accounts").select("id,name,created_at").eq("user_id", userId).order("created_at", { ascending: true });
+      const seen = new Map<string, { id: string; name: string }>();
+      for (const a of existingRaw ?? []) {
+        if (!seen.has(a.name)) { seen.set(a.name, a); }
+        else if (fullOverwrite) { await supabase.from("accounts").delete().eq("id", a.id).eq("user_id", userId); }
+      }
+      const existing = [...seen.values()];
       let saved = 0;
       for (const [name, holdings] of groups) {
         let acct = existing?.find((a) => a.name === name);
@@ -156,7 +171,9 @@ export function PortfolioCsvImport() {
           .eq("id", acct!.id);
         saved += rows.length;
       }
-      toast.success(`Saved ${saved} positions across ${groups.size} account(s).`);
+      toast.success(fullOverwrite
+        ? `Overwrite complete: removed ${removed} old position${removed === 1 ? "" : "s"}, saved ${saved} across ${groups.size} account(s).`
+        : `Saved ${saved} positions across ${groups.size} account(s).`);
       setParsed(null);
       setRaw("");
       void qc.invalidateQueries();
