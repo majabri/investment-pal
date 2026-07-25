@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
 import { AppShell } from "@/components/app/AppShell";
+import { LearningLog } from "@/components/app/LearningLog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -228,6 +229,7 @@ function JournalPage() {
           )}
         </SheetContent>
       </Sheet>
+          <div className="mt-4"><LearningLog /></div>
     </AppShell>
   );
 }
