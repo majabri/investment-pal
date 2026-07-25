@@ -46,8 +46,8 @@ export function ProgressChart({ gross, net, marginUsed }: { gross: number; net: 
   const data = useMemo(() =>
     snaps.map((s) => ({
       date: new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      Gross: Math.round(s.gross * 100) / 100,
-      Net: Math.round(s.net * 100) / 100,
+      "Investments": Math.round(s.gross * 100) / 100,
+      "Account value": Math.round(s.net * 100) / 100,
     })), [snaps]);
 
   return (
@@ -79,8 +79,8 @@ export function ProgressChart({ gross, net, marginUsed }: { gross: number; net: 
                 <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false}
                   tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}K`} domain={["auto", "auto"]} />
                 <Tooltip formatter={(v: number) => fmtUSD(v)} />
-                <Area type="monotone" dataKey="Gross" stroke="hsl(var(--muted-foreground))" fill="none" strokeWidth={1.5} strokeDasharray="4 3" />
-                <Area type="monotone" dataKey="Net" stroke="hsl(var(--primary))" fill="url(#g1)" strokeWidth={2} />
+                <Area type="monotone" dataKey="Investments" stroke="hsl(var(--muted-foreground))" fill="none" strokeWidth={1.5} strokeDasharray="4 3" />
+                <Area type="monotone" dataKey="Account value" stroke="hsl(var(--primary))" fill="url(#g1)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

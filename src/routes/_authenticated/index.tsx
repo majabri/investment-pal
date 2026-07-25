@@ -164,16 +164,16 @@ function Dashboard() {
     >
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard
-          label="Gross value"
-          value={fmtUSD(positionsValue + cash)}
-          hint={`Positions ${fmtUSD(positionsValue)}${cash > 0 ? ` + cash ${fmtUSD(cash)}` : ""}`}
+          label="Total account value"
+          value={fmtUSD(portfolioValue)}
+          hint={marginUsed > 0 ? `Investments − margin loan ${fmtUSD(marginUsed)}` : "No margin set — Settings → Amir - TOD"}
+          tone={marginUsed > 0 ? "default" : "warning"}
           icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
         />
         <StatCard
-          label="Net value (equity)"
-          value={fmtUSD(portfolioValue)}
-          hint={marginUsed > 0 ? `Gross − margin ${fmtUSD(marginUsed)}` : "No margin set — Settings → Amir - TOD"}
-          tone={marginUsed > 0 ? "default" : "warning"}
+          label="Investments (long)"
+          value={fmtUSD(positionsValue + cash)}
+          hint={`${holdings.length} positions${cash > 0 ? ` + cash ${fmtUSD(cash)}` : ""} · Fidelity "Long"`}
           icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
         />
         <StatCard
