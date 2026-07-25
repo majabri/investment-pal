@@ -21,6 +21,7 @@ import {
   useGoal,
   useHoldings,
   useAccount,
+  useAccounts,
   usePriorities,
   useRecommendedActions,
   useLogSync,
@@ -60,7 +61,13 @@ const CATEGORY_META: Record<
 function Dashboard() {
   const navigate = useNavigate();
   const { data: goal } = useGoal();
-  const { data: holdings = [] } = useHoldings();
+  const { data: allHoldings = [] } = useHoldings();
+  const { data: accountsList = [] } = useAccounts();
+  // The Amir Dashboard tracks the Amir - TOD account only (kids have their own).
+  const amirAccount = accountsList.find((a) => a.name === "Amir - TOD");
+  const holdings = amirAccount
+    ? allHoldings.filter((h) => h.account_id === amirAccount.id)
+    : allHoldings.filter((h) => h.account_id == null);
   const { data: account } = useAccount();
   const { data: priorities = [], dismiss: dismissPriority } = usePriorities();
   const { data: actions = [], dismiss: dismissAction } = useRecommendedActions();
@@ -74,8 +81,10 @@ function Dashboard() {
     () => holdings.reduce((sum, h) => sum + h.quantity * h.cost_basis, 0),
     [holdings],
   );
-  const cash = account?.cash ?? 0;
-  const portfolioValue = positionsValue + cash;
+  const cash = Number(amirAccount?.cash ?? account?.cash ?? 0);
+  const marginUsed = Number(amirAccount?.margin_used ?? 0);
+  // Net account value (what Fidelity shows as account value): equity, not gross.
+  const portfolioValue = positionsValue + cash - marginUsed;
   // Simple "today" P/L proxy: (current - cost) delta. Real intraday requires last-close snapshot.
   const totalPL = positionsValue - costBasisTotal;
   const totalPLPct = costBasisTotal > 0 ? totalPL / costBasisTotal : 0;
@@ -154,13 +163,9 @@ function Dashboard() {
     >
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Portfolio value"
+          label="Account value (net)"
           value={fmtUSD(portfolioValue)}
-          hint={
-            account?.last_synced_at
-              ? `Last sync ${formatDistanceToNow(new Date(account.last_synced_at), { addSuffix: true })}`
-              : "No sync yet"
-          }
+          hint={`Positions ${fmtUSD(positionsValue)}${marginUsed > 0 ? ` − margin ${fmtUSD(marginUsed)}` : ""}${cash > 0 ? ` + cash ${fmtUSD(cash)}` : ""}${marginUsed === 0 ? " · set margin in Settings for true net" : ""}`}
           icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
         />
         <StatCard
