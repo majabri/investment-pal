@@ -21,13 +21,17 @@ import {
   riskToVol,
   riskToExpectedReturn,
 } from "@/lib/finance";
-import { buildMorningPrompt, buildEODPrompt, buildWeeklyPrompt, type PromptContext } from "@/lib/prompts";
+import { buildMorningPrompt, buildEODPrompt, buildWeeklyPrompt, buildMiddayPrompt, type PromptContext } from "@/lib/prompts";
+import { useQuery } from "@tanstack/react-query";
+import { getNewsFn } from "@/lib/newsServer";
+import { ECON_EVENTS, EARNINGS_EVENTS } from "@/lib/data/calendars";
+import { useJournal } from "@/hooks/useAppData";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 
 export const Route = createFileRoute("/_authenticated/prompt-center")({
-  validateSearch: (search: Record<string, unknown>): { tab?: "morning" | "eod" | "weekly" } => ({
-    tab: search.tab === "eod" || search.tab === "weekly" || search.tab === "morning"
-      ? (search.tab as "morning" | "eod" | "weekly") : undefined,
+  validateSearch: (search: Record<string, unknown>): { tab?: "morning" | "eod" | "weekly" | "midday" } => ({
+    tab: search.tab === "eod" || search.tab === "weekly" || search.tab === "morning" || search.tab === "midday"
+      ? (search.tab as "morning" | "eod" | "weekly" | "midday") : undefined,
   }),
   head: () => ({
     meta: [
@@ -44,6 +48,8 @@ function PromptCenter() {
   const { data: account } = useAccount();
   const { data: priorities = [] } = usePriorities();
   const addJournal = useAddJournal();
+  const { data: journalEntries = [] } = useJournal("");
+  const { data: news = [] } = useQuery({ queryKey: ["news"], queryFn: () => getNewsFn(), staleTime: 10 * 60 * 1000 });
 
   const [userNotes, setUserNotes] = useState("");
   const [tradesToday, setTradesToday] = useState("");
@@ -90,11 +96,29 @@ function PromptCenter() {
       })),
       priorities: priorities.map((p) => p.label),
       userNotes,
+      watchlist: ["NVDA","AVGO","TSM","AMD","META","COST","NFLX","NOW","PANW","MA","LLY","BRK.B"],
+      upcomingEarnings: (() => {
+        const t = new Date().toISOString().slice(0, 10);
+        const wk = new Date(); wk.setDate(wk.getDate() + 7);
+        const w = wk.toISOString().slice(0, 10);
+        return EARNINGS_EVENTS.filter((e) => e.date >= t && e.date <= w)
+          .map((e) => `${e.date} ${e.symbol} (${e.session === "bmo" ? "pre-market" : "after close"})${e.inPortfolio ? " — HELD" : ""}`);
+      })(),
+      upcomingEcon: (() => {
+        const t = new Date().toISOString().slice(0, 10);
+        const wk = new Date(); wk.setDate(wk.getDate() + 7);
+        const w = wk.toISOString().slice(0, 10);
+        return ECON_EVENTS.filter((e) => e.date >= t && e.date <= w).map((e) => `${e.date} ${e.name} [${e.importance}]`);
+      })(),
+      topHeadlines: news.slice(0, 6).map((n) => `${n.title} (${n.source})`),
+      recentJournal: journalEntries.slice(0, 3).map((j) =>
+        `${j.created_at.slice(0, 10)}: ${(j.title ?? j.content ?? "").slice(0, 120)}`),
     };
-  }, [holdings, account, goal, priorities, userNotes]);
+  }, [holdings, account, goal, priorities, userNotes, news, journalEntries]);
 
   const prompt = tab === "morning" ? buildMorningPrompt(ctx)
     : tab === "weekly" ? buildWeeklyPrompt(ctx)
+    : tab === "midday" ? buildMiddayPrompt(ctx)
     : buildEODPrompt({ ...ctx, tradesToday });
 
   const copy = async () => {
@@ -131,6 +155,7 @@ function PromptCenter() {
           <TabsTrigger value="morning">
             <Sparkles className="mr-2 h-4 w-4" /> Morning review
           </TabsTrigger>
+          <TabsTrigger value="midday">Midday update</TabsTrigger>
           <TabsTrigger value="eod">End-of-day review</TabsTrigger>
           <TabsTrigger value="weekly">Weekly committee</TabsTrigger>
         </TabsList>
@@ -158,6 +183,18 @@ function PromptCenter() {
               placeholder="e.g., Bought 20 NVDA @ 480, trimmed 10 AAPL @ 225…"
             />
           </div>
+          <PromptEditor
+            prompt={prompt}
+            notes={userNotes}
+            setNotes={setUserNotes}
+            aiResponse={aiResponse}
+            setAiResponse={setAiResponse}
+            onCopy={copy}
+            onOpen={openChatGPT}
+            onSave={saveSummary}
+          />
+        </TabsContent>
+        <TabsContent value="midday" className="mt-4 space-y-4">
           <PromptEditor
             prompt={prompt}
             notes={userNotes}
