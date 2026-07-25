@@ -21,7 +21,7 @@ import {
   riskToVol,
   riskToExpectedReturn,
 } from "@/lib/finance";
-import { buildMorningPrompt, buildEODPrompt, buildWeeklyPrompt, buildMiddayPrompt, type PromptContext } from "@/lib/prompts";
+import { buildUniversalPrompt, type MeetingType, type PromptContext } from "@/lib/prompts";
 import { useQuery } from "@tanstack/react-query";
 import { getNewsFn } from "@/lib/newsServer";
 import { ECON_EVENTS, EARNINGS_EVENTS } from "@/lib/data/calendars";
@@ -29,9 +29,9 @@ import { useJournal } from "@/hooks/useAppData";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 
 export const Route = createFileRoute("/_authenticated/prompt-center")({
-  validateSearch: (search: Record<string, unknown>): { tab?: "morning" | "eod" | "weekly" | "midday" } => ({
-    tab: search.tab === "eod" || search.tab === "weekly" || search.tab === "morning" || search.tab === "midday"
-      ? (search.tab as "morning" | "eod" | "weekly" | "midday") : undefined,
+  validateSearch: (search: Record<string, unknown>): { tab?: "morning" | "midday" | "evening" | "weekly" | "monthly" } => ({
+    tab: ["morning", "midday", "evening", "weekly", "monthly"].includes(search.tab as string)
+      ? (search.tab as "morning" | "midday" | "evening" | "weekly" | "monthly") : undefined,
   }),
   head: () => ({
     meta: [
@@ -116,10 +116,10 @@ function PromptCenter() {
     };
   }, [holdings, account, goal, priorities, userNotes, news, journalEntries]);
 
-  const prompt = tab === "morning" ? buildMorningPrompt(ctx)
-    : tab === "weekly" ? buildWeeklyPrompt(ctx)
-    : tab === "midday" ? buildMiddayPrompt(ctx)
-    : buildEODPrompt({ ...ctx, tradesToday });
+  const MEETING: Record<string, MeetingType> = {
+    morning: "Morning", midday: "Mid-Day", evening: "Evening", weekly: "Weekly", monthly: "Monthly",
+  };
+  const prompt = buildUniversalPrompt({ ...ctx, meeting: MEETING[tab] ?? "Morning", tradesToday });
 
   const copy = async () => {
     await navigator.clipboard.writeText(prompt);
@@ -152,12 +152,11 @@ function PromptCenter() {
     >
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="morning">
-            <Sparkles className="mr-2 h-4 w-4" /> Morning review
-          </TabsTrigger>
-          <TabsTrigger value="midday">Midday update</TabsTrigger>
-          <TabsTrigger value="eod">End-of-day review</TabsTrigger>
-          <TabsTrigger value="weekly">Weekly committee</TabsTrigger>
+          <TabsTrigger value="morning">Morning</TabsTrigger>
+          <TabsTrigger value="midday">Mid-Day</TabsTrigger>
+          <TabsTrigger value="evening">Evening</TabsTrigger>
+          <TabsTrigger value="weekly">Weekly</TabsTrigger>
+          <TabsTrigger value="monthly">Monthly</TabsTrigger>
         </TabsList>
 
         <TabsContent value="morning" className="mt-4 space-y-4">
@@ -173,7 +172,7 @@ function PromptCenter() {
           />
         </TabsContent>
 
-        <TabsContent value="eod" className="mt-4 space-y-4">
+        <TabsContent value="evening" className="mt-4 space-y-4">
           <div className="rounded-2xl border bg-card p-5">
             <div className="mb-2 text-sm font-medium">Trades I made today</div>
             <Textarea
@@ -218,9 +217,21 @@ function PromptCenter() {
             onSave={saveSummary}
           />
         </TabsContent>
+        <TabsContent value="monthly" className="mt-4 space-y-4">
+          <PromptEditor
+            prompt={prompt}
+            notes={userNotes}
+            setNotes={setUserNotes}
+            aiResponse={aiResponse}
+            setAiResponse={setAiResponse}
+            onCopy={copy}
+            onOpen={openChatGPT}
+            onSave={saveSummary}
+          />
+        </TabsContent>
       </Tabs>
           <div className="mt-6">
-        <CommitteeChat systemPrompt={prompt} title={tab === "morning" ? "Investment Committee Chat — Morning" : tab === "weekly" ? "Weekly Institutional Committee Chat" : "Investment Committee Chat — End of Day"} />
+        <CommitteeChat systemPrompt={prompt} title={`Investment Committee Chat — ${MEETING[tab] ?? "Morning"}`} />
       </div>
     </AppShell>
   );
