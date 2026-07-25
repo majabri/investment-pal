@@ -1,6 +1,6 @@
 // Financial helpers: formatting, CAGR, probability model.
 
-export const fmtUSD = (v: number | null | undefined, digits = 0) => {
+export const fmtUSD = (v: number | null | undefined, digits = 2) => {
   if (v == null || Number.isNaN(v)) return "—";
   return v.toLocaleString("en-US", {
     style: "currency",
