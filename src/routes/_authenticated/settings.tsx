@@ -70,6 +70,9 @@ function SettingsPage() {
 
   return (
     <AppShell title="Settings" subtitle="Accounts, targets, priorities, and imports.">
+      <div className="mb-4">
+        <PortfolioCsvImport />
+      </div>
       {/* ACCOUNTS */}
       <section className="rounded-2xl border bg-card p-5">
         <div className="mb-3 flex items-center justify-between">
@@ -396,9 +399,6 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
         </div>
       )}
 
-      <div className="mt-4">
-        <PortfolioCsvImport />
-      </div>
     </div>
   );
 }
