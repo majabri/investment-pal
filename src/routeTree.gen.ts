@@ -9,31 +9,31 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedEarningsRouteImport } from './routes/_authenticated/earnings'
-import { Route as AuthenticatedEconomicCalendarRouteImport } from './routes/_authenticated/economic-calendar'
-import { Route as AuthenticatedGeopoliticsRouteImport } from './routes/_authenticated/geopolitics'
-import { Route as AuthenticatedGoalsRouteImport } from './routes/_authenticated/goals'
-import { Route as AuthenticatedJournalRouteImport } from './routes/_authenticated/journal'
-import { Route as AuthenticatedKidsRouteImport } from './routes/_authenticated/kids'
-import { Route as AuthenticatedKidsPromptCenterRouteImport } from './routes/_authenticated/kids-prompt-center'
-import { Route as AuthenticatedKidsWatchlistRouteImport } from './routes/_authenticated/kids-watchlist'
-import { Route as AuthenticatedNewsRouteImport } from './routes/_authenticated/news'
-import { Route as AuthenticatedOpportunitiesRouteImport } from './routes/_authenticated/opportunities'
-import { Route as AuthenticatedPortfolioRouteImport } from './routes/_authenticated/portfolio'
-import { Route as AuthenticatedPromptCenterRouteImport } from './routes/_authenticated/prompt-center'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedWatchlistRouteImport } from './routes/_authenticated/watchlist'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedPromptCenterRouteImport } from './routes/_authenticated/prompt-center'
+import { Route as AuthenticatedPortfolioRouteImport } from './routes/_authenticated/portfolio'
+import { Route as AuthenticatedOpportunitiesRouteImport } from './routes/_authenticated/opportunities'
+import { Route as AuthenticatedNewsRouteImport } from './routes/_authenticated/news'
+import { Route as AuthenticatedKidsWatchlistRouteImport } from './routes/_authenticated/kids-watchlist'
+import { Route as AuthenticatedKidsPromptCenterRouteImport } from './routes/_authenticated/kids-prompt-center'
+import { Route as AuthenticatedKidsRouteImport } from './routes/_authenticated/kids'
+import { Route as AuthenticatedJournalRouteImport } from './routes/_authenticated/journal'
+import { Route as AuthenticatedGoalsRouteImport } from './routes/_authenticated/goals'
+import { Route as AuthenticatedGeopoliticsRouteImport } from './routes/_authenticated/geopolitics'
+import { Route as AuthenticatedEconomicCalendarRouteImport } from './routes/_authenticated/economic-calendar'
+import { Route as AuthenticatedEarningsRouteImport } from './routes/_authenticated/earnings'
 
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -41,64 +41,14 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedEarningsRoute = AuthenticatedEarningsRouteImport.update({
-  id: '/earnings',
-  path: '/earnings',
+const AuthenticatedWatchlistRoute = AuthenticatedWatchlistRouteImport.update({
+  id: '/watchlist',
+  path: '/watchlist',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedEconomicCalendarRoute =
-  AuthenticatedEconomicCalendarRouteImport.update({
-    id: '/economic-calendar',
-    path: '/economic-calendar',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedGeopoliticsRoute =
-  AuthenticatedGeopoliticsRouteImport.update({
-    id: '/geopolitics',
-    path: '/geopolitics',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedGoalsRoute = AuthenticatedGoalsRouteImport.update({
-  id: '/goals',
-  path: '/goals',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedJournalRoute = AuthenticatedJournalRouteImport.update({
-  id: '/journal',
-  path: '/journal',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedKidsRoute = AuthenticatedKidsRouteImport.update({
-  id: '/kids',
-  path: '/kids',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedKidsPromptCenterRoute =
-  AuthenticatedKidsPromptCenterRouteImport.update({
-    id: '/kids-prompt-center',
-    path: '/kids-prompt-center',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedKidsWatchlistRoute =
-  AuthenticatedKidsWatchlistRouteImport.update({
-    id: '/kids-watchlist',
-    path: '/kids-watchlist',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedNewsRoute = AuthenticatedNewsRouteImport.update({
-  id: '/news',
-  path: '/news',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedOpportunitiesRoute =
-  AuthenticatedOpportunitiesRouteImport.update({
-    id: '/opportunities',
-    path: '/opportunities',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedPortfolioRoute = AuthenticatedPortfolioRouteImport.update({
-  id: '/portfolio',
-  path: '/portfolio',
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPromptCenterRoute =
@@ -107,14 +57,64 @@ const AuthenticatedPromptCenterRoute =
     path: '/prompt-center',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const AuthenticatedPortfolioRoute = AuthenticatedPortfolioRouteImport.update({
+  id: '/portfolio',
+  path: '/portfolio',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedWatchlistRoute = AuthenticatedWatchlistRouteImport.update({
-  id: '/watchlist',
-  path: '/watchlist',
+const AuthenticatedOpportunitiesRoute =
+  AuthenticatedOpportunitiesRouteImport.update({
+    id: '/opportunities',
+    path: '/opportunities',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedNewsRoute = AuthenticatedNewsRouteImport.update({
+  id: '/news',
+  path: '/news',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedKidsWatchlistRoute =
+  AuthenticatedKidsWatchlistRouteImport.update({
+    id: '/kids-watchlist',
+    path: '/kids-watchlist',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedKidsPromptCenterRoute =
+  AuthenticatedKidsPromptCenterRouteImport.update({
+    id: '/kids-prompt-center',
+    path: '/kids-prompt-center',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedKidsRoute = AuthenticatedKidsRouteImport.update({
+  id: '/kids',
+  path: '/kids',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedJournalRoute = AuthenticatedJournalRouteImport.update({
+  id: '/journal',
+  path: '/journal',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedGoalsRoute = AuthenticatedGoalsRouteImport.update({
+  id: '/goals',
+  path: '/goals',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedGeopoliticsRoute =
+  AuthenticatedGeopoliticsRouteImport.update({
+    id: '/geopolitics',
+    path: '/geopolitics',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedEconomicCalendarRoute =
+  AuthenticatedEconomicCalendarRouteImport.update({
+    id: '/economic-calendar',
+    path: '/economic-calendar',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedEarningsRoute = AuthenticatedEarningsRouteImport.update({
+  id: '/earnings',
+  path: '/earnings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
@@ -239,18 +239,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth': {
       id: '/auth'
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -260,88 +260,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/earnings': {
-      id: '/_authenticated/earnings'
-      path: '/earnings'
-      fullPath: '/earnings'
-      preLoaderRoute: typeof AuthenticatedEarningsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/economic-calendar': {
-      id: '/_authenticated/economic-calendar'
-      path: '/economic-calendar'
-      fullPath: '/economic-calendar'
-      preLoaderRoute: typeof AuthenticatedEconomicCalendarRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/geopolitics': {
-      id: '/_authenticated/geopolitics'
-      path: '/geopolitics'
-      fullPath: '/geopolitics'
-      preLoaderRoute: typeof AuthenticatedGeopoliticsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/goals': {
-      id: '/_authenticated/goals'
-      path: '/goals'
-      fullPath: '/goals'
-      preLoaderRoute: typeof AuthenticatedGoalsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/journal': {
-      id: '/_authenticated/journal'
-      path: '/journal'
-      fullPath: '/journal'
-      preLoaderRoute: typeof AuthenticatedJournalRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/kids': {
-      id: '/_authenticated/kids'
-      path: '/kids'
-      fullPath: '/kids'
-      preLoaderRoute: typeof AuthenticatedKidsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/kids-prompt-center': {
-      id: '/_authenticated/kids-prompt-center'
-      path: '/kids-prompt-center'
-      fullPath: '/kids-prompt-center'
-      preLoaderRoute: typeof AuthenticatedKidsPromptCenterRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/kids-watchlist': {
-      id: '/_authenticated/kids-watchlist'
-      path: '/kids-watchlist'
-      fullPath: '/kids-watchlist'
-      preLoaderRoute: typeof AuthenticatedKidsWatchlistRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/news': {
-      id: '/_authenticated/news'
-      path: '/news'
-      fullPath: '/news'
-      preLoaderRoute: typeof AuthenticatedNewsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/opportunities': {
-      id: '/_authenticated/opportunities'
-      path: '/opportunities'
-      fullPath: '/opportunities'
-      preLoaderRoute: typeof AuthenticatedOpportunitiesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/portfolio': {
-      id: '/_authenticated/portfolio'
-      path: '/portfolio'
-      fullPath: '/portfolio'
-      preLoaderRoute: typeof AuthenticatedPortfolioRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/prompt-center': {
-      id: '/_authenticated/prompt-center'
-      path: '/prompt-center'
-      fullPath: '/prompt-center'
-      preLoaderRoute: typeof AuthenticatedPromptCenterRouteImport
+    '/_authenticated/watchlist': {
+      id: '/_authenticated/watchlist'
+      path: '/watchlist'
+      fullPath: '/watchlist'
+      preLoaderRoute: typeof AuthenticatedWatchlistRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings': {
@@ -351,11 +274,88 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/watchlist': {
-      id: '/_authenticated/watchlist'
-      path: '/watchlist'
-      fullPath: '/watchlist'
-      preLoaderRoute: typeof AuthenticatedWatchlistRouteImport
+    '/_authenticated/prompt-center': {
+      id: '/_authenticated/prompt-center'
+      path: '/prompt-center'
+      fullPath: '/prompt-center'
+      preLoaderRoute: typeof AuthenticatedPromptCenterRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/portfolio': {
+      id: '/_authenticated/portfolio'
+      path: '/portfolio'
+      fullPath: '/portfolio'
+      preLoaderRoute: typeof AuthenticatedPortfolioRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/opportunities': {
+      id: '/_authenticated/opportunities'
+      path: '/opportunities'
+      fullPath: '/opportunities'
+      preLoaderRoute: typeof AuthenticatedOpportunitiesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/news': {
+      id: '/_authenticated/news'
+      path: '/news'
+      fullPath: '/news'
+      preLoaderRoute: typeof AuthenticatedNewsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/kids-watchlist': {
+      id: '/_authenticated/kids-watchlist'
+      path: '/kids-watchlist'
+      fullPath: '/kids-watchlist'
+      preLoaderRoute: typeof AuthenticatedKidsWatchlistRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/kids-prompt-center': {
+      id: '/_authenticated/kids-prompt-center'
+      path: '/kids-prompt-center'
+      fullPath: '/kids-prompt-center'
+      preLoaderRoute: typeof AuthenticatedKidsPromptCenterRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/kids': {
+      id: '/_authenticated/kids'
+      path: '/kids'
+      fullPath: '/kids'
+      preLoaderRoute: typeof AuthenticatedKidsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/journal': {
+      id: '/_authenticated/journal'
+      path: '/journal'
+      fullPath: '/journal'
+      preLoaderRoute: typeof AuthenticatedJournalRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/goals': {
+      id: '/_authenticated/goals'
+      path: '/goals'
+      fullPath: '/goals'
+      preLoaderRoute: typeof AuthenticatedGoalsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/geopolitics': {
+      id: '/_authenticated/geopolitics'
+      path: '/geopolitics'
+      fullPath: '/geopolitics'
+      preLoaderRoute: typeof AuthenticatedGeopoliticsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/economic-calendar': {
+      id: '/_authenticated/economic-calendar'
+      path: '/economic-calendar'
+      fullPath: '/economic-calendar'
+      preLoaderRoute: typeof AuthenticatedEconomicCalendarRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/earnings': {
+      id: '/_authenticated/earnings'
+      path: '/earnings'
+      fullPath: '/earnings'
+      preLoaderRoute: typeof AuthenticatedEarningsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
   }
@@ -407,13 +407,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
