@@ -795,6 +795,9 @@ Every review ends with a one-page CIO Action Sheet containing only:
 * HIGHEST PRIORITY ACTION: the single most important decision for the current review`;
 
 export function buildUniversalPrompt(ctx: PromptContext & { meeting: MeetingType; tradesToday?: string }): string {
+  if (ctx.meeting === "Morning") {
+    return buildMorningPrompt(ctx);
+  }
   const body = UNIVERSAL_TEMPLATE.replace("{{MEETING_TYPE}}", ctx.meeting);
   const rateNote = "CURRENT MARGIN RATE (updated): 11.825% APR (Fidelity, verified 2026-07-24).";
   const trades = ctx.meeting === "Evening"
