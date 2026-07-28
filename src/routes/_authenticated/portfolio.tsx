@@ -51,8 +51,9 @@ function PortfolioPage() {
   const { data: accountsList = [] } = useAccounts();
   // This page is Amir's portfolio only — kids live on the Kids Dashboard.
   const amirAccount = accountsList.find((a) => a.name === "Amir - TOD");
+  // Amir's rows = his account + any accountless manual adds (kids always have accounts)
   const holdings = amirAccount
-    ? allHoldings.filter((h) => h.account_id === amirAccount.id)
+    ? allHoldings.filter((h) => h.account_id === amirAccount.id || h.account_id == null)
     : allHoldings.filter((h) => h.account_id == null);
   const { data: account, upsert } = useAccount();
   const logSync = useLogSync();
@@ -169,7 +170,10 @@ function PortfolioPage() {
                   const totalGL = value - cost;
                   const dayGL = q && q.prevClose > 0 ? h.quantity * (price - q.prevClose) : null;
                   const dayPct = q && q.prevClose > 0 ? (price - q.prevClose) / q.prevClose : null;
-                  const pctOfAcct = positionsValue > 0 ? value / positionsValue : 0;
+                  // Fidelity divides % of Acct by TOTAL ACCOUNT VALUE (net equity) —
+                  // verified against real statements (CRWD 32.24%, LRCX 26.84%, ...).
+                  const netAcct = positionsValue + Number(amirAccount?.cash ?? 0) - Number(amirAccount?.margin_used ?? 0);
+                  const pctOfAcct = netAcct > 0 ? value / netAcct : 0;
                   const unpriced = !q;
                   return (
                     <TableRow key={h.id} className="cursor-pointer" onClick={() => setSelected(h)}>
@@ -236,9 +240,10 @@ function PortfolioPage() {
                       return q && q.prevClose > 0 ? sum + h.quantity * (q.price - q.prevClose) : sum;
                     }, 0);
                     const net = positionsValue + Number(amirAccount?.cash ?? 0) - Number(amirAccount?.margin_used ?? 0);
+                    const prior = net - day; // Fidelity: % vs yesterday's account value
                     return (
                       <span className={day >= 0 ? "text-success" : "text-destructive"}>
-                        {day >= 0 ? "+" : ""}{fmtUSD(day)} ({net > 0 ? fmtPct(day / net) : "—"})
+                        {day >= 0 ? "+" : ""}{fmtUSD(day)} ({prior > 0 ? fmtPct(day / prior) : "—"})
                       </span>
                     );
                   })()}
@@ -304,7 +309,7 @@ function PortfolioPage() {
             <SheetTitle>Add position</SheetTitle>
             <SheetDescription>Enter what you own. Update the price manually or via CSV import.</SheetDescription>
           </SheetHeader>
-          <AddPositionForm onSaved={() => { setAddOpen(false); qc.invalidateQueries({ queryKey: ["holdings"] }); }} />
+          <AddPositionForm accountId={amirAccount?.id ?? null} onSaved={() => { setAddOpen(false); qc.invalidateQueries({ queryKey: ["holdings"] }); }} />
         </SheetContent>
       </Sheet>
 
@@ -406,7 +411,7 @@ function AccountForm({
   );
 }
 
-function AddPositionForm({ onSaved }: { onSaved: () => void }) {
+function AddPositionForm({ onSaved, accountId }: { onSaved: () => void; accountId: string | null }) {
   const [symbol, setSymbol] = useState("");
   const [qty, setQty] = useState(0);
   const [cost, setCost] = useState(0);
@@ -418,8 +423,16 @@ function AddPositionForm({ onSaved }: { onSaved: () => void }) {
     if (!symbol.trim()) return toast.error("Symbol required");
     setSaving(true);
     const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user!.id;
+    let acctId = accountId;
+    if (!acctId) {
+      const { data: created } = await supabase.from("accounts")
+        .insert({ user_id: userId, name: "Amir - TOD" }).select("id").single();
+      acctId = created?.id ?? null;
+    }
     const { error } = await supabase.from("holdings").insert({
-      user_id: userData.user!.id,
+      user_id: userId,
+      account_id: acctId,
       symbol: symbol.trim().toUpperCase(),
       quantity: qty,
       cost_basis: cost,
