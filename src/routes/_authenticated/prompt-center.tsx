@@ -21,11 +21,12 @@ import {
   riskToVol,
   riskToExpectedReturn,
 } from "@/lib/finance";
-import { buildUniversalPrompt, type MeetingType, type PromptContext } from "@/lib/prompts";
+import { buildV5Prompt, type MeetingType, type PromptContext } from "@/lib/prompts";
 import { useQuery } from "@tanstack/react-query";
 import { getNewsFn } from "@/lib/newsServer";
 import { ECON_EVENTS, EARNINGS_EVENTS } from "@/lib/data/calendars";
 import { useJournal } from "@/hooks/useAppData";
+import { supabase } from "@/integrations/supabase/client";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 
 export const Route = createFileRoute("/_authenticated/prompt-center")({
@@ -50,6 +51,15 @@ function PromptCenter() {
   const addJournal = useAddJournal();
   const { data: journalEntries = [] } = useJournal("");
   const { data: news = [] } = useQuery({ queryKey: ["news"], queryFn: () => getNewsFn(), staleTime: 10 * 60 * 1000 });
+  const { data: decisions = [] } = useQuery({
+    queryKey: ["decisions-for-prompt"],
+    queryFn: async () => {
+      const { data } = await supabase.from("decisions" as never)
+        .select("decided_on,symbol,recommendation,decision,outcome_pl")
+        .order("decided_on", { ascending: false }).limit(10);
+      return (data ?? []) as unknown as { decided_on: string; symbol: string | null; recommendation: string; decision: string; outcome_pl: number | null }[];
+    },
+  });
 
   const [userNotes, setUserNotes] = useState("");
   const [tradesToday, setTradesToday] = useState("");
@@ -111,15 +121,17 @@ function PromptCenter() {
         return ECON_EVENTS.filter((e) => e.date >= t && e.date <= w).map((e) => `${e.date} ${e.name} [${e.importance}]`);
       })(),
       topHeadlines: news.slice(0, 6).map((n) => `${n.title} (${n.source})`),
+      recentDecisions: decisions.map((d) =>
+        `${d.decided_on}${d.symbol ? ` ${d.symbol}` : ""}: "${d.recommendation}" → ${d.decision}${d.outcome_pl != null ? ` → ${d.outcome_pl >= 0 ? "+" : ""}$${d.outcome_pl.toFixed(2)}` : ""}`),
       recentJournal: journalEntries.slice(0, 3).map((j) =>
         `${j.created_at.slice(0, 10)}: ${(j.title ?? j.body ?? "").slice(0, 120)}`),
     };
-  }, [holdings, account, goal, priorities, userNotes, news, journalEntries]);
+  }, [holdings, account, goal, priorities, userNotes, news, journalEntries, decisions]);
 
   const MEETING: Record<string, MeetingType> = {
     morning: "Morning", midday: "Mid-Day", evening: "Evening", weekly: "Weekly", monthly: "Monthly",
   };
-  const prompt = buildUniversalPrompt({ ...ctx, meeting: MEETING[tab] ?? "Morning", tradesToday });
+  const prompt = buildV5Prompt({ ...ctx, meeting: MEETING[tab] ?? "Morning", tradesToday });
 
   const copy = async () => {
     await navigator.clipboard.writeText(prompt);
