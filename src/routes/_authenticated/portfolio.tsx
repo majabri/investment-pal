@@ -30,6 +30,7 @@ import { useHoldings, useAccount, useLogSync, type Holding } from "@/hooks/useAp
 import { useAccounts } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { ThesisDialog } from "@/components/app/ThesisDialog";
+import { MarginCard } from "@/components/app/MarginCard";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD, fmtPct } from "@/lib/finance";
@@ -110,11 +111,10 @@ function PortfolioPage() {
           hint={`${holdings.length} positions${Number(amirAccount?.cash ?? 0) > 0 ? ` + cash ${fmtUSD(Number(amirAccount?.cash ?? 0))}` : ""}`}
           icon={<Wallet className="h-4 w-4" />}
         />
-        <StatCard
-          label="Margin loan"
-          value={fmtUSD(Number(amirAccount?.margin_used ?? 0))}
-          hint={Number(amirAccount?.margin_used ?? 0) > 0 ? "Owed to Fidelity at 11.825% APR" : "Set in Settings → Amir - TOD"}
-          tone={Number(amirAccount?.margin_used ?? 0) > 0 ? "warning" : "default"}
+        <MarginCard
+          accountId={amirAccount?.id ?? null}
+          accountName="Amir - TOD"
+          marginUsed={Number(amirAccount?.margin_used ?? 0)}
         />
         <StatCard
           label="Net — actual account value"
