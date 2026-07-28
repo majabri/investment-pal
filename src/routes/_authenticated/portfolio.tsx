@@ -58,7 +58,6 @@ function PortfolioPage() {
   const { data: account, upsert } = useAccount();
   const logSync = useLogSync();
   const [selected, setSelected] = useState<Holding | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
 
   const positionsValue = holdings.reduce((s, h) => s + h.quantity * h.current_price, 0);
   const costBasis = holdings.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
@@ -100,9 +99,6 @@ function PortfolioPage() {
             }
           >
             <RefreshCw className="mr-2 h-4 w-4" /> Refresh
-          </Button>
-          <Button size="sm" onClick={() => setAddOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Add position
           </Button>
         </>
       }
@@ -302,16 +298,7 @@ function PortfolioPage() {
         <AccountForm account={account} onSave={(patch) => upsert.mutate(patch, { onSuccess: () => toast.success("Saved") })} />
       </div>
 
-      {/* Add position dialog */}
-      <Sheet open={addOpen} onOpenChange={setAddOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>Add position</SheetTitle>
-            <SheetDescription>Enter what you own. Update the price manually or via CSV import.</SheetDescription>
-          </SheetHeader>
-          <AddPositionForm accountId={amirAccount?.id ?? null} onSaved={() => { setAddOpen(false); qc.invalidateQueries({ queryKey: ["holdings"] }); }} />
-        </SheetContent>
-      </Sheet>
+
 
       {/* Position detail drawer */}
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
@@ -407,76 +394,6 @@ function AccountForm({
           <Save className="mr-2 h-4 w-4" /> Save
         </Button>
       </div>
-    </div>
-  );
-}
-
-function AddPositionForm({ onSaved, accountId }: { onSaved: () => void; accountId: string | null }) {
-  const [symbol, setSymbol] = useState("");
-  const [qty, setQty] = useState(0);
-  const [cost, setCost] = useState(0);
-  const [price, setPrice] = useState(0);
-  const [sector, setSector] = useState("");
-  const [thesis, setThesis] = useState("");
-  const [saving, setSaving] = useState(false);
-  const submit = async () => {
-    if (!symbol.trim()) return toast.error("Symbol required");
-    setSaving(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user!.id;
-    let acctId = accountId;
-    if (!acctId) {
-      const { data: created } = await supabase.from("accounts")
-        .insert({ user_id: userId, name: "Amir - TOD" }).select("id").single();
-      acctId = created?.id ?? null;
-    }
-    const { error } = await supabase.from("holdings").insert({
-      user_id: userId,
-      account_id: acctId,
-      symbol: symbol.trim().toUpperCase(),
-      quantity: qty,
-      cost_basis: cost,
-      current_price: price,
-      sector: sector || null,
-      original_thesis: thesis || null,
-      current_thesis: thesis || null,
-    });
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Position added");
-    onSaved();
-  };
-  return (
-    <div className="mt-4 space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="text-xs">Symbol</Label>
-          <Input value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="AAPL" />
-        </div>
-        <div>
-          <Label className="text-xs">Sector</Label>
-          <Input value={sector} onChange={(e) => setSector(e.target.value)} placeholder="Technology" />
-        </div>
-        <div>
-          <Label className="text-xs">Quantity</Label>
-          <Input type="number" value={qty} onChange={(e) => setQty(+e.target.value)} />
-        </div>
-        <div>
-          <Label className="text-xs">Cost basis</Label>
-          <Input type="number" value={cost} onChange={(e) => setCost(+e.target.value)} />
-        </div>
-        <div className="col-span-2">
-          <Label className="text-xs">Current price</Label>
-          <Input type="number" value={price} onChange={(e) => setPrice(+e.target.value)} />
-        </div>
-      </div>
-      <div>
-        <Label className="text-xs">Original thesis</Label>
-        <Textarea value={thesis} onChange={(e) => setThesis(e.target.value)} rows={3} placeholder="Why you bought this…" />
-      </div>
-      <Button onClick={submit} disabled={saving} className="w-full">
-        {saving ? "Saving..." : "Add position"}
-      </Button>
     </div>
   );
 }
