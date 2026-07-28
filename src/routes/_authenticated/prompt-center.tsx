@@ -25,7 +25,8 @@ import { buildV5Prompt, type MeetingType, type PromptContext } from "@/lib/promp
 import { useQuery } from "@tanstack/react-query";
 import { getNewsFn } from "@/lib/newsServer";
 import { ECON_EVENTS, EARNINGS_EVENTS } from "@/lib/data/calendars";
-import { useJournal } from "@/hooks/useAppData";
+import { useJournal, useAccounts } from "@/hooks/useAppData";
+import { getQuotesFn } from "@/lib/marketServer";
 import { supabase } from "@/integrations/supabase/client";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 
@@ -45,8 +46,10 @@ export const Route = createFileRoute("/_authenticated/prompt-center")({
 
 function PromptCenter() {
   const { data: goal } = useGoal();
-  const { data: holdings = [] } = useHoldings();
+  const { data: allHoldings = [] } = useHoldings();
   const { data: account } = useAccount();
+  const { data: accountsList = [] } = useAccounts();
+  const amirAccount = accountsList.find((a) => a.name === "Amir - TOD");
   const { data: priorities = [] } = usePriorities();
   const addJournal = useAddJournal();
   const { data: journalEntries = [] } = useJournal("");
@@ -68,12 +71,29 @@ function PromptCenter() {
   const [tab, setTab] = useState<string>(urlTab ?? "morning");
   useEffect(() => { if (urlTab) setTab(urlTab); }, [urlTab]);
 
+  const amirHoldings = useMemo(() => amirAccount
+    ? allHoldings.filter((h) => h.account_id === amirAccount.id || h.account_id == null)
+    : allHoldings.filter((h) => h.account_id == null), [allHoldings, amirAccount]);
+  const { data: liveQuotes } = useQuery({
+    queryKey: ["pc-quotes", amirHoldings.map((h) => h.symbol).join(",")],
+    queryFn: () => getQuotesFn({ data: { symbols: amirHoldings.map((h) => h.symbol) } }),
+    enabled: amirHoldings.length > 0,
+    refetchInterval: 5 * 60 * 1000,
+  });
   const ctx: PromptContext = useMemo(() => {
+    const holdings = amirHoldings.map((h) => liveQuotes?.[h.symbol]
+      ? { ...h, current_price: liveQuotes[h.symbol].price } : h);
     const positionsValue = holdings.reduce((s, h) => s + h.quantity * h.current_price, 0);
     const cost = holdings.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
     const pl = positionsValue - cost;
-    const cash = account?.cash ?? 0;
-    const portfolioValue = positionsValue + cash;
+    const cash = Number(amirAccount?.cash ?? 0);
+    const marginUsed = Number(amirAccount?.margin_used ?? 0);
+    const grossValue = positionsValue + cash;
+    const portfolioValue = grossValue - marginUsed; // NET — Fidelity's Total account value
+    const dayPL = holdings.reduce((sum, h) => {
+      const q = liveQuotes?.[h.symbol];
+      return q && q.prevClose > 0 ? sum + h.quantity * (q.price - q.prevClose) : sum;
+    }, 0);
     const today = new Date();
     const years = goal ? Math.max(yearsBetween(today, new Date(goal.target_date)), 0.01) : 1;
     const cagr = goal ? requiredCAGR(portfolioValue || goal.starting_value, goal.target_value, years) : 0;
@@ -88,11 +108,12 @@ function PromptCenter() {
       : 0;
     return {
       portfolioValue,
+      grossValue,
       cash,
-      marginUsed: account?.margin_used ?? 0,
-      buyingPower: account?.buying_power ?? 0,
-      todaysPL: pl,
-      todaysPLPct: cost > 0 ? pl / cost : 0,
+      marginUsed,
+      buyingPower: Number(amirAccount?.buying_power ?? 0),
+      todaysPL: dayPL,
+      todaysPLPct: portfolioValue - dayPL > 0 ? dayPL / (portfolioValue - dayPL) : 0,
       goalTarget: goal?.target_value ?? 0,
       goalDate: goal?.target_date ?? "—",
       requiredCagr: cagr,
@@ -126,7 +147,7 @@ function PromptCenter() {
       recentJournal: journalEntries.slice(0, 3).map((j) =>
         `${j.created_at.slice(0, 10)}: ${(j.title ?? j.body ?? "").slice(0, 120)}`),
     };
-  }, [holdings, account, goal, priorities, userNotes, news, journalEntries, decisions]);
+  }, [amirHoldings, liveQuotes, amirAccount, account, goal, priorities, userNotes, news, journalEntries, decisions]);
 
   const MEETING: Record<string, MeetingType> = {
     morning: "Morning", midday: "Mid-Day", evening: "Evening", weekly: "Weekly", monthly: "Monthly",

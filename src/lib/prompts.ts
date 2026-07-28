@@ -2,7 +2,8 @@
 import { fmtPct, fmtUSD } from "./finance";
 
 export type PromptContext = {
-  portfolioValue: number;
+  portfolioValue: number; // NET account value (investments + cash − margin)
+  grossValue?: number;
   cash: number;
   marginUsed: number;
   buyingPower: number;
@@ -32,12 +33,15 @@ export type PromptContext = {
 function dataBlock(ctx: PromptContext): string {
   const holdingsBlock = ctx.holdings.length
     ? ctx.holdings
-        .map(
-          (h) =>
-            `- ${h.symbol}: ${h.quantity} sh @ cost ${fmtUSD(h.costBasis, 2)}, last ${fmtUSD(h.currentPrice, 2)}${
-              h.thesis ? ` — thesis: ${h.thesis}` : ""
-            }`,
-        )
+        .map((h) => {
+          const value = h.quantity * h.currentPrice;
+          const cost = h.quantity * h.costBasis;
+          const gl = cost > 0 ? (value - cost) / cost : null;
+          const pct = ctx.portfolioValue > 0 ? value / ctx.portfolioValue : 0;
+          return `- ${h.symbol}: ${h.quantity} sh @ avg ${fmtUSD(h.costBasis, 2)}, last ${fmtUSD(h.currentPrice, 2)}, value ${fmtUSD(value)} (${fmtPct(pct)} of acct)${
+            gl != null ? `, total G/L ${gl >= 0 ? "+" : ""}${fmtPct(gl)}` : ""
+          }${h.thesis ? ` — thesis: ${h.thesis}` : ""}`;
+        })
         .join("\n")
     : "- (no holdings recorded)";
   const today = new Date().toLocaleDateString("en-US", {
@@ -48,8 +52,9 @@ MY VERIFIED DATA — GROUND EVERY RECOMMENDATION ONLY IN THIS
 ===========================================================
 TODAY IS ${today.toUpperCase()}.
 
-Portfolio value: ${fmtUSD(ctx.portfolioValue)}
-Today's P/L: ${fmtUSD(ctx.todaysPL)} (${fmtPct(ctx.todaysPLPct)})
+Account value (NET, investments + cash − margin): ${fmtUSD(ctx.portfolioValue)}
+Gross investments: ${fmtUSD(ctx.grossValue ?? ctx.portfolioValue)} | Account equity: ${ctx.grossValue && ctx.grossValue > 0 ? fmtPct(ctx.portfolioValue / ctx.grossValue) : "—"}
+Today's P/L (vs prior close, live-quoted positions): ${fmtUSD(ctx.todaysPL)} (${fmtPct(ctx.todaysPLPct)})
 Cash: ${fmtUSD(ctx.cash)} | Margin used: ${fmtUSD(ctx.marginUsed)} | Buying power: ${fmtUSD(ctx.buyingPower)}
 Goal: ${fmtUSD(ctx.goalTarget)} by ${ctx.goalDate} | Required CAGR: ${fmtPct(ctx.requiredCagr)} | Model probability: ${fmtPct(ctx.probability)}
 Required pace: ${fmtPct(Math.pow(1 + ctx.requiredCagr, 1 / 52) - 1)}/week | ${fmtPct(Math.pow(1 + ctx.requiredCagr, 1 / 12) - 1)}/month
