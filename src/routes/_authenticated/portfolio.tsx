@@ -31,6 +31,7 @@ import { useAccounts } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { ThesisDialog } from "@/components/app/ThesisDialog";
 import { MarginCard } from "@/components/app/MarginCard";
+import { sectorFor } from "@/lib/data/sectors";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD, fmtPct } from "@/lib/finance";
@@ -318,7 +319,7 @@ function PortfolioPage() {
           const total = holdings.reduce((s2, h) => s2 + h.quantity * h.current_price, 0);
           const bySector = new Map<string, number>();
           for (const h of holdings) {
-            const k = h.sector?.trim() || "Unclassified";
+            const k = sectorFor(h.symbol, h.sector);
             bySector.set(k, (bySector.get(k) ?? 0) + h.quantity * h.current_price);
           }
           const rows = [...bySector.entries()].sort((a, b) => b[1] - a[1]);
@@ -338,7 +339,7 @@ function PortfolioPage() {
               ))}
               {bySector.has("Unclassified") && (
                 <p className="text-[11px] text-muted-foreground">
-                  Set sectors via the 📄 button on each holding — allocation sharpens as you classify.
+                  Unclassified symbols can be assigned via the 📄 button on the holding.
                 </p>
               )}
             </div>
