@@ -232,7 +232,7 @@ function Dashboard() {
         <StatCard
           label="Total account value"
           value={fmtUSD(portfolioValue)}
-          hint={marginUsed > 0 ? `Investments − margin loan ${fmtUSD(marginUsed)}` : "No margin set — Settings → Amir - TOD"}
+          hint={marginUsed > 0 ? `Investments − margin loan ${fmtUSD(marginUsed)}` : "No margin set — click ✎ on the Portfolio's Margin loan card"}
           tone={marginUsed > 0 ? "default" : "warning"}
           icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
         />
