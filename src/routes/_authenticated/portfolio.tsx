@@ -61,14 +61,18 @@ function PortfolioPage() {
   const logSync = useLogSync();
   const [selected, setSelected] = useState<Holding | null>(null);
 
-  const positionsValue = holdings.reduce((s, h) => s + h.quantity * h.current_price, 0);
-  const costBasis = holdings.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
   const { data: liveQuotes } = useQuery({
     queryKey: ["pf-quotes", holdings.map((h) => h.symbol).join(",")],
     queryFn: () => getQuotesFn({ data: { symbols: holdings.map((h) => h.symbol) } }),
     enabled: holdings.length > 0,
-    refetchInterval: 5 * 60 * 1000,
+    refetchInterval: 60 * 1000, // live: every 60s
   });
+  // One source of truth for prices: live quote when available, else last saved.
+  const liveHoldings = useMemo(() => holdings.map((h) =>
+    liveQuotes?.[h.symbol] ? { ...h, current_price: liveQuotes[h.symbol].price } : h,
+  ), [holdings, liveQuotes]);
+  const positionsValue = liveHoldings.reduce((s, h) => s + h.quantity * h.current_price, 0);
+  const costBasis = liveHoldings.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
   const pl = positionsValue - costBasis;
   const plPct = costBasis > 0 ? pl / costBasis : 0;
 
@@ -157,7 +161,7 @@ function PortfolioPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {[...holdings]
+                {[...liveHoldings]
                   .sort((a, b) => b.quantity * b.current_price - a.quantity * a.current_price)
                   .map((h) => {
                   const q = liveQuotes?.[h.symbol];
@@ -232,7 +236,7 @@ function PortfolioPage() {
                 <span className="font-semibold uppercase tracking-wide text-muted-foreground">Today's change</span>
                 <span className="tabular">
                   {(() => {
-                    const day = holdings.reduce((sum, h) => {
+                    const day = liveHoldings.reduce((sum, h) => {
                       const q = liveQuotes?.[h.symbol];
                       return q && q.prevClose > 0 ? sum + h.quantity * (q.price - q.prevClose) : sum;
                     }, 0);
@@ -316,9 +320,9 @@ function PortfolioPage() {
           <div className="mt-4 rounded-2xl border bg-card p-5">
         <div className="mb-3 text-sm font-medium">Sector allocation</div>
         {(() => {
-          const total = holdings.reduce((s2, h) => s2 + h.quantity * h.current_price, 0);
+          const total = liveHoldings.reduce((s2, h) => s2 + h.quantity * h.current_price, 0);
           const bySector = new Map<string, number>();
-          for (const h of holdings) {
+          for (const h of liveHoldings) {
             const k = sectorFor(h.symbol, h.sector);
             bySector.set(k, (bySector.get(k) ?? 0) + h.quantity * h.current_price);
           }
