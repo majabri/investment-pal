@@ -35,7 +35,10 @@ export function useRefreshPrices(symbols: string[]) {
         if (!error) updated++;
       }
       toast.success(`Prices refreshed: ${updated}/${unique.length} symbols${updated < unique.length ? " (unlisted/legacy symbols keep their last price)" : ""}`);
+      // On-demand: refresh every live consumer immediately
       void qc.invalidateQueries({ queryKey: ["holdings"] });
+      void qc.invalidateQueries({ predicate: (q) =>
+        ["pf-quotes", "daily-quotes", "pc-quotes", "market-tape", "snapshots"].includes(String(q.queryKey[0])) });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Refresh failed");
     } finally {

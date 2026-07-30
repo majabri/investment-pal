@@ -10,8 +10,8 @@ export function MarketTape() {
   const { data } = useQuery({
     queryKey: ["market-tape"],
     queryFn: () => getMarketSnapshotFn(),
-    refetchInterval: 5 * 60 * 1000,
-    staleTime: 4 * 60 * 1000,
+    refetchInterval: 60 * 1000,
+    staleTime: 45 * 1000,
   });
 
   return (

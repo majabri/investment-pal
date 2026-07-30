@@ -92,7 +92,7 @@ function Dashboard() {
     queryKey: ["daily-quotes", heldSymbols.join(",")],
     queryFn: () => getQuotesFn({ data: { symbols: heldSymbols } }),
     enabled: heldSymbols.length > 0,
-    refetchInterval: 5 * 60 * 1000,
+    refetchInterval: 60 * 1000,
   });
   const dailyPL = useMemo(() => {
     if (!liveQuotes) return null;
