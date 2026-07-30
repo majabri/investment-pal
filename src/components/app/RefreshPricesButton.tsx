@@ -38,7 +38,7 @@ export function useRefreshPrices(symbols: string[]) {
       // On-demand: refresh every live consumer immediately
       void qc.invalidateQueries({ queryKey: ["holdings"] });
       void qc.invalidateQueries({ predicate: (q) =>
-        ["pf-quotes", "daily-quotes", "pc-quotes", "market-tape", "snapshots"].includes(String(q.queryKey[0])) });
+        ["pf-quotes", "daily-quotes", "pc-quotes", "kids-quotes", "market-tape", "snapshots"].includes(String(q.queryKey[0])) });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Refresh failed");
     } finally {

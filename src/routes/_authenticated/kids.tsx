@@ -7,6 +7,9 @@ import { FAMILY_POLICY, approvedSymbols, nextContributionDate, requiredCagrWithC
 import { KIDS_SEED, type KidAccount } from "@/lib/data/kidsSeed";
 import { useAccounts, useHoldings } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
+import { useQuery } from "@tanstack/react-query";
+import { getQuotesFn } from "@/lib/marketServer";
+import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/kids")({ component: KidsPage });
 
@@ -36,10 +39,39 @@ function KidsPage() {
     : KIDS_SEED;
   const liveSource = dbKidAccounts.length > 0;
 
+  // Live prices: one source of truth, 60s cadence, merged upstream of all math
+  const allSymbols = useMemo(() => [...new Set(kidsData.flatMap((k) => k.holdings.map((h) => h.symbol)))], [kidsData]);
+  const { data: liveQuotes } = useQuery({
+    queryKey: ["kids-quotes", allSymbols.join(",")],
+    queryFn: () => getQuotesFn({ data: { symbols: allSymbols } }),
+    enabled: allSymbols.length > 0,
+    refetchInterval: 60 * 1000,
+  });
+  const liveKids = useMemo(() => kidsData.map((k) => ({
+    ...k,
+    holdings: k.holdings.map((h) => liveQuotes?.[h.symbol] ? { ...h, price: liveQuotes[h.symbol].price } : h),
+  })), [kidsData, liveQuotes]);
+
+  // Shared column sort across all three kid tables
+  type SortKey = "symbol" | "shares" | "avgCost" | "value" | "gl";
+  const [sortKey, setSortKey] = useState<SortKey>("value");
+  const [sortDir, setSortDir] = useState<1 | -1>(-1);
+  const toggleSort = (k: SortKey) => {
+    if (k === sortKey) setSortDir((d) => (d === 1 ? -1 : 1));
+    else { setSortKey(k); setSortDir(k === "symbol" ? 1 : -1); }
+  };
+  const sortVal = (h: { symbol: string; shares: number; price: number; avgCost: number }, k: SortKey): number | string =>
+    k === "symbol" ? h.symbol
+    : k === "shares" ? h.shares
+    : k === "avgCost" ? h.avgCost
+    : k === "value" ? h.shares * h.price
+    : h.avgCost > 0 ? (h.price - h.avgCost) / h.avgCost : -Infinity;
+  const arrow = (k: SortKey) => (sortKey === k ? (sortDir === 1 ? " ▲" : " ▼") : "");
+
   const years = yearsBetween(new Date(), new Date(FAMILY_POLICY.targetDate));
   const next = nextContributionDate().toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const approved = approvedSymbols();
-  const familyTotal = kidsData.reduce((s, k) => s + k.cash + k.holdings.reduce((x, h) => x + h.shares * h.price, 0), 0);
+  const familyTotal = liveKids.reduce((s, k) => s + k.cash + k.holdings.reduce((x, h) => x + h.shares * h.price, 0), 0);
 
   return (
     <AppShell title="Kids Dashboard" subtitle={`Family Investment OS v${FAMILY_POLICY.version} · $${FAMILY_POLICY.contribution.amountUsd}/child every other Thursday · next ${next}`}>
@@ -49,12 +81,12 @@ function KidsPage() {
           <span><span className="text-muted-foreground">Family target (2036)</span> <strong className="tabular-nums">{fmtUSD(FAMILY_POLICY.familyTarget)}</strong></span>
           <span className="min-w-40 flex-1"><Progress value={(familyTotal / FAMILY_POLICY.familyTarget) * 100} /></span>
           <span className="tabular-nums text-muted-foreground">{fmtPct(familyTotal / FAMILY_POLICY.familyTarget)}</span>
-          <RefreshPricesButton symbols={kidsData.flatMap((k) => k.holdings.map((h) => h.symbol))} />
+          <RefreshPricesButton symbols={allSymbols} />
         </CardContent>
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-3">
-        {kidsData.map((kid) => {
+        {liveKids.map((kid) => {
           const mv = kid.holdings.reduce((s, h) => s + h.shares * h.price, 0);
           const total = mv + kid.cash;
           const req = requiredCagrWithContributions(total, FAMILY_POLICY.targetPerChild, years, FAMILY_POLICY.contribution.amountUsd);
@@ -108,15 +140,18 @@ function KidsPage() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b text-left text-[10px] uppercase text-muted-foreground">
-                      <th className="py-1">Symbol</th>
-                      <th className="text-right">Shares</th>
-                      <th className="text-right">Avg cost</th>
-                      <th className="text-right">Value</th>
-                      <th className="text-right">G/L</th>
+                      <th className="cursor-pointer select-none py-1" onClick={() => toggleSort("symbol")}>Symbol{arrow("symbol")}</th>
+                      <th className="cursor-pointer select-none text-right" onClick={() => toggleSort("shares")}>Shares{arrow("shares")}</th>
+                      <th className="cursor-pointer select-none text-right" onClick={() => toggleSort("avgCost")}>Avg cost{arrow("avgCost")}</th>
+                      <th className="cursor-pointer select-none text-right" onClick={() => toggleSort("value")}>Value{arrow("value")}</th>
+                      <th className="cursor-pointer select-none text-right" onClick={() => toggleSort("gl")}>G/L{arrow("gl")}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {[...kid.holdings].sort((a, b) => b.shares * b.price - a.shares * a.price).slice(0, 8).map((h) => (
+                    {[...kid.holdings].sort((a, b) => {
+                      const va = sortVal(a, sortKey), vb = sortVal(b, sortKey);
+                      return (typeof va === "string" ? va.localeCompare(vb as string) : (va as number) - (vb as number)) * sortDir;
+                    }).map((h) => (
                       <tr key={h.symbol} className="border-b last:border-0">
                         <td className="py-1 font-medium">{h.symbol}</td>
                         <td className="py-1 text-right tabular-nums text-muted-foreground">{h.shares}</td>
@@ -130,7 +165,7 @@ function KidsPage() {
                   </tbody>
                 </table>
                 )}
-                <p className="text-[11px] text-muted-foreground">Top 8 of {kid.holdings.length}{liveSource ? " · live from your Fidelity imports" : " · seeded 2026-07-21 — run a Fidelity Import to go live"}</p>
+                <p className="text-[11px] text-muted-foreground">{kid.holdings.length} positions{liveSource ? " · live from your Fidelity imports" : " · seeded 2026-07-21 — run a Fidelity Import to go live"}</p>
               </CardContent>
             </Card>
           );
