@@ -24,7 +24,7 @@ import {
 import { buildV5Prompt, type MeetingType, type PromptContext } from "@/lib/prompts";
 import { useQuery } from "@tanstack/react-query";
 import { getNewsFn } from "@/lib/newsServer";
-import { ECON_EVENTS, EARNINGS_EVENTS } from "@/lib/data/calendars";
+import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
 import { useJournal, useAccounts } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { supabase } from "@/integrations/supabase/client";
@@ -80,6 +80,16 @@ function PromptCenter() {
     enabled: amirHoldings.length > 0,
     refetchInterval: 60 * 1000,
   });
+  const { data: liveEconCal = [] } = useQuery({
+    queryKey: ["econ-cal-pc"], queryFn: () => getEconCalendarFn({ data: { days: 7 } }),
+    refetchInterval: 60 * 60 * 1000,
+  });
+  const { data: liveEarnCal = [] } = useQuery({
+    queryKey: ["earn-cal-pc", amirHoldings.map((h) => h.symbol).join(",")],
+    queryFn: () => getEarningsCalendarFn({ data: { symbols: [...amirHoldings.map((h) => h.symbol), "NVDA","META","COST","PANW","TSM","AAPL"], days: 7 } }),
+    enabled: amirHoldings.length > 0,
+    refetchInterval: 60 * 60 * 1000,
+  });
   const ctx: PromptContext = useMemo(() => {
     const holdings = amirHoldings.map((h) => liveQuotes?.[h.symbol]
       ? { ...h, current_price: liveQuotes[h.symbol].price } : h);
@@ -128,26 +138,17 @@ function PromptCenter() {
       priorities: priorities.map((p) => p.label),
       userNotes,
       watchlist: ["NVDA","AVGO","TSM","AMD","META","COST","NFLX","NOW","PANW","MA","LLY","BRK.B"],
-      upcomingEarnings: (() => {
-        const t = new Date().toISOString().slice(0, 10);
-        const wk = new Date(); wk.setDate(wk.getDate() + 7);
-        const w = wk.toISOString().slice(0, 10);
-        return EARNINGS_EVENTS.filter((e) => e.date >= t && e.date <= w)
-          .map((e) => `${e.date} ${e.symbol} (${e.session === "bmo" ? "pre-market" : "after close"})${e.inPortfolio ? " — HELD" : ""}`);
-      })(),
-      upcomingEcon: (() => {
-        const t = new Date().toISOString().slice(0, 10);
-        const wk = new Date(); wk.setDate(wk.getDate() + 7);
-        const w = wk.toISOString().slice(0, 10);
-        return ECON_EVENTS.filter((e) => e.date >= t && e.date <= w).map((e) => `${e.date} ${e.name} [${e.importance}]`);
-      })(),
+      upcomingEarnings: liveEarnCal.map((e) =>
+        `${e.date} ${e.symbol} (${e.session === "bmo" ? "pre-market" : "after close"})${amirHoldings.some((h) => h.symbol === e.symbol) ? " — HELD" : ""}`),
+      upcomingEcon: liveEconCal.filter((e) => e.importance !== "low")
+        .map((e) => `${e.date} ${e.name} [${e.importance}]${e.consensus ? ` est ${e.consensus}` : ""}`),
       topHeadlines: news.slice(0, 6).map((n) => `${n.title} (${n.source})`),
       recentDecisions: decisions.map((d) =>
         `${d.decided_on}${d.symbol ? ` ${d.symbol}` : ""}: "${d.recommendation}" → ${d.decision}${d.outcome_pl != null ? ` → ${d.outcome_pl >= 0 ? "+" : ""}$${d.outcome_pl.toFixed(2)}` : ""}`),
       recentJournal: journalEntries.slice(0, 3).map((j) =>
         `${j.created_at.slice(0, 10)}: ${(j.title ?? j.body ?? "").slice(0, 120)}`),
     };
-  }, [amirHoldings, liveQuotes, amirAccount, account, goal, priorities, userNotes, news, journalEntries, decisions]);
+  }, [amirHoldings, liveQuotes, amirAccount, account, goal, priorities, userNotes, news, journalEntries, decisions, liveEconCal, liveEarnCal]);
 
   const MEETING: Record<string, MeetingType> = {
     morning: "Morning", midday: "Mid-Day", evening: "Evening", weekly: "Weekly", monthly: "Monthly",

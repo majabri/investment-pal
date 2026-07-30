@@ -58,3 +58,33 @@ export const getNewsFn = createServerFn({ method: "GET" }).handler(async (): Pro
   }
   return items.sort((a, b) => b.score - a.score).slice(0, 40);
 });
+
+// ─── Live geopolitics: derived from world/market news, impact-rated ───
+export interface GeoItem { region: string; title: string; impact: "high" | "medium" | "low"; link: string; source: string; publishedAt: string | null; }
+
+const REGIONS: [RegExp, string][] = [
+  [/taiwan|china|beijing|xi jinping|pla\b/i, "China / Taiwan"],
+  [/israel|gaza|iran|hezbollah|houthi|red sea|middle east|saudi|opec/i, "Middle East / Energy"],
+  [/russia|ukraine|kremlin|putin|nato/i, "Russia / Ukraine"],
+  [/tariff|trade war|sanction|export control|trade deal/i, "Trade / Tariffs"],
+  [/semiconductor|chip ban|tsmc|asml export/i, "Semiconductors"],
+  [/north korea|missile test/i, "North Korea"],
+  [/election|coup|parliament/i, "Political"],
+];
+const GEO_HIGH = /war|strike|invasion|attack|sanction|export control|blockade|missile|tariff/i;
+
+export const getGeopoliticsFn = createServerFn({ method: "GET" }).handler(async (): Promise<GeoItem[]> => {
+  const world = await fetchFeed("https://www.cnbc.com/id/100727362/device/rss/rss.html", "CNBC", "World");
+  const markets = await fetchFeed("https://feeds.content.dowjones.io/public/rss/mw_topstories", "MarketWatch", "Markets");
+  const out: GeoItem[] = [];
+  for (const n of [...world, ...markets]) {
+    const region = REGIONS.find(([re]) => re.test(n.title))?.[1];
+    if (!region) continue;
+    out.push({
+      region, title: n.title, link: n.link, source: n.source, publishedAt: n.publishedAt,
+      impact: GEO_HIGH.test(n.title) ? "high" : "medium",
+    });
+  }
+  const seen = new Set<string>();
+  return out.filter((g) => { const k = g.title.slice(0, 50); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 12);
+});

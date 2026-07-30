@@ -19,7 +19,7 @@ import { ProgressChart } from "@/components/app/ProgressChart";
 import { WorkflowButtons } from "@/components/app/WorkflowButtons";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
-import { ECON_EVENTS, EARNINGS_EVENTS } from "@/lib/data/calendars";
+import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -106,14 +106,26 @@ function Dashboard() {
   const week = new Date(); week.setDate(week.getDate() + 7);
   const weekEnd = week.toISOString().slice(0, 10);
   const todayStr = new Date().toISOString().slice(0, 10);
+  const { data: liveEcon = [] } = useQuery({
+    queryKey: ["econ-cal-office"],
+    queryFn: () => getEconCalendarFn({ data: { days: 7 } }),
+    refetchInterval: 60 * 60 * 1000,
+  });
+  const { data: liveEarn = [] } = useQuery({
+    queryKey: ["earn-cal-office", heldSymbols.join(",")],
+    queryFn: () => getEarningsCalendarFn({ data: { symbols: heldSymbols, days: 7 } }),
+    enabled: heldSymbols.length > 0,
+    refetchInterval: 60 * 60 * 1000,
+  });
   const alerts = useMemo(() => {
-    const held = new Set(holdings.map((h) => h.symbol));
-    const econ = ECON_EVENTS.filter((e) => e.importance === "high" && e.date >= todayStr && e.date <= weekEnd)
+    const econ = liveEcon.filter((e) => e.importance === "high" && e.date >= todayStr && e.date <= weekEnd)
       .map((e) => ({ date: e.date, text: e.name, kind: "econ" as const }));
-    const earn = EARNINGS_EVENTS.filter((e) => e.date >= todayStr && e.date <= weekEnd && (held.has(e.symbol) || e.inPortfolio))
+    const earn = liveEarn.filter((e) => e.date >= todayStr && e.date <= weekEnd)
       .map((e) => ({ date: e.date, text: `${e.symbol} earnings (${e.session === "bmo" ? "pre-market" : "after close"})`, kind: "earnings" as const }));
-    return [...econ, ...earn].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
-  }, [holdings, todayStr, weekEnd]);
+    const seen = new Set<string>();
+    return [...econ, ...earn].sort((a, b) => a.date.localeCompare(b.date))
+      .filter((a) => { const k = a.text; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 6);
+  }, [liveEcon, liveEarn, todayStr, weekEnd]);
   const cash = Number(amirAccount?.cash ?? account?.cash ?? 0);
   const marginUsed = Number(amirAccount?.margin_used ?? 0);
   // Net account value (what Fidelity shows as account value): equity, not gross.
