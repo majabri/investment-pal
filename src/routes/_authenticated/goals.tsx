@@ -16,6 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useGoal, useHoldings, useAccount, useAccounts } from "@/hooks/useAppData";
+import { useQuery } from "@tanstack/react-query";
+import { getQuotesFn } from "@/lib/marketServer";
 import {
   fmtPct,
   fmtUSD,
@@ -66,15 +68,22 @@ function GoalsPage() {
 
   const { data: accountsList = [] } = useAccounts();
   const amirAccount = accountsList.find((a) => a.name === "Amir - TOD");
+  const goalSymbols = useMemo(() => [...new Set(holdings.map((h) => h.symbol))], [holdings]);
+  const { data: liveQuotes } = useQuery({
+    queryKey: ["goal-quotes", goalSymbols.join(",")],
+    queryFn: () => getQuotesFn({ data: { symbols: goalSymbols } }),
+    enabled: goalSymbols.length > 0,
+    refetchInterval: 60 * 1000,
+  });
   const portfolioValue = useMemo(() => {
     const scoped = amirAccount
-      ? holdings.filter((h) => h.account_id === amirAccount.id)
+      ? holdings.filter((h) => h.account_id === amirAccount.id || h.account_id == null)
       : holdings.filter((h) => h.account_id == null);
-    const positions = scoped.reduce((s, h) => s + h.quantity * h.current_price, 0);
+    const positions = scoped.reduce((s, h) => s + h.quantity * (liveQuotes?.[h.symbol]?.price ?? h.current_price), 0);
     const cash = Number(amirAccount?.cash ?? account?.cash ?? 0);
     const marginUsed = Number(amirAccount?.margin_used ?? 0);
     return positions + cash - marginUsed; // net equity — same base as the Office
-  }, [holdings, account, amirAccount]);
+  }, [holdings, account, amirAccount, liveQuotes]);
 
   const metrics = useMemo(() => {
     if (!date) return null;
