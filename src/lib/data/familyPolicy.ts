@@ -5,9 +5,9 @@ export const FAMILY_POLICY = {
   targetDate: "2036-07-01",
   familyTarget: 600_000,
   children: [
-    { key: "karim", name: "Karim", age: 12 },
-    { key: "zain", name: "Zain", age: 9 },
-    { key: "jude", name: "Jude", age: 6 },
+    { key: "karim", name: "Karim", birthDate: "2014-06-03" },
+    { key: "zain", name: "Zain", birthDate: "2017-11-25" },
+    { key: "jude", name: "Jude", birthDate: "2019-08-08" },
   ],
   contribution: { amountUsd: 100, cadenceDays: 14, anchorDate: "2026-07-30" },
   core: ["MSFT","AMZN","GOOGL","V","AVGO","BLK","ABT","RY"],
@@ -17,6 +17,16 @@ export const FAMILY_POLICY = {
   parityRule: "Default to keeping the three portfolios substantially identical. Only recommend different holdings if there is a compelling, evidence-based reason.",
   scoreWeights: { quality: 30, diversification: 25, progress: 20, valuation: 15, risk: 10 },
 } as const;
+
+/** Current age from birth date — never hardcode ages. */
+export function ageOf(birthDateIso: string, at = new Date()): number {
+  const b = new Date(birthDateIso + "T12:00:00");
+  let age = at.getFullYear() - b.getFullYear();
+  const beforeBirthday = at.getMonth() < b.getMonth() ||
+    (at.getMonth() === b.getMonth() && at.getDate() < b.getDate());
+  if (beforeBirthday) age -= 1;
+  return age;
+}
 
 export const approvedSymbols = () => new Set<string>([
   ...FAMILY_POLICY.core, ...FAMILY_POLICY.supporting,

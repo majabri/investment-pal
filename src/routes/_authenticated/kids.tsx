@@ -3,7 +3,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { fmtUSD, fmtPct, yearsBetween } from "@/lib/finance";
-import { FAMILY_POLICY, approvedSymbols, nextContributionDate, requiredCagrWithContributions, fvWithContributions } from "@/lib/data/familyPolicy";
+import { FAMILY_POLICY, ageOf, approvedSymbols, nextContributionDate, requiredCagrWithContributions, fvWithContributions } from "@/lib/data/familyPolicy";
 import { KIDS_SEED, type KidAccount } from "@/lib/data/kidsSeed";
 import { useAccounts, useHoldings } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
@@ -95,7 +95,8 @@ function KidsPage() {
           const largest = [...kid.holdings].sort((a, b) => b.shares * b.price - a.shares * a.price)[0];
           const empty = kid.holdings.length === 0;
           const status = req <= 0.08 ? "Ahead" : req <= 0.12 ? "On Track" : "Behind";
-          const age = FAMILY_POLICY.children.find((c) => c.key === kid.key)?.age;
+          const child = FAMILY_POLICY.children.find((c) => c.key === kid.key);
+          const age = child ? ageOf(child.birthDate) : undefined;
           return (
             <Card key={kid.key}>
               <CardHeader className="flex flex-row items-baseline justify-between">
