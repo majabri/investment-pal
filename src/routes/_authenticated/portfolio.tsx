@@ -67,6 +67,15 @@ function PortfolioPage() {
     enabled: holdings.length > 0,
     refetchInterval: 60 * 1000, // live: every 60s
   });
+  type PfSortKey = "symbol" | "last" | "dayGL" | "totalGL" | "value" | "pct" | "qty" | "avgCost" | "totalCost";
+  const [pfSortKey, setPfSortKey] = useState<PfSortKey>("value");
+  const [pfSortDir, setPfSortDir] = useState<1 | -1>(-1);
+  const togglePfSort = (k: PfSortKey) => {
+    if (k === pfSortKey) setPfSortDir((d) => (d === 1 ? -1 : 1));
+    else { setPfSortKey(k); setPfSortDir(k === "symbol" ? 1 : -1); }
+  };
+  const pfArrow = (k: PfSortKey) => (pfSortKey === k ? (pfSortDir === 1 ? " ▲" : " ▼") : "");
+
   // One source of truth for prices: live quote when available, else last saved.
   const liveHoldings = useMemo(() => holdings.map((h) =>
     liveQuotes?.[h.symbol] ? { ...h, current_price: liveQuotes[h.symbol].price } : h,
@@ -148,21 +157,41 @@ function PortfolioPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Symbol</TableHead>
-                  <TableHead className="text-right">Last Price</TableHead>
-                  <TableHead className="text-right">Today's G/L</TableHead>
-                  <TableHead className="text-right">Total G/L</TableHead>
-                  <TableHead className="text-right">Current Value</TableHead>
-                  <TableHead className="text-right">% of Acct</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Avg Cost</TableHead>
-                  <TableHead className="text-right">Total Cost</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => togglePfSort("symbol")}>Symbol{pfArrow("symbol")}</TableHead>
+                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("last")}>Last Price{pfArrow("last")}</TableHead>
+                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("dayGL")}>Today's G/L{pfArrow("dayGL")}</TableHead>
+                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("totalGL")}>Total G/L{pfArrow("totalGL")}</TableHead>
+                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("value")}>Current Value{pfArrow("value")}</TableHead>
+                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("pct")}>% of Acct{pfArrow("pct")}</TableHead>
+                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("qty")}>Qty{pfArrow("qty")}</TableHead>
+                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("avgCost")}>Avg Cost{pfArrow("avgCost")}</TableHead>
+                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("totalCost")}>Total Cost{pfArrow("totalCost")}</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {[...liveHoldings]
-                  .sort((a, b) => b.quantity * b.current_price - a.quantity * a.current_price)
+                  .sort((a, b) => {
+                    const metric = (h: typeof a): number | string => {
+                      const q = liveQuotes?.[h.symbol];
+                      const price = q?.price ?? h.current_price;
+                      const value = h.quantity * price;
+                      const cost = h.quantity * h.cost_basis;
+                      switch (pfSortKey) {
+                        case "symbol": return h.symbol;
+                        case "last": return price;
+                        case "dayGL": return q && q.prevClose > 0 ? h.quantity * (price - q.prevClose) : -Infinity;
+                        case "totalGL": return cost > 0 ? value - cost : -Infinity;
+                        case "value": return value;
+                        case "pct": return value; // same ordering as value
+                        case "qty": return h.quantity;
+                        case "avgCost": return h.cost_basis;
+                        case "totalCost": return cost;
+                      }
+                    };
+                    const va = metric(a), vb = metric(b);
+                    return (typeof va === "string" ? va.localeCompare(vb as string) : (va as number) - (vb as number)) * pfSortDir;
+                  })
                   .map((h) => {
                   const q = liveQuotes?.[h.symbol];
                   const price = q?.price ?? h.current_price;
