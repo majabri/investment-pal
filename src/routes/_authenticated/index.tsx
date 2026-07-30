@@ -87,13 +87,15 @@ function Dashboard() {
     () => holdings.reduce((sum, h) => sum + h.quantity * h.cost_basis, 0),
     [holdings],
   );
+  const householdSymbols = useMemo(() => [...new Set(allHoldings.map((h) => h.symbol))], [allHoldings]);
   const heldSymbols = useMemo(() => holdings.map((h) => h.symbol), [holdings]);
   const { data: liveQuotes } = useQuery({
-    queryKey: ["daily-quotes", heldSymbols.join(",")],
-    queryFn: () => getQuotesFn({ data: { symbols: heldSymbols } }),
-    enabled: heldSymbols.length > 0,
+    queryKey: ["daily-quotes", householdSymbols.join(",")],
+    queryFn: () => getQuotesFn({ data: { symbols: householdSymbols } }),
+    enabled: householdSymbols.length > 0,
     refetchInterval: 60 * 1000,
   });
+  const px = (h: { symbol: string; current_price: number }) => liveQuotes?.[h.symbol]?.price ?? h.current_price;
   const dailyPL = useMemo(() => {
     if (!liveQuotes) return null;
     let sum = 0, covered = 0;
@@ -214,13 +216,13 @@ function Dashboard() {
           <span className="font-medium">
             Household {fmtUSD(accountsList.reduce((s, a) => {
               const pos = allHoldings.filter((h) => h.account_id === a.id)
-                .reduce((x, h) => x + h.quantity * h.current_price, 0);
+                .reduce((x, h) => x + h.quantity * px(h), 0);
               return s + pos + Number(a.cash ?? 0) - Number(a.margin_used ?? 0);
             }, 0))}
           </span>
           {accountsList.map((a) => {
             const pos = allHoldings.filter((h) => h.account_id === a.id)
-              .reduce((x, h) => x + h.quantity * h.current_price, 0);
+              .reduce((x, h) => x + h.quantity * px(h), 0);
             const net = pos + Number(a.cash ?? 0) - Number(a.margin_used ?? 0);
             return (
               <span key={a.id} className="text-muted-foreground">
