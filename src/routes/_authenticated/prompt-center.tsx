@@ -78,7 +78,7 @@ function PromptCenter() {
     queryKey: ["pc-quotes", amirHoldings.map((h) => h.symbol).join(",")],
     queryFn: () => getQuotesFn({ data: { symbols: amirHoldings.map((h) => h.symbol) } }),
     enabled: amirHoldings.length > 0,
-    refetchInterval: 5 * 60 * 1000,
+    refetchInterval: 60 * 1000,
   });
   const ctx: PromptContext = useMemo(() => {
     const holdings = amirHoldings.map((h) => liveQuotes?.[h.symbol]
