@@ -45,14 +45,108 @@ function Page() {
       return `${k.name}: ${fmtUSD(mv + k.cash)} (cash ${fmtUSD(k.cash, 2)}) — ` +
         live.map((h) => `${h.symbol} ${h.shares}sh @ ${fmtUSD(h.price, 2)} = ${fmtUSD(h.shares * h.price)}${h.avgCost > 0 ? ` (avg ${fmtUSD(h.avgCost, 2)})` : ""}`).join(", ");
     }).join("\n");
-    return `You are my Family Investment Committee. Today is my biweekly review for my children's investment accounts (${kidsLine}). Long-term wealth creation only: college, first home, business. NOT for income.
-Rules: No margin. No options. No leverage. Long-term investing only. Each child receives $${FAMILY_POLICY.contribution.amountUsd} every two weeks. Do not recommend trades simply because cash is available.
-${FAMILY_POLICY.parityRule}
-Approved core: ${FAMILY_POLICY.core.join(", ")}. Supporting: ${FAMILY_POLICY.supporting.join(", ")}. Preferred future: ${FAMILY_POLICY.preferredFuture.join(", ")}. Speculative cap ${FAMILY_POLICY.speculative.maxPct}% (${FAMILY_POLICY.speculative.symbols.join(", ")}).
-Target: $${FAMILY_POLICY.targetPerChild.toLocaleString()} per child by July 2036. Next contribution: ${next}.
-Analyze: 1 Executive Summary, 2 Market Review, 3 Account Review per child, 4 Contribution Recommendation (exactly what today's $100 buys per child), 5 Portfolio Balance Review, 6 New Investment Ideas (up to 5), 7 Dividend Review, 8 Long-Term Outlook, 9 Next Contribution Plan, 10 Committee Decision. End with a one-page Family Action Sheet (Karim/Zain/Jude: Buy/Hold/Sell) and whether all three remain on track.
+    return `Family Investment Committee – Biweekly Capital Allocation Review
+
+Today is my biweekly investment review for my children's accounts (${kidsLine}).
+Each account receives $${FAMILY_POLICY.contribution.amountUsd} today.
+
+Objective
+Maximize the probability of each child reaching $200,000 within 10 years through disciplined long-term investing.
+These accounts are for:
+* College
+* First home
+* Business
+* Financial independence
+This is not an income portfolio.
+
+Investment Rules
+* Long-term investing only
+* No margin
+* No options
+* No leverage
+* No market timing
+* Buy only high-conviction businesses
+* Use today's market data
+* Challenge your own assumptions before making recommendations
+* Do not recommend purchases simply because cash is available
+
+Existing Holdings
+Use the portfolio I provide for:
+* Karim
+* Zain
+* Jude
+Assume the portfolios should remain substantially identical unless there is a compelling reason otherwise.
+
+Investment Committee Tasks
+Analyze in the following order:
+
+1. Executive Summary
+   * Is today a good day to deploy capital?
+   * What are the biggest macro and market developments since the last review?
+
+2. Market Environment
+   * Interest rates
+   * Inflation
+   * AI
+   * Cloud
+   * Semiconductors
+   * Cybersecurity
+   * Healthcare
+   * Consumer
+   * Financials
+   * Market valuation
+   * Major earnings
+   * Geopolitical risks
+
+3. Opportunity Ranking
+Rank the 10 best investment opportunities for the next 10 years.
+For each provide:
+* Investment thesis
+* Current valuation attractiveness
+* Expected long-term CAGR
+* Key risks
+* Confidence (1–10)
+
+4. Portfolio Review
+Review each child's portfolio:
+* Strengths
+* Weaknesses
+* Sector allocation
+* Concentration risk
+* Progress toward the $200,000 goal
+* Required annual return from today to reach the target
+
+5. Contribution Decision
+The committee must recommend exactly one of the following:
+* Add to an existing holding
+* Start a new position
+* Hold cash
+If recommending a purchase, specify:
+* Company
+* Dollar amount ($100)
+* Fractional shares (approximate)
+* Why this is the highest expected-return decision today
+* Why it is superior to every other candidate
+
+6. Devil's Advocate Review
+Challenge the recommendation by explaining:
+* Why buying it could be a mistake
+* The strongest alternative
+* Why the final recommendation still wins
+
+7. Next Contribution Plan
+If today's purchase is executed, identify the highest-priority purchase for the next $100 contribution in two weeks.
+
+8. Final Investment Committee Vote
+For Karim: BUY / HOLD / SELL
+For Zain: BUY / HOLD / SELL
+For Jude: BUY / HOLD / SELL
+Provide an overall confidence score (1–10).
+End with a one-page Family Action Sheet containing only the final actions.
 
 MY VERIFIED DATA (live prices as of ${new Date().toLocaleString("en-US")})
+Next contribution date: ${next}
+Approved universe (family policy — committee approval required for additions): Core ${FAMILY_POLICY.core.join(", ")}; Supporting ${FAMILY_POLICY.supporting.join(", ")}; Preferred future ${FAMILY_POLICY.preferredFuture.join(", ")}; Speculative cap ${FAMILY_POLICY.speculative.maxPct}% (${FAMILY_POLICY.speculative.symbols.join(", ")})
 ${data}`;
   }, [kidsData, quotes]);
 
