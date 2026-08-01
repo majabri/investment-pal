@@ -36,6 +36,7 @@ export function PortfolioCsvImport() {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [cashByAccount, setCashByAccount] = useState<Record<string, number>>({});
   const [fullOverwrite, setFullOverwrite] = useState(true);
+  const [createAll, setCreateAll] = useState(true);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
@@ -268,6 +269,12 @@ export function PortfolioCsvImport() {
                   </p>
                 </div>
                 <Switch id="full-overwrite" checked={fullOverwrite} onCheckedChange={setFullOverwrite} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="create-all" className="text-xs text-muted-foreground">
+                Create accounts for everything in the file (529 / Crypto / IRA grouped on the Office)
+              </Label>
+              <Switch id="create-all" checked={createAll} onCheckedChange={setCreateAll} />
               </div>
               <Button className="w-full" size="lg" onClick={() => void save()} disabled={busy || mapped.length === 0}>
                 {saveLabel}

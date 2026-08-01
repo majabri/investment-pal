@@ -20,6 +20,7 @@ import { WorkflowButtons } from "@/components/app/WorkflowButtons";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
+import { accountCategory, CATEGORY_ORDER } from "@/lib/data/accountGroups";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -213,23 +214,47 @@ function Dashboard() {
       </div>
       {accountsList.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-sm">
-          <span className="font-medium">
-            Household {fmtUSD(accountsList.reduce((s, a) => {
-              const pos = allHoldings.filter((h) => h.account_id === a.id)
-                .reduce((x, h) => x + h.quantity * px(h), 0);
-              return s + pos + Number(a.cash ?? 0) - Number(a.margin_used ?? 0);
-            }, 0))}
-          </span>
-          {accountsList.map((a) => {
-            const pos = allHoldings.filter((h) => h.account_id === a.id)
-              .reduce((x, h) => x + h.quantity * px(h), 0);
-            const net = pos + Number(a.cash ?? 0) - Number(a.margin_used ?? 0);
-            return (
-              <span key={a.id} className="text-muted-foreground">
-                {a.name} <span className="tabular-nums text-foreground">{fmtUSD(net)}</span>
-              </span>
+          {(() => {
+            const statsOf = (a: (typeof accountsList)[number]) => {
+              const rows = allHoldings.filter((h) => h.account_id === a.id);
+              const pos = rows.reduce((x, h) => x + h.quantity * px(h), 0);
+              const day = rows.reduce((x, h) => {
+                const q = liveQuotes?.[h.symbol];
+                return q && q.prevClose > 0 ? x + h.quantity * (q.price - q.prevClose) : x;
+              }, 0);
+              return { net: pos + Number(a.cash ?? 0) - Number(a.margin_used ?? 0), day };
+            };
+            const groups = new Map<string, { net: number; day: number }>();
+            let total = 0, totalDay = 0;
+            for (const a of accountsList) {
+              const { net, day } = statsOf(a);
+              total += net; totalDay += day;
+              const cat = accountCategory(a.name);
+              const g = groups.get(cat) ?? { net: 0, day: 0 };
+              g.net += net; g.day += day;
+              groups.set(cat, g);
+            }
+            const Day = ({ v }: { v: number }) => (
+              Math.abs(v) < 0.005 ? null : (
+                <span className={v >= 0 ? "text-emerald-500" : "text-red-500"}>
+                  {" "}{v >= 0 ? "+" : ""}{fmtUSD(v)}
+                </span>
+              )
             );
-          })}
+            return (
+              <>
+                <span className="font-medium">
+                  Household {fmtUSD(total)}<Day v={totalDay} />
+                </span>
+                {CATEGORY_ORDER.filter((c) => groups.has(c)).map((c) => (
+                  <span key={c} className="text-muted-foreground">
+                    {c} <span className="tabular-nums text-foreground">{fmtUSD(groups.get(c)!.net)}</span>
+                    <Day v={groups.get(c)!.day} />
+                  </span>
+                ))}
+              </>
+            );
+          })()}
         </div>
       )}
       {alerts.length > 0 && (
