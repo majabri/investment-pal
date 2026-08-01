@@ -16,10 +16,13 @@ const CORE: Record<string, string> = {
   "Bitcoin": "BTC-USD", "US Dollar": "DX-Y.NYB",
 };
 
+/** Yahoo symbol form: share classes use dashes (BRK.B → BRK-B); crypto pairs use dashes (BTC/USD → BTC-USD). */
+const yahooSymbol = (s: string) => s.replace(".", "-").replace("/", "-");
+
 async function quote(symbol: string): Promise<Quote | null> {
   try {
     const res = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol(symbol))}?range=1d&interval=1d`,
       { headers: { "User-Agent": "Mozilla/5.0" } },
     );
     if (!res.ok) return null;
