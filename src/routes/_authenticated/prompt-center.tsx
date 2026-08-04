@@ -21,7 +21,7 @@ import {
   riskToVol,
   riskToExpectedReturn,
 } from "@/lib/finance";
-import { buildV5Prompt, type MeetingType, type PromptContext } from "@/lib/prompts";
+import { buildV6Prompt, type MeetingType, type PromptContext } from "@/lib/prompts";
 import { useQuery } from "@tanstack/react-query";
 import { getNewsFn } from "@/lib/newsServer";
 import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
@@ -153,7 +153,7 @@ function PromptCenter() {
   const MEETING: Record<string, MeetingType> = {
     morning: "Morning", midday: "Mid-Day", evening: "Evening", weekly: "Weekly", monthly: "Monthly",
   };
-  const prompt = buildV5Prompt({ ...ctx, meeting: MEETING[tab] ?? "Morning", tradesToday });
+  const prompt = buildV6Prompt({ ...ctx, meeting: MEETING[tab] ?? "Morning", tradesToday });
 
   const copy = async () => {
     await navigator.clipboard.writeText(prompt);
