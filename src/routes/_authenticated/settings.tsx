@@ -78,6 +78,7 @@ function SettingsPage() {
         <div className="mb-3 flex items-center justify-between">
           <div>
             <div className="text-sm font-medium">Accounts</div>
+            <AddAccountForm />
             <p className="text-xs text-muted-foreground">
               Add each brokerage or retirement account. Set a target value and date per account —
               the app will track progress independently.
@@ -408,6 +409,36 @@ function Field({ label, children, className }: { label: string; children: React.
     <div className={className}>
       <Label className="text-xs text-muted-foreground">{label}</Label>
       <div className="mt-1">{children}</div>
+    </div>
+  );
+}
+
+
+function AddAccountForm() {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function add() {
+    const n = name.trim();
+    if (!n) return;
+    setBusy(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("Not signed in");
+      const { error } = await supabase.from("accounts").insert({ user_id: auth.user.id, name: n });
+      if (error) throw error;
+      toast.success(`Account "${n}" added`);
+      setName("");
+      void qc.invalidateQueries();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally { setBusy(false); }
+  }
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Add account (e.g. HSA, ROTH IRA)"
+        className="h-8 max-w-xs text-sm" onKeyDown={(e) => e.key === "Enter" && void add()} />
+      <Button size="sm" className="h-8" disabled={busy || !name.trim()} onClick={() => void add()}>Add</Button>
     </div>
   );
 }
