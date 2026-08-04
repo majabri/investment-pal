@@ -89,6 +89,18 @@ IRA total: ${fmtUSD(total)}`;
         </div>
         {reviewDue() && <Badge variant="destructive">Monthly review due</Badge>}
       </div>
+      {rows.length === 0 && (
+        <Card className="mb-4">
+          <CardContent className="pt-6 text-sm text-muted-foreground">
+            <p className="mb-1 font-medium text-foreground">No IRA accounts yet.</p>
+            <p>They appear here automatically after your next Fidelity import with
+            <span className="font-medium"> "Create accounts for everything in the file" </span>
+            switched on (Settings → Portfolio CSV Import) — your ROTH IRA and ROLLOVER IRA
+            will be created and grouped here with live prices. You can also add one manually
+            in Settings → Add account.</p>
+          </CardContent>
+        </Card>
+      )}
       <div className="grid gap-4 md:grid-cols-2">
         {rows.map(({ a, hs, value, day }) => (
           <Card key={a.id}>
