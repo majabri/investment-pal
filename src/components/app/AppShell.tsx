@@ -15,6 +15,7 @@ import {
   CalendarClock,
   CalendarDays,
   Globe,
+  PiggyBank,
 } from "lucide-react";
 import { MarketTape } from "./MarketTape";
 
@@ -35,6 +36,7 @@ const navGroups: NavGroup[] = [
       { to: "/journal", label: "Trade Journal", icon: BookOpen },
       { to: "/watchlist", label: "Investment Watchlist", icon: Eye },
       { to: "/goals", label: "Goals", icon: Target },
+      { to: "/ira", label: "IRA", icon: PiggyBank },
     ],
   },
   {
