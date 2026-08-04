@@ -16,18 +16,20 @@ const DESTINATIONS = [
   { value: "Karim", label: "Kids — Karim" },
   { value: "Zain", label: "Kids — Zain" },
   { value: "Jude", label: "Kids — Jude" },
+  { value: "__create__", label: "Create this account (keep its Fidelity name)" },
   { value: "__skip__", label: "Skip this account" },
 ] as const;
 
-/** Exact-name defaults only; anything unrecognized defaults to Skip.
- *  ("Jude Crypto" / "Jude 529" must NOT auto-merge into Jude's brokerage.) */
-function defaultDestination(label: string | undefined): string {
+/** Exact-name defaults map to the four primary accounts; anything else
+ *  ("Jude Crypto", "Jude 529", ROTH IRA, ...) is created under its own
+ *  Fidelity name when create-all is on, else skipped. */
+function defaultDestination(label: string | undefined, createAll: boolean): string {
   const l = (label ?? "").trim().toLowerCase();
   if (l === "karim") return "Karim";
   if (l === "zain") return "Zain";
   if (l === "jude") return "Jude";
   if (l === "amir - tod" || l === "amir-tod") return "Amir - TOD";
-  return "__skip__";
+  return createAll ? "__create__" : "__skip__";
 }
 
 export function PortfolioCsvImport() {
@@ -73,13 +75,27 @@ export function PortfolioCsvImport() {
     initMapping(res.rows);
   }
 
-  function initMapping(rows: ParsedHolding[]) {
+  function initMapping(rows: ParsedHolding[], create = createAll) {
     const m: Record<string, string> = {};
     for (const h of rows) {
       const key = h.accountName ?? "Unlabeled account";
-      if (!(key in m)) m[key] = defaultDestination(h.accountName);
+      if (!(key in m)) m[key] = defaultDestination(h.accountName, create);
     }
     setMapping(m);
+  }
+
+  function onToggleCreateAll(next: boolean) {
+    setCreateAll(next);
+    // Re-default any unknown accounts the user hasn't manually remapped
+    setMapping((m) => {
+      const out: Record<string, string> = { ...m };
+      for (const [label, dest] of Object.entries(m)) {
+        if (dest === "__skip__" || dest === "__create__") {
+          out[label] = defaultDestination(label, next);
+        }
+      }
+      return out;
+    });
   }
 
   async function save() {
@@ -94,8 +110,9 @@ export function PortfolioCsvImport() {
       const groups = new Map<string, ParsedHolding[]>();
       for (const h of parsed) {
         const key = h.accountName ?? "Unlabeled account";
-        const dest = mapping[key] ?? defaultDestination(h.accountName);
-        if (dest === "__skip__") continue;
+        const destRaw = mapping[key] ?? defaultDestination(h.accountName, createAll);
+        if (destRaw === "__skip__") continue;
+        const dest = destRaw === "__create__" ? key : destRaw; // create keeps the Fidelity name
         if (!groups.has(dest)) groups.set(dest, []);
         groups.get(dest)!.push(h);
       }
@@ -274,7 +291,7 @@ export function PortfolioCsvImport() {
               <Label htmlFor="create-all" className="text-xs text-muted-foreground">
                 Create accounts for everything in the file (529 / Crypto / IRA grouped on the Office)
               </Label>
-              <Switch id="create-all" checked={createAll} onCheckedChange={setCreateAll} />
+              <Switch id="create-all" checked={createAll} onCheckedChange={onToggleCreateAll} />
               </div>
               <Button className="w-full" size="lg" onClick={() => void save()} disabled={busy || mapped.length === 0}>
                 {saveLabel}
