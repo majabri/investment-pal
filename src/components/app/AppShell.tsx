@@ -42,7 +42,9 @@ const navGroups: NavGroup[] = [
   {
     group: "Kids",
     items: [
-      { to: "/kids", label: "Kids Dashboard", icon: Users },
+      { to: "/kids", label: "Kids Trading Dashboard", icon: Users },
+      { to: "/kids-529", label: "Kids 529 Dashboard", icon: Users },
+      { to: "/kids-crypto", label: "Kids Crypto Dashboard", icon: Users },
       { to: "/kids-prompt-center", label: "Kids Prompt Center", icon: Sparkles },
       { to: "/kids-watchlist", label: "Kids Watchlist", icon: Eye },
     ],
