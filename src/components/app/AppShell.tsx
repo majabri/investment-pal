@@ -18,6 +18,7 @@ import {
   PiggyBank,
 } from "lucide-react";
 import { MarketTape } from "./MarketTape";
+import { APP_VERSION } from "@/lib/version";
 
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";

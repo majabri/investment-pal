@@ -61,7 +61,7 @@ function PortfolioPage() {
   const logSync = useLogSync();
   const [selected, setSelected] = useState<Holding | null>(null);
 
-  const { data: liveQuotes } = useQuery({
+  const { data: liveQuotes, dataUpdatedAt } = useQuery({
     queryKey: ["pf-quotes", holdings.map((h) => h.symbol).join(",")],
     queryFn: () => getQuotesFn({ data: { symbols: holdings.map((h) => h.symbol) } }),
     enabled: holdings.length > 0,
@@ -144,7 +144,9 @@ function PortfolioPage() {
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium">Holdings</span>
             <span className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Amir - TOD only</span>
+              <span className="text-xs text-muted-foreground">
+                Amir - TOD only{dataUpdatedAt ? ` · as of ${new Date(dataUpdatedAt).toLocaleTimeString("en-US")}` : ""}
+              </span>
               <RefreshPricesButton symbols={holdings.map((h) => h.symbol)} />
             </span>
           </div>
