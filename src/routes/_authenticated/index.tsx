@@ -212,6 +212,47 @@ function Dashboard() {
       <div className="mb-4">
         <WorkflowButtons symbols={holdings.map((h) => h.symbol)} />
       </div>
+      {(() => {
+        // ── Command-center strip: freshness · margin meter · constitution check ──
+        const amir = accountsList.find((a) => a.name === "Amir - TOD");
+        const marginUsed = Number(amir?.margin_used ?? 0);
+        const amirHs = holdings;
+        const gross = amirHs.reduce((x, h) => x + h.quantity * px(h), 0) + Number(amir?.cash ?? 0);
+        const net = gross - marginUsed;
+        const equityPct = gross > 0 ? net / gross : 1;
+        const dailyInterest = (marginUsed * 0.11825) / 365;
+        const lastUpdate = amirHs.reduce<string | null>((m, h) => {
+          const u = (h as { updated_at?: string }).updated_at ?? null;
+          return u && (!m || u > m) ? u : m;
+        }, null);
+        const staleDays = lastUpdate ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / 86400000) : null;
+        const breaches: string[] = [];
+        for (const h of amirHs) {
+          const v = h.quantity * px(h);
+          if (net > 0 && v / net > 0.30) breaches.push(`${h.symbol} ${fmtPct(v / net)} > 30% cap`);
+        }
+        if (marginUsed > 0 && equityPct < 0.5) breaches.push(`Equity ${fmtPct(equityPct)} < 50%`);
+        return (
+          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-xs">
+            <span className={staleDays != null && staleDays >= 1 ? "font-medium text-amber-500" : "text-muted-foreground"}>
+              Positions: {staleDays == null ? "never imported" : staleDays === 0 ? "imported today" : `imported ${staleDays}d ago`}
+            </span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-muted-foreground">
+              Margin {marginUsed > 0 ? `${fmtUSD(marginUsed)} · ~${fmtUSD(dailyInterest, 2)}/day interest · equity ${fmtPct(equityPct)}` : "not set"}
+            </span>
+            <span className="text-muted-foreground">·</span>
+            {breaches.length === 0 ? (
+              <span className="text-emerald-500">Constitution: clean</span>
+            ) : (
+              <span className="font-medium text-red-500">⚠ {breaches.join(" · ")}</span>
+            )}
+            {(staleDays == null || staleDays >= 1) && (
+              <Link to="/settings" className="ml-auto font-medium text-primary hover:underline">Import now →</Link>
+            )}
+          </div>
+        );
+      })()}
       {accountsList.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-sm">
           {(() => {
