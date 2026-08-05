@@ -22,7 +22,7 @@ import {
   riskToExpectedReturn,
 } from "@/lib/finance";
 import { buildV6Prompt, type MeetingType, type PromptContext } from "@/lib/prompts";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getNewsFn } from "@/lib/newsServer";
 import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
 import { useJournal, useAccounts } from "@/hooks/useAppData";
@@ -67,6 +67,7 @@ function PromptCenter() {
   const [userNotes, setUserNotes] = useState("");
   const [tradesToday, setTradesToday] = useState("");
   const [aiResponse, setAiResponse] = useState("");
+  const qc = useQueryClient();
   const { tab: urlTab } = Route.useSearch();
   const [tab, setTab] = useState<string>(urlTab ?? "morning");
   useEffect(() => { if (urlTab) setTab(urlTab); }, [urlTab]);
@@ -160,6 +161,38 @@ function PromptCenter() {
     toast.success("Prompt copied");
   };
   const openChatGPT = () => window.open("https://chat.openai.com/", "_blank", "noopener");
+  const extractActionSheet = async () => {
+    if (!aiResponse.trim()) return toast.error("Paste the committee response first");
+    const lines = aiResponse.split("\n").map((l) => l.trim());
+    const actions: { action: string; line: string; symbol: string | null }[] = [];
+    const ACT = /^[-*•\s]*\**(BUY MORE|BUY|SELL|TRIM|MARGIN|HIGHEST PRIORITY ACTION|SINGLE HIGHEST PRIORITY ACTION)\**[:\s|—-]/i;
+    for (const l of lines) {
+      const m = ACT.exec(l);
+      if (!m) continue;
+      const body = l.replace(ACT, "").trim();
+      if (!body || /^(none|n\/a|no action)/i.test(body)) continue;
+      const sym = /\b([A-Z]{1,5}(?:\.[A-B])?)\b/.exec(body)?.[1] ?? null;
+      actions.push({ action: m[1].toUpperCase(), line: `${m[1].toUpperCase()}: ${body}`.slice(0, 300), symbol: sym });
+      if (actions.length >= 12) break;
+    }
+    if (!actions.length) return toast.error("No Action Sheet lines found (BUY/SELL/TRIM/MARGIN…)");
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("Not signed in");
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = actions.map((a) => ({
+        user_id: auth.user!.id, decided_on: today, symbol: a.symbol,
+        recommendation: a.line, decision: "pending",
+      }));
+      const { error } = await supabase.from("decisions" as never).insert(rows as never);
+      if (error) throw error;
+      toast.success(`Action Sheet extracted: ${actions.length} items logged as pending decisions`);
+      void qc.invalidateQueries({ predicate: (q: { queryKey: readonly unknown[] }) => String(q.queryKey[0]).startsWith("decisions") });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Extract failed");
+    }
+  };
+
   const saveSummary = () => {
     if (!aiResponse.trim()) return toast.error("Paste the AI response first");
     addJournal.mutate(
@@ -203,6 +236,7 @@ function PromptCenter() {
             onCopy={copy}
             onOpen={openChatGPT}
             onSave={saveSummary}
+            onExtract={extractActionSheet}
           />
         </TabsContent>
 
@@ -225,6 +259,7 @@ function PromptCenter() {
             onCopy={copy}
             onOpen={openChatGPT}
             onSave={saveSummary}
+            onExtract={extractActionSheet}
           />
         </TabsContent>
         <TabsContent value="midday" className="mt-4 space-y-4">
@@ -237,6 +272,7 @@ function PromptCenter() {
             onCopy={copy}
             onOpen={openChatGPT}
             onSave={saveSummary}
+            onExtract={extractActionSheet}
           />
         </TabsContent>
         <TabsContent value="weekly" className="mt-4 space-y-4">
@@ -249,6 +285,7 @@ function PromptCenter() {
             onCopy={copy}
             onOpen={openChatGPT}
             onSave={saveSummary}
+            onExtract={extractActionSheet}
           />
         </TabsContent>
         <TabsContent value="monthly" className="mt-4 space-y-4">
@@ -261,6 +298,7 @@ function PromptCenter() {
             onCopy={copy}
             onOpen={openChatGPT}
             onSave={saveSummary}
+            onExtract={extractActionSheet}
           />
         </TabsContent>
       </Tabs>
@@ -280,6 +318,7 @@ function PromptEditor({
   onCopy,
   onOpen,
   onSave,
+  onExtract,
 }: {
   prompt: string;
   notes: string;
@@ -289,6 +328,7 @@ function PromptEditor({
   onCopy: () => void;
   onOpen: () => void;
   onSave: () => void;
+  onExtract?: () => void;
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">

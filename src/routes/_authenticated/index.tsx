@@ -14,6 +14,7 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
+import { supabase } from "@/integrations/supabase/client";
 import { StatCard } from "@/components/app/StatCard";
 import { ProgressChart } from "@/components/app/ProgressChart";
 import { WorkflowButtons } from "@/components/app/WorkflowButtons";
@@ -109,6 +110,17 @@ function Dashboard() {
   const week = new Date(); week.setDate(week.getDate() + 7);
   const weekEnd = week.toISOString().slice(0, 10);
   const todayStr = new Date().toISOString().slice(0, 10);
+  const { data: todaysPlan = [] } = useQuery({
+    queryKey: ["decisions-today"],
+    queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data } = await supabase.from("decisions" as never)
+        .select("id,recommendation,decision").eq("decided_on", today)
+        .order("id", { ascending: true }).limit(12);
+      return (data ?? []) as unknown as { id: string; recommendation: string; decision: string }[];
+    },
+    refetchInterval: 5 * 60 * 1000,
+  });
   const { data: liveEcon = [] } = useQuery({
     queryKey: ["econ-cal-office"],
     queryFn: () => getEconCalendarFn({ data: { days: 7 } }),
@@ -296,6 +308,19 @@ function Dashboard() {
               </>
             );
           })()}
+        </div>
+      )}
+      {todaysPlan.length > 0 && (
+        <div className="mb-4 rounded-xl border bg-card/60 px-4 py-3">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today's Plan — committee Action Sheet</div>
+          <ul className="space-y-0.5 text-sm">
+            {todaysPlan.map((d) => (
+              <li key={d.id} className="flex items-center gap-2">
+                <span className={d.decision === "pending" ? "text-amber-500" : "text-emerald-500"}>●</span>
+                <span>{d.recommendation}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {alerts.length > 0 && (
