@@ -74,7 +74,7 @@ function KidsPage() {
   const familyTotal = liveKids.reduce((s, k) => s + k.cash + k.holdings.reduce((x, h) => x + h.shares * h.price, 0), 0);
 
   return (
-    <AppShell title="Kids Dashboard" subtitle={`Family Investment OS v${FAMILY_POLICY.version} · $${FAMILY_POLICY.contribution.amountUsd}/child every other Thursday · next ${next}`}>
+    <AppShell title="Kids Trading Dashboard" subtitle={`Family Investment OS v${FAMILY_POLICY.version} · $${FAMILY_POLICY.contribution.amountUsd}/child every other Thursday · next ${next}`}>
       <Card className="mb-6">
         <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 pt-6 text-sm">
           <span><span className="text-muted-foreground">Family value</span> <strong className="tabular-nums">{fmtUSD(familyTotal)}</strong></span>
