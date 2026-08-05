@@ -37,7 +37,7 @@ export function WorkflowButtons({ symbols }: { symbols: string[] }) {
       <Button size="lg" variant={v("refresh")} className="h-12" disabled={busy}
         onClick={() => { void refresh(); void qc.invalidateQueries({ queryKey: ["market-tape"] }); }}>
         <RefreshCw className={`mr-2 h-4 w-4 ${busy ? "animate-spin" : ""}`} />
-        {busy ? "Refreshing…" : "Refresh & Reassess"}
+        {busy ? "Refreshing…" : "Mid-Day Meeting"}
       </Button>
       <Button asChild size="lg" variant={v("evening")} className="h-12">
         <Link to="/prompt-center" search={{ tab: "evening" }}>
