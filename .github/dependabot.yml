@@ -1,0 +1,26 @@
+# Dependabot configuration.
+#
+# This repo is bun-managed: Lovable builds from bun.lock, which is the source of
+# truth. package-lock.json was removed (it drifted and misled `npm ci`), so we
+# track the bun ecosystem here instead of npm.
+#
+# NOTE: as of 2025-02 Dependabot supports the bun package manager for VERSION
+# updates (text-based bun.lock, bun >= 1.1.39) but does NOT yet support bun
+# SECURITY updates. So scheduled version updates below keep bun.lock current;
+# GitHub Dependabot *alerts* still surface vulnerabilities for manual action
+# until bun security updates ship.
+version: 2
+updates:
+  - package-ecosystem: "bun"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Batch minor/patch bumps into one PR to reduce noise.
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
