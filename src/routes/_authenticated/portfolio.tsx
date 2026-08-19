@@ -29,6 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useHoldings, useAccount, useLogSync, type Holding } from "@/hooks/useAppData";
 import { useAccounts } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
+import { PriceHistoryRecorder } from "@/components/app/PriceHistoryRecorder";
 import { ThesisDialog } from "@/components/app/ThesisDialog";
 import { MarginCard } from "@/components/app/MarginCard";
 import { sectorFor } from "@/lib/data/sectors";
@@ -118,6 +119,8 @@ function PortfolioPage() {
         </>
       }
     >
+      {/* Invisible: records one daily close per held symbol into price_history. */}
+      <PriceHistoryRecorder quotes={liveQuotes} />
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard
           label="Gross — investments"
