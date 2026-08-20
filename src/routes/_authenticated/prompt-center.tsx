@@ -23,6 +23,7 @@ import {
   riskToExpectedReturn,
 } from "@/lib/finance";
 import { buildV6Prompt, type MeetingType, type PromptContext } from "@/lib/prompts";
+import { scorecardByAction, formatScorecardLines } from "@/lib/committeeScorecard";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getNewsFn } from "@/lib/newsServer";
 import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
@@ -104,6 +105,23 @@ function PromptCenter() {
       return (data ?? []) as unknown as { decided_on: string; symbol: string | null; recommendation: string; decision: string; outcome_pl: number | null }[];
     },
   });
+  // Committee scorecard: graded track record by action type (migration item 4).
+  const { data: scorecardRows = [] } = useQuery({
+    queryKey: ["decisions-scorecard"],
+    queryFn: async () => {
+      const { data } = await supabase.from("decisions" as never)
+        .select("action,recommendation,grade,outcome_1m")
+        .in("grade", ["CORRECT", "WRONG"]).limit(200);
+      return (data ?? []) as unknown as {
+        action: string | null; recommendation: string;
+        grade: "CORRECT" | "WRONG" | "NEUTRAL" | "PENDING" | null; outcome_1m: number | null;
+      }[];
+    },
+  });
+  const committeeScorecard = useMemo(
+    () => formatScorecardLines(scorecardByAction(scorecardRows)),
+    [scorecardRows],
+  );
 
   const [userNotes, setUserNotes] = useState("");
   const [tradesToday, setTradesToday] = useState("");
@@ -192,8 +210,9 @@ function PromptCenter() {
         `${d.decided_on}${d.symbol ? ` ${d.symbol}` : ""}: "${d.recommendation}" → ${d.decision}${d.outcome_pl != null ? ` → ${d.outcome_pl >= 0 ? "+" : ""}$${d.outcome_pl.toFixed(2)}` : ""}`),
       recentJournal: journalEntries.slice(0, 3).map((j) =>
         `${j.created_at.slice(0, 10)}: ${(j.title ?? j.body ?? "").slice(0, 120)}`),
+      committeeScorecard,
     };
-  }, [amirHoldings, liveQuotes, amirAccount, account, goal, priorities, ipsLite, userNotes, news, journalEntries, decisions, liveEconCal, liveEarnCal]);
+  }, [amirHoldings, liveQuotes, amirAccount, account, goal, priorities, ipsLite, userNotes, news, journalEntries, decisions, committeeScorecard, liveEconCal, liveEarnCal]);
 
   const MEETING: Record<string, MeetingType> = {
     morning: "Morning", midday: "Mid-Day", evening: "Evening", weekly: "Weekly", monthly: "Monthly",

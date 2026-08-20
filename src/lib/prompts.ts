@@ -31,6 +31,7 @@ export type PromptContext = {
   topHeadlines?: string[];
   recentJournal?: string[];
   recentDecisions?: string[];
+  committeeScorecard?: string[];
 };
 
 function dataBlock(ctx: PromptContext): string {
@@ -90,6 +91,9 @@ ${ctx.topHeadlines?.length ? ctx.topHeadlines.map((h) => `- ${h}`).join("\n") : 
 
 RECENT JOURNAL ENTRIES
 ${ctx.recentJournal?.length ? ctx.recentJournal.map((j) => `- ${j}`).join("\n") : "- (none)"}
+
+COMMITTEE SCORECARD — your graded track record by action type (calibrate confidence to this)
+${ctx.committeeScorecard?.length ? ctx.committeeScorecard.map((s) => `- ${s}`).join("\n") : "- (not enough graded decisions yet)"}
 
 DECISION HISTORY (recommendation → my decision → outcome)
 ${ctx.recentDecisions?.length ? ctx.recentDecisions.map((d) => `- ${d}`).join("\n") : "- (none logged yet)"}`;
