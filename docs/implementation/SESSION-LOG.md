@@ -49,3 +49,24 @@ preserved for reference.
    nullable) + Action Sheet extractor update. `confidence ≠ probability` (separate columns).
 2. Then outcome grading (`price_at_rec` + 1d/1w/1m grades) building on price_history.
 3. Committee scorecard → v6 prompt feedback loop.
+
+## Session 2 — 2026-08-19
+
+- **Merged:** #60 (ADR-APP-001), #61 (price_history), and Dependabot #59 (js-yaml 4.3.1 —
+  benign security patch, npm-lockfile only). Diligence confirmed #59 is not money-adjacent
+  and does not contradict ADR-APP-001.
+- **PR2 opened (#63):** evidence-contract columns on `decisions` — migration-only, additive,
+  all nullable; `confidence`/`probability_impact` separate columns. Verified `npm install` +
+  `tsc --noEmit` + boot 200 (see gate change below).
+- **Health finding:** a Lovable sync commit bumped `@lovable.dev/vite-tanstack-config` in
+  `package.json`/`bun.lock` but not `package-lock.json`, so `npm ci` fails on `main`. The repo
+  is **bun-managed** (Lovable builds from `bun.lock`); the npm lockfile was vestigial.
+- **Verification gate updated:** now **`bun install --frozen-lockfile` (npm install fallback)
+  + `npx tsc --noEmit` + boot check** — no more `npm ci`. Documented in `CLAUDE.md`.
+- **Housekeeping PR:** removes `package-lock.json`, adds `.github/dependabot.yml` tracking the
+  **bun** ecosystem, adds `CLAUDE.md`. (Dependabot supports bun *version* updates, not yet
+  *security* updates — noted in that PR.)
+
+### Next
+- **PR3** — populate the new evidence columns from `extractActionSheet` (action, best-effort
+  confidence), leaving the rest nullable. Then outcome grading, committee scorecard.

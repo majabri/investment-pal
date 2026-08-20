@@ -67,5 +67,6 @@ Concretely:
 
 - Spec (read-only): `~/invest-os-intake/spec/` and Drive `My Drive/Projects/Invest IOS/`.
 - Authority order: this instruction set → app operating rules (`AGENTS.md`, branch→PR→
-  merge, `npm ci && npx tsc --noEmit` + boot check before merge) → reference-library
+  merge, `bun install --frozen-lockfile && npx tsc --noEmit` + boot check before
+  merge — see CLAUDE.md) → reference-library
   concepts.
