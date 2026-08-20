@@ -368,3 +368,51 @@ export function useLogSync() {
     },
   });
 }
+
+export type IpsLite = {
+  position_cap_pct: number;
+  position_cap_hard: boolean;
+  margin_cap_pct: number;
+};
+
+// Signed-off defaults (ADR-APP-004): 30% soft position cap, 25% margin cap.
+export const IPS_LITE_DEFAULTS: IpsLite = {
+  position_cap_pct: 30,
+  position_cap_hard: false,
+  margin_cap_pct: 25,
+};
+
+// IPS-lite policy record (one row per user). Falls back to the signed-off
+// defaults when unset, so the policy always has values.
+export function useIpsLite() {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["ips_lite"],
+    queryFn: async (): Promise<IpsLite> => {
+      const { data, error } = await supabase
+        .from("ips_lite" as never)
+        .select("position_cap_pct,position_cap_hard,margin_cap_pct")
+        .limit(1);
+      const rows = (data ?? []) as unknown as Partial<IpsLite>[];
+      if (error || rows.length === 0) return IPS_LITE_DEFAULTS;
+      const row = rows[0]!;
+      return {
+        position_cap_pct: Number(row.position_cap_pct ?? IPS_LITE_DEFAULTS.position_cap_pct),
+        position_cap_hard: Boolean(row.position_cap_hard ?? IPS_LITE_DEFAULTS.position_cap_hard),
+        margin_cap_pct: Number(row.margin_cap_pct ?? IPS_LITE_DEFAULTS.margin_cap_pct),
+      };
+    },
+  });
+  const save = useMutation({
+    mutationFn: async (patch: Partial<IpsLite>) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not signed in");
+      const { error } = await supabase
+        .from("ips_lite" as never)
+        .upsert({ user_id: userData.user.id, ...patch } as never, { onConflict: "user_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ips_lite"] }),
+  });
+  return { ...query, data: query.data ?? IPS_LITE_DEFAULTS, save };
+}

@@ -13,6 +13,9 @@ export type PromptContext = {
   goalDate: string;
   requiredCagr: number;
   probability: number;
+  ipsPositionCapPct?: number;
+  ipsPositionCapHard?: boolean;
+  ipsMarginCapPct?: number;
   holdings: Array<{
     symbol: string;
     quantity: number;
@@ -58,6 +61,11 @@ Today's P/L (vs prior close, live-quoted positions): ${fmtUSD(ctx.todaysPL)} (${
 Cash: ${fmtUSD(ctx.cash)} | Margin used: ${fmtUSD(ctx.marginUsed)} | Buying power: ${fmtUSD(ctx.buyingPower)}
 Goal: ${fmtUSD(ctx.goalTarget)} by ${ctx.goalDate} | Required CAGR: ${fmtPct(ctx.requiredCagr)} | Model probability: ${fmtPct(ctx.probability)}
 Required pace: ${fmtPct(Math.pow(1 + ctx.requiredCagr, 1 / 52) - 1)}/week | ${fmtPct(Math.pow(1 + ctx.requiredCagr, 1 / 12) - 1)}/month
+
+INVESTMENT POLICY (IPS-lite) — HARD GOVERNANCE
+Max single position: ${ctx.ipsPositionCapPct ?? 30}% of gross${ctx.ipsPositionCapHard ? " (HARD — do not exceed)" : " (soft — flag any breach; explicit justification required)"}.
+Max margin utilization: ${ctx.ipsMarginCapPct ?? 25}% of account value.
+The objective never justifies overriding risk limits or the evidence contract.
 
 HOLDINGS
 ${holdingsBlock}

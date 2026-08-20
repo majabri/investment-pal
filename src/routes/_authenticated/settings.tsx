@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Upload, LogOut, Trash2, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -25,6 +25,7 @@ import {
   useSyncLog,
   useLogSync,
   useAccounts,
+  useIpsLite,
   type Account,
 } from "@/hooks/useAppData";
 import { useQueryClient } from "@tanstack/react-query";
@@ -52,6 +53,72 @@ const ACCOUNT_TYPES = [
   "other",
 ] as const;
 
+// IPS-lite policy editor (ADR-APP-004). Position cap + margin cap govern the
+// committee prompt and the Constitution Check strip. Money-adjacent numbers were
+// signed off in ADR-APP-004; edits here re-set the policy going forward.
+function IpsLiteCard() {
+  const { data: ips, save } = useIpsLite();
+  const [posCap, setPosCap] = useState("");
+  const [marginCap, setMarginCap] = useState("");
+  const [mode, setMode] = useState("soft");
+  useEffect(() => {
+    setPosCap(String(ips.position_cap_pct));
+    setMarginCap(String(ips.margin_cap_pct));
+    setMode(ips.position_cap_hard ? "hard" : "soft");
+  }, [ips.position_cap_pct, ips.margin_cap_pct, ips.position_cap_hard]);
+
+  const onSave = () => {
+    const p = Number(posCap);
+    const m = Number(marginCap);
+    if (!Number.isFinite(p) || p < 0 || p > 100) return toast.error("Position cap must be 0–100%");
+    if (!Number.isFinite(m) || m < 0 || m > 100) return toast.error("Margin cap must be 0–100%");
+    save.mutate(
+      { position_cap_pct: p, position_cap_hard: mode === "hard", margin_cap_pct: m },
+      {
+        onSuccess: () => toast.success("Policy saved"),
+        onError: (e) => toast.error((e as Error).message),
+      },
+    );
+  };
+
+  return (
+    <section className="mb-4 rounded-2xl border bg-card p-5">
+      <div className="mb-1 text-sm font-medium">Investment policy (IPS-lite)</div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Governs the committee prompt and the Constitution Check strip. The objective never
+        justifies overriding these limits or the evidence contract.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-[200px_200px_160px_auto]">
+        <div>
+          <Label className="text-xs">Max single position (% of gross)</Label>
+          <Input type="number" min={0} max={100} value={posCap} onChange={(e) => setPosCap(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-xs">Max margin utilization (% of acct)</Label>
+          <Input type="number" min={0} max={100} value={marginCap} onChange={(e) => setMarginCap(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-xs">Position cap enforcement</Label>
+          <Select value={mode} onValueChange={setMode}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="soft">Soft (flag)</SelectItem>
+              <SelectItem value="hard">Hard (block)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-end">
+          <Button onClick={onSave} disabled={save.isPending}>
+            Save policy
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SettingsPage() {
   const qc = useQueryClient();
   const { data: priorities = [], add: addPriority, dismiss: dismissP } = usePriorities();
@@ -73,6 +140,7 @@ function SettingsPage() {
       <div className="mb-4">
         <PortfolioCsvImport />
       </div>
+      <IpsLiteCard />
       {/* ACCOUNTS */}
       <section className="rounded-2xl border bg-card p-5">
         <div className="mb-3 flex items-center justify-between">
