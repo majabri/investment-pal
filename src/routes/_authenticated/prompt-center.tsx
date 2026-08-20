@@ -227,6 +227,9 @@ function PromptCenter() {
         // confidence live in the committee body, so those stay null here.
         action: canonicalAction(a.action),
         confidence: parseConfidence(a.line),
+        // Outcome grading: anchor the live price now so the decision can be
+        // graded at 1d/1w/1m later (null if the symbol has no live quote).
+        price_at_rec: a.symbol ? (liveQuotes?.[a.symbol]?.price ?? null) : null,
       }));
       const { error } = await supabase.from("decisions" as never).insert(rows as never);
       if (error) throw error;
