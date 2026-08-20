@@ -31,3 +31,6 @@ settle it: **don't infer.** File `../open-decisions/OD-xxx.md` and ask in chat.
 | ADR | Title | Status |
 |---|---|---|
 | ADR-APP-001 | Evolve investment-pal instead of building the multi-tenant platform | Accepted |
+| ADR-APP-002 | Swing Score (advisory trim signal) | Accepted |
+| ADR-APP-003 | Buy-back zones (re-entry ladder after a trim/sell) | Accepted |
+| ADR-APP-004 | IPS-lite (single-user policy record) | Accepted |
