@@ -30,11 +30,14 @@ import { useHoldings, useAccount, useLogSync, type Holding } from "@/hooks/useAp
 import { useAccounts } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { PriceHistoryRecorder } from "@/components/app/PriceHistoryRecorder";
+import { SwingScoreBadge } from "@/components/app/SwingScoreBadge";
 import { ThesisDialog } from "@/components/app/ThesisDialog";
 import { MarginCard } from "@/components/app/MarginCard";
 import { sectorFor } from "@/lib/data/sectors";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
+import { getEarningsCalendarFn } from "@/lib/calendarServer";
+import { computeSwing, tradingDaysUntil, type SwingResult } from "@/lib/swingScore";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -68,6 +71,49 @@ function PortfolioPage() {
     enabled: holdings.length > 0,
     refetchInterval: 60 * 1000, // live: every 60s
   });
+
+  // Swing Score (ADR-APP-002): advisory trim signal from price_history + earnings.
+  const swingSymbols = holdings.map((h) => h.symbol);
+  const swingSymbolKey = swingSymbols.join(",");
+  const { data: swingHistory = [] } = useQuery({
+    queryKey: ["price-history-swing", swingSymbolKey],
+    enabled: swingSymbols.length > 0,
+    queryFn: async (): Promise<{ symbol: string; date: string; close: number }[]> => {
+      const { data } = await supabase
+        .from("price_history" as never)
+        .select("symbol,date,close")
+        .in("symbol", swingSymbols)
+        .order("date", { ascending: true });
+      return (data ?? []) as unknown as { symbol: string; date: string; close: number }[];
+    },
+  });
+  const { data: swingEarnings = [] } = useQuery({
+    queryKey: ["swing-earnings", swingSymbolKey],
+    enabled: swingSymbols.length > 0,
+    refetchInterval: 60 * 60 * 1000,
+    queryFn: () => getEarningsCalendarFn({ data: { symbols: swingSymbols, days: 10 } }),
+  });
+  const swing = useMemo(() => {
+    const closesBySym = new Map<string, number[]>();
+    for (const r of swingHistory) {
+      const arr = closesBySym.get(r.symbol) ?? [];
+      arr.push(Number(r.close));
+      closesBySym.set(r.symbol, arr);
+    }
+    const earnDays = new Map<string, number>();
+    for (const e of swingEarnings) {
+      const d = tradingDaysUntil(e.date);
+      if (d != null && (!earnDays.has(e.symbol) || d < earnDays.get(e.symbol)!)) earnDays.set(e.symbol, d);
+    }
+    const out = new Map<string, SwingResult>();
+    for (const s of swingSymbolKey ? swingSymbolKey.split(",") : []) {
+      out.set(s, computeSwing(closesBySym.get(s) ?? [], earnDays.get(s) ?? null));
+    }
+    return out;
+  }, [swingHistory, swingEarnings, swingSymbolKey]);
+  const swingFor = (sym: string): SwingResult =>
+    swing.get(sym) ?? { insufficient: true, band: "none", suggestion: null };
+
   type PfSortKey = "symbol" | "last" | "dayGL" | "totalGL" | "value" | "pct" | "qty" | "avgCost" | "totalCost";
   const [pfSortKey, setPfSortKey] = useState<PfSortKey>("value");
   const [pfSortDir, setPfSortDir] = useState<1 | -1>(-1);
@@ -164,6 +210,7 @@ function PortfolioPage() {
                 <TableRow>
                   <TableHead className="cursor-pointer select-none" onClick={() => togglePfSort("symbol")}>Symbol{pfArrow("symbol")}</TableHead>
                   <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("last")}>Last Price{pfArrow("last")}</TableHead>
+                  <TableHead className="text-right" title="Advisory trim signal (ADR-APP-002)">Swing</TableHead>
                   <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("dayGL")}>Today's G/L{pfArrow("dayGL")}</TableHead>
                   <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("totalGL")}>Total G/L{pfArrow("totalGL")}</TableHead>
                   <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("value")}>Current Value{pfArrow("value")}</TableHead>
@@ -228,6 +275,9 @@ function PortfolioPage() {
                           </>
                         )}
                       </TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <SwingScoreBadge r={swingFor(h.symbol)} />
+                      </TableCell>
                       <TableCell className={`text-right tabular ${dayGL == null ? "text-muted-foreground" : dayGL >= 0 ? "text-success" : "text-destructive"}`}>
                         {dayGL == null ? "--" : `${dayGL >= 0 ? "+" : ""}${fmtUSD(dayGL)}`}
                       </TableCell>
@@ -247,6 +297,11 @@ function PortfolioPage() {
                 })}
               </TableBody>
             </Table>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              <span className="font-medium">Swing</span> (advisory · ADR-APP-002): 65–79 → consider trim 10–25% ·
+              80+ → trim 25–50% · <span aria-hidden>⚠</span> = earnings within 5 trading days (hold the trim
+              decision). Score blends RSI(14) + distance above the 20/50-day MAs. The committee decides; you execute.
+            </p>
             {/* Fidelity-style account summary footer */}
             <div className="mt-3 divide-y border-t text-sm">
               <div className="flex items-center justify-between py-2">
