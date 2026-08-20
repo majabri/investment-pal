@@ -30,6 +30,45 @@ import { getQuotesFn } from "@/lib/marketServer";
 import { supabase } from "@/integrations/supabase/client";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 
+// Map the Action Sheet's action verbs to a canonical set for the `action` column.
+// Priority markers ("HIGHEST PRIORITY ACTION") aren't a trade action → null.
+const ACTION_CANON: Record<string, string> = {
+  BUY: "BUY",
+  "BUY MORE": "ADD",
+  ADD: "ADD",
+  SELL: "SELL",
+  TRIM: "TRIM",
+  HOLD: "HOLD",
+  WATCH: "WATCH",
+  MARGIN: "MARGIN",
+};
+function canonicalAction(raw: string): string | null {
+  return ACTION_CANON[raw.trim().toUpperCase()] ?? null;
+}
+
+// Best-effort confidence, in [0,1] (matches the decisions_confidence_range CHECK).
+// Only reads a value when "confidence"/"conf" is present, so a trim size like
+// "TRIM 25%" is never mistaken for confidence. Returns null when absent.
+function parseConfidence(text: string): number | null {
+  const l = text.toLowerCase();
+  let m = /conf(?:idence)?[^0-9]{0,6}(\d{1,3})\s*%/.exec(l);
+  if (m) {
+    const p = Number(m[1]);
+    if (p >= 0 && p <= 100) return Math.round(p) / 100;
+  }
+  m = /conf(?:idence)?[^0-9]{0,6}(\d{1,2})\s*\/\s*10/.exec(l);
+  if (m) {
+    const n = Number(m[1]);
+    if (n >= 0 && n <= 10) return n / 10;
+  }
+  m = /conf(?:idence)?[^0-9]{0,6}(\d{1,2})\b/.exec(l);
+  if (m) {
+    const n = Number(m[1]);
+    if (n >= 1 && n <= 10) return n / 10;
+  }
+  return null;
+}
+
 export const Route = createFileRoute("/_authenticated/prompt-center")({
   validateSearch: (search: Record<string, unknown>): { tab?: "morning" | "midday" | "evening" | "weekly" | "monthly" } => ({
     tab: ["morning", "midday", "evening", "weekly", "monthly"].includes(search.tab as string)
@@ -183,6 +222,11 @@ function PromptCenter() {
       const rows = actions.map((a) => ({
         user_id: auth.user!.id, decided_on: today, symbol: a.symbol,
         recommendation: a.line, decision: "pending",
+        // Evidence-contract columns: populate what a line-based extract can.
+        // The Action Sheet carries the action verb; per-line evidence/risks/
+        // confidence live in the committee body, so those stay null here.
+        action: canonicalAction(a.action),
+        confidence: parseConfidence(a.line),
       }));
       const { error } = await supabase.from("decisions" as never).insert(rows as never);
       if (error) throw error;
