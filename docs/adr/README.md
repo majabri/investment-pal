@@ -34,3 +34,4 @@ settle it: **don't infer.** File `../open-decisions/OD-xxx.md` and ask in chat.
 | ADR-APP-002 | Swing Score (advisory trim signal) | Accepted |
 | ADR-APP-003 | Buy-back zones (re-entry ladder after a trim/sell) | Accepted |
 | ADR-APP-004 | IPS-lite (single-user policy record) | Accepted |
+| ADR-APP-005 | Standing merge policy (self-merge authority) | Accepted |
