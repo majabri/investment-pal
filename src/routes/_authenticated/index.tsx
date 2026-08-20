@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/integrations/supabase/client";
+import { activeBuybackBySymbol, type TrimDecision } from "@/lib/buybackZones";
 import { StatCard } from "@/components/app/StatCard";
 import { ProgressChart } from "@/components/app/ProgressChart";
 import { WorkflowButtons } from "@/components/app/WorkflowButtons";
@@ -123,6 +124,28 @@ function Dashboard() {
     },
     refetchInterval: 5 * 60 * 1000,
   });
+  // Buy-back zones (ADR-APP-003): re-entry ladders from recent valuation/overbought trims.
+  const { data: buybackTrims = [] } = useQuery({
+    queryKey: ["buyback-trims"],
+    queryFn: async (): Promise<TrimDecision[]> => {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 45);
+      const { data } = await supabase.from("decisions" as never)
+        .select("id,symbol,action,recommendation,price_at_rec,decided_on")
+        .gte("decided_on", cutoff.toISOString().slice(0, 10))
+        .not("price_at_rec", "is", null)
+        .order("decided_on", { ascending: false }).limit(100);
+      return (data ?? []) as unknown as TrimDecision[];
+    },
+  });
+  const buybackPlans = Array.from(
+    activeBuybackBySymbol(buybackTrims, (sym) => {
+      const q = liveQuotes?.[sym]?.price;
+      if (q != null) return q;
+      const h = holdings.find((x) => x.symbol === sym);
+      return h ? px(h) : null;
+    }).values(),
+  );
   const { data: liveEcon = [] } = useQuery({
     queryKey: ["econ-cal-office"],
     queryFn: () => getEconCalendarFn({ data: { days: 7 } }),
@@ -331,6 +354,36 @@ function Dashboard() {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {buybackPlans.length > 0 && (
+        <div className="mb-4 rounded-xl border bg-card/60 px-4 py-3">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Buy-back zones — re-entry ladder after trims (advisory)
+          </div>
+          <ul className="space-y-1 text-sm">
+            {buybackPlans.map((p) => (
+              <li key={p.symbol} className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                <span className="font-medium">{p.symbol}</span>
+                <span className="text-xs text-muted-foreground">
+                  trim {p.decidedOn.slice(5)} @ ~{fmtUSD(p.anchor, 2)}
+                </span>
+                {p.zones.map((z) => (
+                  <span
+                    key={z.pct}
+                    className={z.status === "hit" ? "font-medium text-emerald-500" : "text-muted-foreground"}
+                  >
+                    {z.pct}% {fmtUSD(z.price, 2)}
+                    {z.status === "hit" ? " ✓ reached" : ""}
+                  </span>
+                ))}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Anchor ≈ logged trim price (your Fidelity fill may differ). Advisory only — you execute.
+            Expires after 30 days or when the thesis invalidates.
+          </p>
         </div>
       )}
       {alerts.length > 0 && (
