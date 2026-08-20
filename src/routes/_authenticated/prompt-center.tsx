@@ -13,6 +13,7 @@ import {
   useAccount,
   usePriorities,
   useAddJournal,
+  useIpsLite,
 } from "@/hooks/useAppData";
 import {
   requiredCAGR,
@@ -90,6 +91,7 @@ function PromptCenter() {
   const { data: accountsList = [] } = useAccounts();
   const amirAccount = accountsList.find((a) => a.name === "Amir - TOD");
   const { data: priorities = [] } = usePriorities();
+  const { data: ipsLite } = useIpsLite();
   const addJournal = useAddJournal();
   const { data: journalEntries = [] } = useJournal("");
   const { data: news = [] } = useQuery({ queryKey: ["news"], queryFn: () => getNewsFn(), staleTime: 10 * 60 * 1000 });
@@ -168,6 +170,9 @@ function PromptCenter() {
       goalDate: goal?.target_date ?? "—",
       requiredCagr: cagr,
       probability: prob,
+      ipsPositionCapPct: ipsLite.position_cap_pct,
+      ipsPositionCapHard: ipsLite.position_cap_hard,
+      ipsMarginCapPct: ipsLite.margin_cap_pct,
       holdings: holdings.map((h) => ({
         symbol: h.symbol,
         quantity: h.quantity,
@@ -188,7 +193,7 @@ function PromptCenter() {
       recentJournal: journalEntries.slice(0, 3).map((j) =>
         `${j.created_at.slice(0, 10)}: ${(j.title ?? j.body ?? "").slice(0, 120)}`),
     };
-  }, [amirHoldings, liveQuotes, amirAccount, account, goal, priorities, userNotes, news, journalEntries, decisions, liveEconCal, liveEarnCal]);
+  }, [amirHoldings, liveQuotes, amirAccount, account, goal, priorities, ipsLite, userNotes, news, journalEntries, decisions, liveEconCal, liveEarnCal]);
 
   const MEETING: Record<string, MeetingType> = {
     morning: "Morning", midday: "Mid-Day", evening: "Evening", weekly: "Weekly", monthly: "Monthly",

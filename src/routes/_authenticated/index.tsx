@@ -32,6 +32,7 @@ import {
   usePriorities,
   useRecommendedActions,
   useLogSync,
+  useIpsLite,
 } from "@/hooks/useAppData";
 import {
   fmtUSD,
@@ -71,6 +72,7 @@ function Dashboard() {
   const { data: goal } = useGoal();
   const { data: allHoldings = [] } = useHoldings();
   const { data: accountsList = [] } = useAccounts();
+  const { data: ipsLite } = useIpsLite();
   // The Amir Dashboard tracks the Amir - TOD account only (kids have their own).
   const amirAccount = accountsList.find((a) => a.name === "Amir - TOD");
   const holdings = amirAccount
@@ -239,10 +241,18 @@ function Dashboard() {
         }, null);
         const staleDays = lastUpdate ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / 86400000) : null;
         const breaches: string[] = [];
+        // IPS-lite (ADR-APP-004): configurable soft/hard position cap + margin cap.
+        const posCap = ipsLite.position_cap_pct / 100;
         for (const h of amirHs) {
           const v = h.quantity * px(h);
-          if (net > 0 && v / net > 0.30) breaches.push(`${h.symbol} ${fmtPct(v / net)} > 30% cap`);
+          if (net > 0 && v / net > posCap)
+            breaches.push(
+              `${h.symbol} ${fmtPct(v / net)} > ${ipsLite.position_cap_pct}% cap${ipsLite.position_cap_hard ? " (HARD)" : ""}`,
+            );
         }
+        const marginUtil = net > 0 ? marginUsed / net : 0;
+        if (marginUsed > 0 && marginUtil > ipsLite.margin_cap_pct / 100)
+          breaches.push(`Margin util ${fmtPct(marginUtil)} > ${ipsLite.margin_cap_pct}% cap`);
         if (marginUsed > 0 && equityPct < 0.5) breaches.push(`Equity ${fmtPct(equityPct)} < 50%`);
         return (
           <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-xs">
