@@ -27,3 +27,26 @@ price, shown on the holding row and in Today's Plan until hit or invalidated.
   and `price_at_rec` (outcome-grading work). Zones for untagged legacy decisions are
   simply not shown.
 - No order is ever placed; zones are annotations for the human decision.
+
+## Classification sign-off (money-adjacent — recorded 2026-08-20)
+
+The one part of B1 not fixed by the ADR's numbers is *how* a trim is classified as
+valuation/overbought (gets zones) vs thesis-break (never). Implemented in
+`isBuybackEligible()` (`src/lib/buybackZones.ts`), shipped in PR #78.
+
+- **Amir's explicit sign-off (retroactive to the #78 merge): option B1** — attach
+  buy-back zones to `TRIM`/`REDUCE` decisions whose text shows **no thesis-break
+  keywords** (thesis, deteriorate, broken, downgrade, exit, stop-loss, …);
+  **full `SELL` is excluded** (likelier a thesis exit). This is the classification
+  now live in production.
+- **Accepted trade-off:** keyword inference will occasionally mistag; acceptable for
+  now given zones are advisory (no orders).
+- **Planned upgrade (UI/UX workstream): option B3** — replace keyword inference with
+  an **explicit valuation/overbought tag** captured in the decision-logging flow.
+  Sensible today, precise later.
+
+## Milestone
+
+With PR #78, the migration plan is **complete** — all seven capabilities are live on
+`main`: price history, evidence contract, outcome grading, swing score, IPS-lite,
+committee scorecard, and buy-back zones.
