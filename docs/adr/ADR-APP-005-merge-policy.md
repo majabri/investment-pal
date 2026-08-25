@@ -34,10 +34,20 @@ When blocked on one of these, the agent sends a **push notification** and **wait
 for Amir's decision (Remote Control). Questions are framed mobile-friendly: a short
 question with numbered options where possible.
 
-### 3. Dependabot
-- The agent **may merge the grouped minor/patch PR** after running the full bun gate
-  on it.
-- **Hold all majors** — batch them for a maintenance pass; they are not blocking.
+### 3. Dependabot (amended 2026-08-20 after the #70 boot outage)
+- **Grouped dependency PRs are NOT self-mergeable as a bundle.** A grouped bump
+  hides which package changed what; the #70 group silently bumped a build-toolchain
+  package and broke `main`'s boot. Split grouped PRs into individual changes.
+- **Dependency changes to build-critical packages ALWAYS get an individual PR with a
+  mandatory full boot gate** (`bun run dev` → `/auth` 200 — not just `tsc`).
+  Build-critical includes at least: **vite**, **zod**, **@tanstack/\***,
+  **@lovable.dev/vite-tanstack-config**, **postcss / postcss-\* / tailwind**, **nitro**,
+  and anything the Vite/TanStack Start config loads at boot.
+- Non-build-critical **minor/patch** bumps may be self-merged individually after the
+  full bun gate (incl. boot).
+- **Hold all majors** for an individual, boot-gated maintenance pass; never bundle them.
+- The boot gate is non-negotiable for dependency PRs because `tsc` passes while the
+  app fails to boot (exactly the #70 failure mode).
 
 ### 4. Production safety valve
 - Amir keeps doing the **production glance after deploys**. If he flags a problem,
