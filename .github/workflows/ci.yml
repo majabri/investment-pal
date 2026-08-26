@@ -1,0 +1,40 @@
+name: CI
+# Boot gate (ADR-APP-005, amended). tsc alone passed while the app failed to boot
+# (#70 zod/vite-config crash), so this also verifies the dev server loads its
+# config and reaches "ready". Required on main via branch protection.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boot-gate:
+    name: boot-gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install (frozen lockfile)
+        run: bun install --frozen-lockfile
+      - name: Type-check
+        run: bunx tsc --noEmit
+      - name: Boot check (dev server config loads + reaches ready)
+        run: |
+          bun run dev > dev.log 2>&1 &
+          DEV_PID=$!
+          OK=0
+          for i in $(seq 1 60); do
+            if grep -qiE "ready in|Local:[[:space:]]*http" dev.log; then OK=1; break; fi
+            if grep -qiE "error when starting|failed to load config|prefault|is not a function|SyntaxError|Cannot find package" dev.log; then
+              echo "::error::dev server failed to boot"; tail -40 dev.log; kill $DEV_PID 2>/dev/null || true; exit 1
+            fi
+            sleep 1
+          done
+          kill $DEV_PID 2>/dev/null || true
+          if [ "$OK" != "1" ]; then echo "::error::dev server never became ready"; tail -40 dev.log; exit 1; fi
+          echo "dev server booted cleanly"
