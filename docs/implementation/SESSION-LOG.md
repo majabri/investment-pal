@@ -70,3 +70,12 @@ preserved for reference.
 ### Next
 - **PR3** — populate the new evidence columns from `extractActionSheet` (action, best-effort
   confidence), leaving the rest nullable. Then outcome grading, committee scorecard.
+
+## PR-UI-0 — Test harness (2026-08-27)
+
+- **Branch:** `ui/pr-0-test-harness` · **Classification:** not money-adjacent · **Authority:** UIUX-MASTER v1.0 Part 5.2.
+- **Gap closed:** G7 (no tests / no harness) — foundation only; accessibility suite is PR-UI-9.
+- **Files:** `package.json` (add `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`, `vitest-axe` via bun; `test`/`test:watch` scripts), `bun.lock`, `vitest.config.ts` (jsdom, `@/`→src alias, does not touch `vite.config.ts`), `tests/setup.ts`, `tests/finance.test.ts` (pure `fmtPct`), `tests/swingScoreBadge.test.tsx` (leaf render), `.github/workflows/ci.yml` (non-blocking `test` job, `continue-on-error: true` until PR-UI-9).
+- **Verification:** `bun install --frozen-lockfile` ✔ in sync · `bunx tsc --noEmit` ✔ clean · `bun run test` ✔ 2 files / 5 tests pass · boot check ✔ `/auth` 200 (Vite ready). No dependency upgrades; no route/component behaviour changed.
+- **Zero-diff proof:** no changes under `src/routes/` or `src/components/`.
+- **Not merged** — opened for Amir's review per Part 0.2.

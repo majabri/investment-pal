@@ -38,3 +38,16 @@ jobs:
           kill $DEV_PID 2>/dev/null || true
           if [ "$OK" != "1" ]; then echo "::error::dev server never became ready"; tail -40 dev.log; exit 1; fi
           echo "dev server booted cleanly"
+
+  # Non-blocking until PR-UI-9 makes it blocking (per UIUX-MASTER Part 5.2).
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install (frozen lockfile)
+        run: bun install --frozen-lockfile
+      - name: Unit tests
+        run: bun run test
