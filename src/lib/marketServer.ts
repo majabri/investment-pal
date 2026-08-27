@@ -3,22 +3,30 @@
 //   const snap = await getMarketSnapshotFn();
 //   const prices = await getPricesFn({ data: { symbols: ["MSFT", "CRWD"] } });
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { fetchMarketSnapshot, fetchPrices, type MarketSnapshot } from "./market";
+import { symbolsInputSchema } from "./serverInput";
 
-export const getMarketSnapshotFn = createServerFn({ method: "GET" }).handler(
-  async (): Promise<MarketSnapshot> => fetchMarketSnapshot(),
-);
+export const getMarketSnapshotFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (): Promise<MarketSnapshot> => fetchMarketSnapshot());
 
 export const getPricesFn = createServerFn({ method: "POST" })
-  .validator((input: { symbols: string[] }) => input)
-  .handler(async ({ data }): Promise<Record<string, number>> => fetchPrices(data.symbols ?? []));
+  .middleware([requireSupabaseAuth])
+  .validator((input) => symbolsInputSchema.parse(input))
+  .handler(async ({ data }): Promise<Record<string, number>> => fetchPrices(data.symbols));
 
-export interface LiveQuote { price: number; prevClose: number; changePct: number; }
+export interface LiveQuote {
+  price: number;
+  prevClose: number;
+  changePct: number;
+}
 
 /** Full quotes (with previous close) for daily gain/loss computation. */
 export const getQuotesFn = createServerFn({ method: "POST" })
-  .validator((input: { symbols: string[] }) => input)
+  .middleware([requireSupabaseAuth])
+  .validator((input) => symbolsInputSchema.parse(input))
   .handler(async ({ data }): Promise<Record<string, LiveQuote>> => {
     const { fetchQuotes } = await import("./market");
-    return fetchQuotes(data.symbols ?? []);
+    return fetchQuotes(data.symbols);
   });
