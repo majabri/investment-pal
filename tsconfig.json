@@ -23,5 +23,6 @@
     "paths": {
       "@/*": ["./src/*"]
     }
-  }
+  },
+  "exclude": ["src/lib/__tests__/**"]
 }

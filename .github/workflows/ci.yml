@@ -22,7 +22,11 @@ jobs:
       - name: Install (frozen lockfile)
         run: bun install --frozen-lockfile
       - name: Type-check
-        run: bunx tsc --noEmit
+        run: bun run typecheck
+      - name: Test type-check
+        run: bun run test:typecheck
+      - name: Unit tests
+        run: bun test
       - name: Boot check (dev server config loads + reaches ready)
         run: |
           bun run dev > dev.log 2>&1 &
