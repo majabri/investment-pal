@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { chatInputSchema } from "./serverInput";
+import { enforceProviderRateLimit } from "./serverRateLimit";
 
 export interface ChatMsg {
   role: "system" | "user" | "assistant";
@@ -15,7 +16,8 @@ export interface ChatMsg {
 export const chatFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) => chatInputSchema.parse(input))
-  .handler(async ({ data }): Promise<{ ok: boolean; content: string }> => {
+  .handler(async ({ data, context }): Promise<{ ok: boolean; content: string }> => {
+    await enforceProviderRateLimit(context.supabase, "chat");
     const openai = process.env.OPENAI_API_KEY;
     const lovable = process.env.LOVABLE_API_KEY;
     const key = openai ?? lovable;

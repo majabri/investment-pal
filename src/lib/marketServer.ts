@@ -6,15 +6,22 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { fetchMarketSnapshot, fetchPrices, type MarketSnapshot } from "./market";
 import { symbolsInputSchema } from "./serverInput";
+import { enforceProviderRateLimit } from "./serverRateLimit";
 
 export const getMarketSnapshotFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<MarketSnapshot> => fetchMarketSnapshot());
+  .handler(async ({ context }): Promise<MarketSnapshot> => {
+    await enforceProviderRateLimit(context.supabase, "market");
+    return fetchMarketSnapshot();
+  });
 
 export const getPricesFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) => symbolsInputSchema.parse(input))
-  .handler(async ({ data }): Promise<Record<string, number>> => fetchPrices(data.symbols));
+  .handler(async ({ data, context }): Promise<Record<string, number>> => {
+    await enforceProviderRateLimit(context.supabase, "market");
+    return fetchPrices(data.symbols);
+  });
 
 export interface LiveQuote {
   price: number;
@@ -26,7 +33,8 @@ export interface LiveQuote {
 export const getQuotesFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) => symbolsInputSchema.parse(input))
-  .handler(async ({ data }): Promise<Record<string, LiveQuote>> => {
+  .handler(async ({ data, context }): Promise<Record<string, LiveQuote>> => {
+    await enforceProviderRateLimit(context.supabase, "market");
     const { fetchQuotes } = await import("./market");
     return fetchQuotes(data.symbols);
   });

@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ECON_EVENTS, EARNINGS_EVENTS, type EconEvent, type EarningsEvt } from "./data/calendars";
 import { economicCalendarInputSchema, earningsCalendarInputSchema } from "./serverInput";
+import { enforceProviderRateLimit } from "./serverRateLimit";
 
 const HDRS = { "User-Agent": "Mozilla/5.0", Accept: "application/json" };
 const cache = new Map<string, { at: number; data: unknown }>();
@@ -41,7 +42,8 @@ export interface LiveEcon extends EconEvent {
 export const getEarningsCalendarFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) => earningsCalendarInputSchema.parse(input))
-  .handler(async ({ data }): Promise<LiveEarnings[]> => {
+  .handler(async ({ data, context }): Promise<LiveEarnings[]> => {
+    await enforceProviderRateLimit(context.supabase, "calendar");
     const want = new Set(data.symbols.map((s) => s.toUpperCase()));
     const days = Math.min(data.days ?? 14, 21);
     try {
@@ -91,7 +93,8 @@ const MED = /ppi|retail sales|ism|pmi|consumer confidence|housing|jobless|durabl
 export const getEconCalendarFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) => economicCalendarInputSchema.parse(input))
-  .handler(async ({ data }): Promise<LiveEcon[]> => {
+  .handler(async ({ data, context }): Promise<LiveEcon[]> => {
+    await enforceProviderRateLimit(context.supabase, "calendar");
     const days = Math.min(data.days ?? 10, 21);
     try {
       const rows = await cached(`econ:${days}`, async () => {
