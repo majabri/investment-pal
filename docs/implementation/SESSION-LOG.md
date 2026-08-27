@@ -79,3 +79,4 @@ preserved for reference.
 - **Verification:** `bun install --frozen-lockfile` ✔ in sync · `bunx tsc --noEmit` ✔ clean · `bun run test` ✔ 2 files / 5 tests pass · boot check ✔ `/auth` 200 (Vite ready). No dependency upgrades; no route/component behaviour changed.
 - **Zero-diff proof:** no changes under `src/routes/` or `src/components/`.
 - **Not merged** — opened for Amir's review per Part 0.2.
+- **Added the zod-3 resolution invariant** (`tests/zodVersion.test.ts`): asserts `import { z } from "zod"` has no v4-only `.prefault` (incident #70), locking the pin against the transitive zod 4 in bun.lock.
