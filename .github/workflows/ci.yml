@@ -7,6 +7,10 @@ on:
     branches: [main]
   push:
     branches: [main]
+  schedule:
+    # Weekdays at 11:37 UTC: validates main even when no PR is active.
+    - cron: "37 11 * * 1-5"
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
