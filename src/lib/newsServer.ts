@@ -2,6 +2,7 @@
 // Server-side (CORS); importance = recency + magnitude keywords + relevance.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { enforceProviderRateLimit } from "./serverRateLimit";
 
 export type NewsCategory = "Markets" | "Economy" | "Technology" | "Business" | "World" | "Crypto";
 export interface NewsItem {
@@ -74,7 +75,8 @@ const HELD = /\b(CRWD|LRCX|TSLA|RY|MSFT|AMZN|GOOGL|INTU|GBTC|AVGO|ABT|BLK|NVDA|M
 
 export const getNewsFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<NewsItem[]> => {
+  .handler(async ({ context }): Promise<NewsItem[]> => {
+    await enforceProviderRateLimit(context.supabase, "news");
     const all = (await Promise.all(FEEDS.map(([u, s, c]) => fetchFeed(u, s, c)))).flat();
     const seen = new Set<string>();
     const now = Date.now();
@@ -117,7 +119,8 @@ const GEO_HIGH = /war|strike|invasion|attack|sanction|export control|blockade|mi
 
 export const getGeopoliticsFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async (): Promise<GeoItem[]> => {
+  .handler(async ({ context }): Promise<GeoItem[]> => {
+    await enforceProviderRateLimit(context.supabase, "news");
     const world = await fetchFeed(
       "https://www.cnbc.com/id/100727362/device/rss/rss.html",
       "CNBC",
