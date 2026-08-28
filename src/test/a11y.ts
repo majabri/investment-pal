@@ -16,7 +16,18 @@ export async function assertNoA11yViolations(
   container: ElementContext,
   options: RunOptions = {},
 ): Promise<void> {
-  const results = await axe.run(container, { ...DEFAULT_OPTIONS, ...options });
+  // `rules` is merged per-rule rather than replaced: a caller adding one rule
+  // toggle must not silently re-enable color-contrast and get a false green.
+  // Re-enabling it stays possible, but only by naming it explicitly.
+  // `runOnly` is a scope selector, not a set of toggles, so a caller that
+  // passes one means to replace the tag scope outright.
+  const merged: RunOptions = {
+    ...DEFAULT_OPTIONS,
+    ...options,
+    rules: { ...DEFAULT_OPTIONS.rules, ...options.rules },
+  };
+
+  const results = await axe.run(container, merged);
 
   if (results.violations.length === 0) return;
 

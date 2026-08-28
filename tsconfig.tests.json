@@ -1,5 +1,8 @@
 {
   "extends": "./tsconfig.json",
+  // Component tests are .tsx, so both extensions must be listed or they would
+  // run untype-checked with CI still green. `*.ts` also matches src/test/*.d.ts,
+  // which is how the bun matcher augmentation reaches this program.
   "include": [
     "src/**/__tests__/**/*.ts",
     "src/**/__tests__/**/*.tsx",
@@ -8,6 +11,9 @@
   ],
   "exclude": [],
   "compilerOptions": {
-    "types": ["bun", "@testing-library/jest-dom"]
+    // @testing-library/jest-dom is deliberately NOT listed here: its shipped
+    // types augment the `jest` namespace, which does nothing under bun's
+    // runner. src/test/jest-dom.d.ts does the real work.
+    "types": ["bun"]
   }
 }
