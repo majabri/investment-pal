@@ -307,6 +307,27 @@ export type Database = {
         }
         Relationships: []
       }
+      server_request_limits: {
+        Row: {
+          request_count: number
+          scope: string
+          user_id: string
+          window_started_at: string
+        }
+        Insert: {
+          request_count?: number
+          scope: string
+          user_id: string
+          window_started_at: string
+        }
+        Update: {
+          request_count?: number
+          scope?: string
+          user_id?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       sync_log: {
         Row: {
           created_at: string
@@ -366,7 +387,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      consume_provider_request_limit: {
+        Args: { p_scope: string }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          retry_after_seconds: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
