@@ -70,3 +70,60 @@ preserved for reference.
 ### Next
 - **PR3** — populate the new evidence columns from `extractActionSheet` (action, best-effort
   confidence), leaving the rest nullable. Then outcome grading, committee scorecard.
+
+## Session — 2026-08-28 — PR-UI-0: component & accessibility test harness
+
+Handoff item 1 of 4 (Claude Code Handoff — investment-pal — 4 Items, 2026-08-28).
+Serves gap **G7** and the Phase 10 accessibility exit gate.
+
+- **Audit correction carried out.** The UIUX-MASTER brief's G7 ("no test script, no
+  test files, no axe") was stale. `main` already had `bun test` + `test:typecheck`
+  scripts, `tsconfig.tests.json`, three lib tests and a CI boot-gate running all of
+  it. Bun's built-in runner is the runner of record; **no Vitest/Jest was added**.
+  The real gap was narrower: the harness could test pure functions but could not
+  render a component.
+- **Added (devDependencies):** `@happy-dom/global-registrator` (DOM),
+  `@testing-library/react` + `@testing-library/dom` + `@testing-library/jest-dom`
+  (rendering + matchers), `axe-core` (accessibility).
+- **`src/test/setup.ts`** — preloaded for every run via `bunfig.toml` `[test] preload`.
+  Registers happy-dom before any `@testing-library/*` import, extends `expect` with
+  jest-dom matchers, and cleans up the document after each test.
+- **`src/test/a11y.ts`** — `assertNoA11yViolations()`, scoped to WCAG 2.1 A/AA and
+  reporting rule id, impact and offending markup. `color-contrast` is disabled:
+  happy-dom does not compute the Tailwind layer, so the rule returns *incomplete*,
+  not *pass* — leaving it on would be a false signal.
+- **`src/test/jest-dom.d.ts`** — augments `bun:test`'s `Matchers`. jest-dom ships
+  augmentations for jest and vitest only; without this, `toBeInTheDocument` runs but
+  is invisible to `test:typecheck`.
+- **Widened both tsconfigs.** `tsconfig.tests.json` `include` was `.ts`-only under
+  `src/lib/__tests__`, so `.tsx` component tests would have run **untype-checked**
+  with CI still green. It now covers `src/**/__tests__/**` (`.ts` + `.tsx`) and
+  `src/test/**`; `tsconfig.json`'s matching `exclude` was widened in step.
+- **Smoke tests only** — `src/components/app/__tests__/StatCard.test.tsx`: one render
+  assertion, one axe assertion. StatCard is a leaf presentational component. The real
+  component suite starts in a later PR.
+- **No production source file changed.** All `src/` additions are test files.
+
+**Gate:** `bun install --frozen-lockfile` ✓ · `bun run typecheck` ✓ ·
+`bun run test:typecheck` ✓ · `bun test` 13 pass / 0 fail (11 pre-existing unchanged
++ 2 new) ✓ · dev-server boot ✓ (`ready in 1363 ms`, `GET /auth` → 200).
+
+Two negative controls were run rather than assumed: a deliberate type error injected
+into the `.tsx` test **did** fail `test:typecheck` (proving the widened include works),
+and the axe helper **did** throw on a known `image-alt` violation (proving the
+assertion is not vacuous). Both probes were reverted.
+
+**Environment note:** this sandbox blocks the Lovable npm mirror
+(`europe-west4-npm.pkg.dev`, 403 at CONNECT) and has no IPv6. The gate was therefore
+run in a disposable clone resolving those three packages from npmjs (identical
+integrity hashes), and the boot check was bound to IPv4. The committed `bun.lock`
+keeps all three Lovable registry pins **byte-identical to `main`** — verified
+per-entry. CI runs the unmodified gate.
+
+### Next
+- **Item 2 — PR-UI-2:** AccountContext + identity removal (~19 sites / 8 files; nine
+  in `prompts.ts`, where the IPS mandate itself is hardcoded into committee prompts —
+  money-adjacent) + mobile drawer for `AppShell.tsx` `.slice(0, 5)`.
+- **Item 3 — ADR-APP-007 (margin rate):** ⛔ blocked pending Amir's four sign-off
+  values. Note the ADR number is **007**; 006 is taken.
+- **Item 4 — PR-UI-3:** decision card against `recommendation.schema.json`.
