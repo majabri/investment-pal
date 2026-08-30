@@ -178,11 +178,18 @@ function PortfolioPage() {
           hint={`${holdings.length} positions${Number(selectedAccount?.cash ?? 0) > 0 ? ` + cash ${fmtUSD(Number(selectedAccount?.cash ?? 0))}` : ""}`}
           icon={<Wallet className="h-4 w-4" />}
         />
-        <MarginCard
-          accountId={selectedAccount?.id ?? null}
-          accountName={selectedAccount?.name ?? "—"}
-          marginUsed={Number(selectedAccount?.margin_used ?? 0)}
-        />
+        {selectedAccount ? (
+          <MarginCard
+            accountId={selectedAccount.id}
+            marginUsed={Number(selectedAccount.margin_used ?? 0)}
+          />
+        ) : (
+          <StatCard
+            label="Margin loan"
+            value="—"
+            hint="Select an account to view or edit the margin loan"
+          />
+        )}
         <StatCard
           label="Net — actual account value"
           value={fmtUSD(positionsValue + Number(selectedAccount?.cash ?? 0) - Number(selectedAccount?.margin_used ?? 0))}

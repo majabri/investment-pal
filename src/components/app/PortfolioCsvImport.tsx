@@ -21,8 +21,14 @@ type Destination = { value: string; label: string };
  *  Previously this named four specific accounts, so the importer only worked
  *  for one household and silently offered dead options to anyone else. */
 function destinationsFor(accountNames: string[]): Destination[] {
+  // De-duplicated: `accounts.name` carries no unique constraint, and the import
+  // groups rows by destination *name*, so two accounts sharing a name would
+  // otherwise emit duplicate option keys and values for what resolves to one
+  // destination. (The underlying ambiguity — two accounts, one name — predates
+  // this and is a data question, not one the picker can settle.)
+  const unique = [...new Set(accountNames)];
   return [
-    ...accountNames.map((name) => ({ value: name, label: name })),
+    ...unique.map((name) => ({ value: name, label: name })),
     { value: CREATE, label: "Create this account (keep its Fidelity name)" },
     { value: SKIP, label: "Skip this account" },
   ];

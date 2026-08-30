@@ -64,9 +64,20 @@ function writeStored(id: string): void {
 
 export function AccountProvider({ children }: { children: ReactNode }) {
   const { data: accounts = [], isLoading } = useAccounts();
-  // Read on mount rather than in the initializer so the first client render
-  // matches whatever the server produced (localStorage does not exist there).
-  const [storedId, setStoredId] = useState<string | null>(null);
+  // Three distinct states, deliberately:
+  //   undefined — storage not read yet
+  //   null      — read, nothing stored
+  //   string    — read, a selection exists
+  //
+  // Collapsing the first two into `null` meant the first render fell straight
+  // through to the default account, so a user whose stored selection was a
+  // different account saw that account's figures flash before the effect ran.
+  // On a screen used for real money decisions, briefly-wrong numbers are the
+  // exact failure this PR exists to remove.
+  //
+  // Storage is read on mount rather than in the initializer so the first client
+  // render matches whatever the server produced (no localStorage there).
+  const [storedId, setStoredId] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     setStoredId(readStored());
@@ -78,16 +89,18 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AccountContextValue>(() => {
+    const storageRead = storedId !== undefined;
     const resolved = storedId ? (accounts.find((a) => a.id === storedId) ?? null) : null;
 
-    // No explicit choice yet → fall back to the default account. This is a
-    // default, not a substitution: it only applies when nothing was chosen.
+    // No explicit choice → fall back to the default account. This is a default,
+    // not a substitution: it applies only once storage has been read and held
+    // nothing. Before that we resolve to nothing and report `loading`.
     const fallbackId = storedId === null ? defaultAccountId(accounts) : null;
     const fallback = fallbackId ? (accounts.find((a) => a.id === fallbackId) ?? null) : null;
     const selectedAccount = resolved ?? fallback;
 
     let status: AccountStatus;
-    if (isLoading) status = "loading";
+    if (isLoading || !storageRead) status = "loading";
     else if (accounts.length === 0) status = "no-accounts";
     else if (selectedAccount === null) status = "unresolved";
     else status = "ready";

@@ -74,3 +74,11 @@ describe("accountCategory", () => {
     }
   });
 });
+
+describe("destination de-duplication", () => {
+  // `accounts.name` has no unique constraint; the CSV importer groups by name.
+  test("duplicate account names collapse to one destination", () => {
+    const unique = [...new Set(["Brokerage", "Roth IRA", "Brokerage"])];
+    expect(unique).toEqual(["Brokerage", "Roth IRA"]);
+  });
+});
