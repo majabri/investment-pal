@@ -21,7 +21,7 @@ import { MarketTape } from "./MarketTape";
 import { APP_VERSION } from "@/lib/version";
 
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };

@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { getQuotesFn } from "@/lib/marketServer";
 import { computeOutcome, type Grade, type Close } from "@/lib/outcomeGrade";
