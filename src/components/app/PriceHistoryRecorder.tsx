@@ -5,7 +5,7 @@
 // (scripts/backfill-price-history.mjs) supplies authoritative historical closes.
 // Renders nothing. Free source only — reuses the existing Yahoo quote layer (OD-002).
 import { useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 
 type QuoteMap = Record<string, { price: number }> | undefined;
 

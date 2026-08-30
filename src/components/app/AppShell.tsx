@@ -6,7 +6,7 @@ import { navGroups, MOBILE_PRIMARY } from "@/lib/nav";
 import { APP_VERSION } from "@/lib/version";
 
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,

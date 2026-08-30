@@ -8,7 +8,7 @@
 //
 // This version briefly waits for the session to appear before giving up.
 import { createMiddleware } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 
 async function getAccessToken(): Promise<string | undefined> {
   for (let attempt = 0; attempt < 6; attempt++) {

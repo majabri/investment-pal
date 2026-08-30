@@ -31,7 +31,7 @@ import { getNewsFn } from "@/lib/newsServer";
 import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
 import { useJournal } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 
 // Map the Action Sheet's action verbs to a canonical set for the `action` column.

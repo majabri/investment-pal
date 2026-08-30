@@ -27,7 +27,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 import { useHoldings, useAccount, useLogSync, type Holding } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { PriceHistoryRecorder } from "@/components/app/PriceHistoryRecorder";

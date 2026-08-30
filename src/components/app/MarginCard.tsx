@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 import { fmtUSD } from "@/lib/finance";
 
 export function MarginCard({ accountId, marginUsed }: {
