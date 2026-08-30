@@ -23,10 +23,13 @@ import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
 import { accountCategory, CATEGORY_ORDER } from "@/lib/data/accountGroups";
+import { useAccountContext, selectAccountHoldings } from "@/contexts/AccountContext";
+import { AccountNotice } from "@/components/app/AccountNotice";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   useGoal,
+  useProfile,
   useHoldings,
   useAccount,
   useAccounts,
@@ -71,14 +74,20 @@ const CATEGORY_META: Record<
 function Dashboard() {
   const navigate = useNavigate();
   const { data: goal } = useGoal();
+  const { data: profile } = useProfile();
+  const displayName = profile?.display_name?.trim() ?? "";
   const { data: allHoldings = [] } = useHoldings();
   const { data: accountsList = [] } = useAccounts();
   const { data: ipsLite } = useIpsLite();
-  // The Amir Dashboard tracks the Amir - TOD account only (kids have their own).
-  const amirAccount = accountsList.find((a) => a.name === "Amir - TOD");
-  const holdings = amirAccount
-    ? allHoldings.filter((h) => h.account_id === amirAccount.id)
-    : allHoldings.filter((h) => h.account_id == null);
+  // The dashboard tracks the selected account only (each other account has its
+  // own screen). An unresolved selection yields no holdings and an explicit
+  // notice — it must never fall back to accountless rows, which used to render
+  // a plausible but wrong portfolio with no error.
+  const { selectedAccount, status: accountStatus } = useAccountContext();
+  const holdings = useMemo(
+    () => selectAccountHoldings(allHoldings, selectedAccount?.id ?? null),
+    [allHoldings, selectedAccount],
+  );
   const { data: account } = useAccount();
   const { data: priorities = [], dismiss: dismissPriority } = usePriorities();
   const { data: actions = [], dismiss: dismissAction } = useRecommendedActions();
@@ -166,8 +175,8 @@ function Dashboard() {
     return [...econ, ...earn].sort((a, b) => a.date.localeCompare(b.date))
       .filter((a) => { const k = a.text; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 6);
   }, [liveEcon, liveEarn, todayStr, weekEnd]);
-  const cash = Number(amirAccount?.cash ?? account?.cash ?? 0);
-  const marginUsed = Number(amirAccount?.margin_used ?? 0);
+  const cash = Number(selectedAccount?.cash ?? account?.cash ?? 0);
+  const marginUsed = Number(selectedAccount?.margin_used ?? 0);
   // Net account value (what Fidelity shows as account value): equity, not gross.
   const portfolioValue = positionsValue + cash - marginUsed;
   // Simple "today" P/L proxy: (current - cost) delta. Real intraday requires last-close snapshot.
@@ -215,7 +224,7 @@ function Dashboard() {
 
   return (
     <AppShell
-      title={`${greeting}, Amir`}
+      title={displayName ? `${greeting}, ${displayName}` : greeting}
       subtitle="Investment Office · What changed. What matters. What to do."
       actions={
         <>
@@ -246,15 +255,15 @@ function Dashboard() {
         </>
       }
     >
+      <AccountNotice status={accountStatus} />
       <div className="mb-4">
         <WorkflowButtons symbols={holdings.map((h) => h.symbol)} />
       </div>
       {(() => {
         // ── Command-center strip: freshness · margin meter · constitution check ──
-        const amir = accountsList.find((a) => a.name === "Amir - TOD");
-        const marginUsed = Number(amir?.margin_used ?? 0);
+        const marginUsed = Number(selectedAccount?.margin_used ?? 0);
         const amirHs = holdings;
-        const gross = amirHs.reduce((x, h) => x + h.quantity * px(h), 0) + Number(amir?.cash ?? 0);
+        const gross = amirHs.reduce((x, h) => x + h.quantity * px(h), 0) + Number(selectedAccount?.cash ?? 0);
         const net = gross - marginUsed;
         const equityPct = gross > 0 ? net / gross : 1;
         const dailyInterest = (marginUsed * 0.11825) / 365;

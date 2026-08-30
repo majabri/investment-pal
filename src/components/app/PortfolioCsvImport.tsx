@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useAccountContext } from "@/contexts/AccountContext";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -11,25 +12,45 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-const DESTINATIONS = [
-  { value: "Amir - TOD", label: "Amir Portfolio (Amir - TOD)" },
-  { value: "Karim", label: "Kids — Karim" },
-  { value: "Zain", label: "Kids — Zain" },
-  { value: "Jude", label: "Kids — Jude" },
-  { value: "__create__", label: "Create this account (keep its Fidelity name)" },
-  { value: "__skip__", label: "Skip this account" },
-] as const;
+const CREATE = "__create__";
+const SKIP = "__skip__";
 
-/** Exact-name defaults map to the four primary accounts; anything else
- *  ("Jude Crypto", "Jude 529", ROTH IRA, ...) is created under its own
- *  Fidelity name when create-all is on, else skipped. */
-function defaultDestination(label: string | undefined, createAll: boolean): string {
-  const l = (label ?? "").trim().toLowerCase();
-  if (l === "karim") return "Karim";
-  if (l === "zain") return "Zain";
-  if (l === "jude") return "Jude";
-  if (l === "amir - tod" || l === "amir-tod") return "Amir - TOD";
-  return createAll ? "__create__" : "__skip__";
+type Destination = { value: string; label: string };
+
+/** Destinations are the user's own accounts, not a hardcoded list (PR-UI-2).
+ *  Previously this named four specific accounts, so the importer only worked
+ *  for one household and silently offered dead options to anyone else. */
+function destinationsFor(accountNames: string[]): Destination[] {
+  // De-duplicated: `accounts.name` carries no unique constraint, and the import
+  // groups rows by destination *name*, so two accounts sharing a name would
+  // otherwise emit duplicate option keys and values for what resolves to one
+  // destination. (The underlying ambiguity — two accounts, one name — predates
+  // this and is a data question, not one the picker can settle.)
+  const unique = [...new Set(accountNames)];
+  return [
+    ...unique.map((name) => ({ value: name, label: name })),
+    { value: CREATE, label: "Create this account (keep its Fidelity name)" },
+    { value: SKIP, label: "Skip this account" },
+  ];
+}
+
+/** A CSV account label maps to an existing account when the names match
+ *  (case- and separator-insensitive, so "Foo-TOD" still matches "Foo - TOD").
+ *  Anything else is created under its own Fidelity name when create-all is on,
+ *  else skipped. */
+function normalizeAccountName(name: string): string {
+  return name.trim().toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+function defaultDestination(
+  label: string | undefined,
+  createAll: boolean,
+  accountNames: string[],
+): string {
+  const l = normalizeAccountName(label ?? "");
+  const match = accountNames.find((n) => normalizeAccountName(n) === l);
+  if (match) return match;
+  return createAll ? CREATE : SKIP;
 }
 
 export function PortfolioCsvImport() {
@@ -42,6 +63,9 @@ export function PortfolioCsvImport() {
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
+  const { accounts } = useAccountContext();
+  const accountNames = useMemo(() => accounts.map((a) => a.name), [accounts]);
+  const destinations = useMemo(() => destinationsFor(accountNames), [accountNames]);
 
   function onFile(file: File | undefined) {
     if (!file) return;
@@ -79,7 +103,7 @@ export function PortfolioCsvImport() {
     const m: Record<string, string> = {};
     for (const h of rows) {
       const key = h.accountName ?? "Unlabeled account";
-      if (!(key in m)) m[key] = defaultDestination(h.accountName, create);
+      if (!(key in m)) m[key] = defaultDestination(h.accountName, create, accountNames);
     }
     setMapping(m);
   }
@@ -90,8 +114,8 @@ export function PortfolioCsvImport() {
     setMapping((m) => {
       const out: Record<string, string> = { ...m };
       for (const [label, dest] of Object.entries(m)) {
-        if (dest === "__skip__" || dest === "__create__") {
-          out[label] = defaultDestination(label, next);
+        if (dest === SKIP || dest === CREATE) {
+          out[label] = defaultDestination(label, next, accountNames);
         }
       }
       return out;
@@ -110,9 +134,9 @@ export function PortfolioCsvImport() {
       const groups = new Map<string, ParsedHolding[]>();
       for (const h of parsed) {
         const key = h.accountName ?? "Unlabeled account";
-        const destRaw = mapping[key] ?? defaultDestination(h.accountName, createAll);
-        if (destRaw === "__skip__") continue;
-        const dest = destRaw === "__create__" ? key : destRaw; // create keeps the Fidelity name
+        const destRaw = mapping[key] ?? defaultDestination(h.accountName, createAll, accountNames);
+        if (destRaw === SKIP) continue;
+        const dest = destRaw === CREATE ? key : destRaw; // create keeps the Fidelity name
         if (!groups.has(dest)) groups.set(dest, []);
         groups.get(dest)!.push(h);
       }
@@ -204,7 +228,7 @@ export function PortfolioCsvImport() {
 
   const mapped = (parsed ?? []).filter((h) => {
     const dest = mapping[h.accountName ?? "Unlabeled account"];
-    return dest && dest !== "__skip__";
+    return dest && dest !== SKIP;
   });
   const mappedTotal = mapped.reduce((s, h) => s + (h.currentValue ?? h.quantity * h.current_price), 0);
   const mappedAccounts = new Set(mapped.map((h) => mapping[h.accountName ?? "Unlabeled account"])).size;
@@ -251,14 +275,14 @@ export function PortfolioCsvImport() {
                         <Select value={mapping[label]} onValueChange={(v) => setMapping((m) => ({ ...m, [label]: v }))}>
                           <SelectTrigger><SelectValue placeholder="Import to…" /></SelectTrigger>
                           <SelectContent>
-                            {DESTINATIONS.map((d) => (
+                            {destinations.map((d) => (
                               <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
-                    {mapping[label] !== "__skip__" && (
+                    {mapping[label] !== SKIP && (
                       <table className="w-full text-xs">
                         <tbody>
                           {rows.slice(0, 6).map((h, i) => (

@@ -91,6 +91,30 @@ export type JournalEntry = {
   created_at: string;
 };
 
+export type Profile = {
+  id: string;
+  display_name: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** The signed-in user's profile. Supplies the display name so screens do not
+ *  hardcode a person (PR-UI-2). */
+export function useProfile() {
+  return useQuery({
+    queryKey: ["profile"],
+    queryFn: async (): Promise<Profile | null> => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as Profile | null;
+    },
+  });
+}
+
 export function useGoal() {
   const qc = useQueryClient();
   const query = useQuery({

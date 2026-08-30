@@ -4,6 +4,8 @@ import { Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
+import { AccountNotice } from "@/components/app/AccountNotice";
+import { useAccountContext, selectAccountHoldings } from "@/contexts/AccountContext";
 import { StatCard } from "@/components/app/StatCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useGoal, useHoldings, useAccount, useAccounts } from "@/hooks/useAppData";
+import { useGoal, useHoldings, useAccount } from "@/hooks/useAppData";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import {
@@ -66,8 +68,7 @@ function GoalsPage() {
     }
   }, [goal]);
 
-  const { data: accountsList = [] } = useAccounts();
-  const amirAccount = accountsList.find((a) => a.name === "Amir - TOD");
+  const { selectedAccount, status: accountStatus } = useAccountContext();
   const goalSymbols = useMemo(() => [...new Set(holdings.map((h) => h.symbol))], [holdings]);
   const { data: liveQuotes } = useQuery({
     queryKey: ["goal-quotes", goalSymbols.join(",")],
@@ -76,14 +77,14 @@ function GoalsPage() {
     refetchInterval: 60 * 1000,
   });
   const portfolioValue = useMemo(() => {
-    const scoped = amirAccount
-      ? holdings.filter((h) => h.account_id === amirAccount.id || h.account_id == null)
-      : holdings.filter((h) => h.account_id == null);
+    const scoped = selectAccountHoldings(holdings, selectedAccount?.id ?? null, {
+      includeUnassigned: true,
+    });
     const positions = scoped.reduce((s, h) => s + h.quantity * (liveQuotes?.[h.symbol]?.price ?? h.current_price), 0);
-    const cash = Number(amirAccount?.cash ?? account?.cash ?? 0);
-    const marginUsed = Number(amirAccount?.margin_used ?? 0);
+    const cash = Number(selectedAccount?.cash ?? account?.cash ?? 0);
+    const marginUsed = Number(selectedAccount?.margin_used ?? 0);
     return positions + cash - marginUsed; // net equity — same base as the Office
-  }, [holdings, account, amirAccount, liveQuotes]);
+  }, [holdings, account, selectedAccount, liveQuotes]);
 
   const metrics = useMemo(() => {
     if (!date) return null;
@@ -124,6 +125,7 @@ function GoalsPage() {
 
   return (
     <AppShell title="Goals" subtitle="Change the goal — everything else recalculates instantly.">
+      <AccountNotice status={accountStatus} />
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border bg-card p-5 lg:col-span-2">
           <div className="mb-4 text-sm font-medium">Primary goal</div>

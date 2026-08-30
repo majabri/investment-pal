@@ -5,6 +5,8 @@ import { Plus, Save, Trash2, Wallet, RefreshCw } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 import { AppShell } from "@/components/app/AppShell";
+import { AccountNotice } from "@/components/app/AccountNotice";
+import { useAccountContext, selectAccountHoldings } from "@/contexts/AccountContext";
 import { StatCard } from "@/components/app/StatCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +29,6 @@ import {
 } from "@/components/ui/sheet";
 import { supabase } from "@/lib/supabaseClient";
 import { useHoldings, useAccount, useLogSync, type Holding } from "@/hooks/useAppData";
-import { useAccounts } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { PriceHistoryRecorder } from "@/components/app/PriceHistoryRecorder";
 import { SwingScoreBadge } from "@/components/app/SwingScoreBadge";
@@ -54,13 +55,15 @@ export const Route = createFileRoute("/_authenticated/portfolio")({
 function PortfolioPage() {
   const qc = useQueryClient();
   const { data: allHoldings = [] } = useHoldings();
-  const { data: accountsList = [] } = useAccounts();
-  // This page is Amir's portfolio only — kids live on the Kids Dashboard.
-  const amirAccount = accountsList.find((a) => a.name === "Amir - TOD");
-  // Amir's rows = his account + any accountless manual adds (kids always have accounts)
-  const holdings = amirAccount
-    ? allHoldings.filter((h) => h.account_id === amirAccount.id || h.account_id == null)
-    : allHoldings.filter((h) => h.account_id == null);
+  // This page shows the selected account only — other accounts have their own
+  // screens. Resolved: its rows plus accountless manual adds (unchanged).
+  // Unresolved: empty plus an explicit notice, never the accountless rows
+  // standing in for a portfolio.
+  const { selectedAccount, status: accountStatus } = useAccountContext();
+  const holdings = useMemo(
+    () => selectAccountHoldings(allHoldings, selectedAccount?.id ?? null, { includeUnassigned: true }),
+    [allHoldings, selectedAccount],
+  );
   const { data: account, upsert } = useAccount();
   const logSync = useLogSync();
   const [selected, setSelected] = useState<Holding | null>(null);
@@ -165,27 +168,35 @@ function PortfolioPage() {
         </>
       }
     >
+      <AccountNotice status={accountStatus} />
       {/* Invisible: records one daily close per held symbol into price_history. */}
       <PriceHistoryRecorder quotes={liveQuotes} />
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard
           label="Gross — investments"
-          value={fmtUSD(positionsValue + Number(amirAccount?.cash ?? 0))}
-          hint={`${holdings.length} positions${Number(amirAccount?.cash ?? 0) > 0 ? ` + cash ${fmtUSD(Number(amirAccount?.cash ?? 0))}` : ""}`}
+          value={fmtUSD(positionsValue + Number(selectedAccount?.cash ?? 0))}
+          hint={`${holdings.length} positions${Number(selectedAccount?.cash ?? 0) > 0 ? ` + cash ${fmtUSD(Number(selectedAccount?.cash ?? 0))}` : ""}`}
           icon={<Wallet className="h-4 w-4" />}
         />
-        <MarginCard
-          accountId={amirAccount?.id ?? null}
-          accountName="Amir - TOD"
-          marginUsed={Number(amirAccount?.margin_used ?? 0)}
-        />
+        {selectedAccount ? (
+          <MarginCard
+            accountId={selectedAccount.id}
+            marginUsed={Number(selectedAccount.margin_used ?? 0)}
+          />
+        ) : (
+          <StatCard
+            label="Margin loan"
+            value="—"
+            hint="Select an account to view or edit the margin loan"
+          />
+        )}
         <StatCard
           label="Net — actual account value"
-          value={fmtUSD(positionsValue + Number(amirAccount?.cash ?? 0) - Number(amirAccount?.margin_used ?? 0))}
+          value={fmtUSD(positionsValue + Number(selectedAccount?.cash ?? 0) - Number(selectedAccount?.margin_used ?? 0))}
           hint="Gross − margin loan · matches Fidelity's Total account value"
         />
         <StatCard label="Total Gain/Loss" value={`${fmtUSD(pl)} (${fmtPct(plPct)})`} tone={pl >= 0 ? "positive" : "negative"} />
-        <StatCard label="Buying power" value={fmtUSD(Number(amirAccount?.buying_power ?? account?.buying_power ?? 0))} />
+        <StatCard label="Buying power" value={fmtUSD(Number(selectedAccount?.buying_power ?? account?.buying_power ?? 0))} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -194,7 +205,8 @@ function PortfolioPage() {
             <span className="text-sm font-medium">Holdings</span>
             <span className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
-                Amir - TOD only{dataUpdatedAt ? ` · as of ${new Date(dataUpdatedAt).toLocaleTimeString("en-US")}` : ""}
+                {selectedAccount ? `${selectedAccount.name} only` : "No account selected"}
+                {dataUpdatedAt ? ` · as of ${new Date(dataUpdatedAt).toLocaleTimeString("en-US")}` : ""}
               </span>
               <RefreshPricesButton symbols={holdings.map((h) => h.symbol)} />
             </span>
@@ -254,7 +266,7 @@ function PortfolioPage() {
                   const dayPct = q && q.prevClose > 0 ? (price - q.prevClose) / q.prevClose : null;
                   // Fidelity divides % of Acct by TOTAL ACCOUNT VALUE (net equity) —
                   // verified against real statements (CRWD 32.24%, LRCX 26.84%, ...).
-                  const netAcct = positionsValue + Number(amirAccount?.cash ?? 0) - Number(amirAccount?.margin_used ?? 0);
+                  const netAcct = positionsValue + Number(selectedAccount?.cash ?? 0) - Number(selectedAccount?.margin_used ?? 0);
                   const pctOfAcct = netAcct > 0 ? value / netAcct : 0;
                   const unpriced = !q;
                   return (
@@ -313,12 +325,12 @@ function PortfolioPage() {
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="font-semibold uppercase tracking-wide text-muted-foreground">Pending activity</span>
-                <span className="tabular">{fmtUSD(-Number(amirAccount?.margin_used ?? 0))}</span>
+                <span className="tabular">{fmtUSD(-Number(selectedAccount?.margin_used ?? 0))}</span>
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="font-semibold uppercase tracking-wide">Total account value</span>
                 <span className="tabular font-semibold">
-                  {fmtUSD(positionsValue + Number(amirAccount?.cash ?? 0) - Number(amirAccount?.margin_used ?? 0))}
+                  {fmtUSD(positionsValue + Number(selectedAccount?.cash ?? 0) - Number(selectedAccount?.margin_used ?? 0))}
                 </span>
               </div>
               <div className="flex items-center justify-between py-2">
@@ -329,7 +341,7 @@ function PortfolioPage() {
                       const q = liveQuotes?.[h.symbol];
                       return q && q.prevClose > 0 ? sum + h.quantity * (q.price - q.prevClose) : sum;
                     }, 0);
-                    const net = positionsValue + Number(amirAccount?.cash ?? 0) - Number(amirAccount?.margin_used ?? 0);
+                    const net = positionsValue + Number(selectedAccount?.cash ?? 0) - Number(selectedAccount?.margin_used ?? 0);
                     const prior = net - day; // Fidelity: % vs yesterday's account value
                     return (
                       <span className={day >= 0 ? "text-success" : "text-destructive"}>

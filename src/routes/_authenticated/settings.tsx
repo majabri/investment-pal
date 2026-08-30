@@ -156,7 +156,7 @@ function SettingsPage() {
 
         <div className="mb-4 grid gap-2 sm:grid-cols-[1fr_180px_auto]">
           <Input
-            placeholder="Account name (e.g., Amir-TOD, Roth IRA, Kids UTMA)"
+            placeholder="Account name (e.g., Brokerage, Roth IRA, Kids UTMA)"
             value={newAcctName}
             onChange={(e) => setNewAcctName(e.target.value)}
           />

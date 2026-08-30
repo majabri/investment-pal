@@ -10,8 +10,14 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { fmtUSD } from "@/lib/finance";
 
-export function MarginCard({ accountId, accountName, marginUsed }: {
-  accountId: string | null; accountName: string; marginUsed: number;
+export function MarginCard({ accountId, marginUsed }: {
+  /** A resolved account is required. This used to accept null and create an
+   *  account named after whatever label the caller passed — which, once the
+   *  caller became the account switcher, meant saving with nothing selected
+   *  would create an account literally named "—" and attach a margin loan to
+   *  it. Callers must not render this card without a resolved account. */
+  accountId: string;
+  marginUsed: number;
 }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -26,14 +32,7 @@ export function MarginCard({ accountId, accountName, marginUsed }: {
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth.user?.id;
       if (!userId) throw new Error("Not signed in");
-      let id = accountId;
-      if (!id) {
-        const { data: created, error } = await supabase.from("accounts")
-          .insert({ user_id: userId, name: accountName }).select("id").single();
-        if (error) throw error;
-        id = created.id;
-      }
-      const { error } = await supabase.from("accounts").update({ margin_used: n }).eq("id", id!);
+      const { error } = await supabase.from("accounts").update({ margin_used: n }).eq("id", accountId);
       if (error) throw error;
       toast.success(`Margin loan set: ${fmtUSD(n)}`);
       setEditing(false);
