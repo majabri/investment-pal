@@ -1,67 +1,21 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import {
-  LayoutDashboard,
-  Briefcase,
-  Sparkles,
-  BookOpen,
-  Target,
-  Settings as SettingsIcon,
-  LogOut,
-  Eye,
-  Users,
-  Newspaper,
-  TrendingUp,
-  CalendarClock,
-  CalendarDays,
-  Globe,
-  PiggyBank,
-} from "lucide-react";
+import { LayoutDashboard, LogOut, Menu } from "lucide-react";
 import { MarketTape } from "./MarketTape";
+import { navGroups, MOBILE_PRIMARY } from "@/lib/nav";
 import { APP_VERSION } from "@/lib/version";
 
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-
-type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
-type NavGroup = { group: string; items: NavItem[] };
-
-const navGroups: NavGroup[] = [
-  {
-    group: "Amir",
-    items: [
-      { to: "/", label: "Investment Office", icon: LayoutDashboard },
-      { to: "/prompt-center", label: "Prompt Center", icon: Sparkles },
-      { to: "/portfolio", label: "Portfolio", icon: Briefcase },
-      { to: "/journal", label: "Trade Journal", icon: BookOpen },
-      { to: "/watchlist", label: "Investment Watchlist", icon: Eye },
-      { to: "/goals", label: "Goals", icon: Target },
-      { to: "/ira", label: "IRA", icon: PiggyBank },
-    ],
-  },
-  {
-    group: "Kids",
-    items: [
-      { to: "/kids", label: "Kids Trading Dashboard", icon: Users },
-      { to: "/kids-529", label: "Kids 529 Dashboard", icon: Users },
-      { to: "/kids-crypto", label: "Kids Crypto Dashboard", icon: Users },
-      { to: "/kids-prompt-center", label: "Kids Prompt Center", icon: Sparkles },
-      { to: "/kids-watchlist", label: "Kids Watchlist", icon: Eye },
-    ],
-  },
-  {
-    group: "General",
-    items: [
-      { to: "/news", label: "News", icon: Newspaper },
-      { to: "/opportunities", label: "Opportunities", icon: TrendingUp },
-      { to: "/earnings", label: "Earnings", icon: CalendarClock },
-      { to: "/economic-calendar", label: "Economic Calendar", icon: CalendarDays },
-      { to: "/geopolitics", label: "Geopolitics", icon: Globe },
-      { to: "/settings", label: "Settings", icon: SettingsIcon },
-    ],
-  },
-];
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { AccountSwitcher } from "./AccountSwitcher";
 
 export function AppShell({
   title,
@@ -84,6 +38,9 @@ export function AppShell({
             <LayoutDashboard className="h-4 w-4" />
           </div>
           <div className="text-sm font-semibold tracking-tight">Investment Companion</div>
+        </div>
+        <div className="px-3 pb-2">
+          <AccountSwitcher className="h-8 w-full text-xs" />
         </div>
         <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-2">
           {navGroups.map((g) => (
@@ -128,8 +85,8 @@ export function AppShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
-        <div className="flex items-center justify-between border-b px-4 py-3 md:hidden">
-          <div className="text-sm font-semibold">Investment Companion</div>
+        <div className="flex items-center gap-2 border-b px-4 py-3 md:hidden">
+          <AccountSwitcher className="h-8 min-w-0 flex-1 text-xs" />
           <Button size="sm" variant="ghost" onClick={() => supabase.auth.signOut()}>
             Sign out
           </Button>
@@ -148,9 +105,13 @@ export function AppShell({
 
         <main className="flex-1 px-6 py-6">{children}</main>
 
-        {/* Mobile bottom nav */}
+        {/* Mobile bottom nav — three primaries plus a More sheet.
+            This used to be `.slice(0, 5)` over the flattened list, which left
+            13 of 18 routes unreachable on a phone (all of Kids, all research,
+            Settings) and silently changed what phones could reach whenever the
+            array was reordered. Every route is now reachable at 390px. */}
         <nav className="sticky bottom-0 flex justify-around border-t bg-sidebar/95 px-2 py-1 backdrop-blur md:hidden">
-          {navGroups.flatMap((g) => g.items).slice(0, 5).map((item) => {
+          {MOBILE_PRIMARY.map((item) => {
             const active =
               item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             return (
@@ -158,15 +119,61 @@ export function AppShell({
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-3 py-2 text-[10px]",
+                  "flex min-w-0 flex-col items-center gap-0.5 px-3 py-2 text-[11px]",
                   active ? "text-primary" : "text-muted-foreground",
                 )}
               >
                 <item.icon className="h-4 w-4" />
-                {item.label}
+                <span className="truncate">{item.shortLabel}</span>
               </Link>
             );
           })}
+          <Sheet>
+            <SheetTrigger asChild>
+              <button
+                type="button"
+                className="flex min-w-0 flex-col items-center gap-0.5 px-3 py-2 text-[11px] text-muted-foreground"
+              >
+                <Menu className="h-4 w-4" />
+                <span>More</span>
+              </button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>All sections</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 space-y-4 pb-6">
+                {navGroups.map((g) => (
+                  <div key={g.group}>
+                    <div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                      {g.group}
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {g.items.map((item) => {
+                        const active =
+                          item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+                        return (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            className={cn(
+                              "flex items-center gap-2 rounded-lg px-3 py-2 text-sm",
+                              active
+                                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SheetContent>
+          </Sheet>
         </nav>
       </div>
     </div>

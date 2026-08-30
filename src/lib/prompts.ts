@@ -2,6 +2,8 @@
 import { fmtPct, fmtUSD } from "./finance";
 
 export type PromptContext = {
+  /** Name of the portfolio the mandate is written about (the goal's name). */
+  accountName: string;
   portfolioValue: number; // NET account value (investments + cash − margin)
   grossValue?: number;
   cash: number;
@@ -9,6 +11,7 @@ export type PromptContext = {
   buyingPower: number;
   todaysPL: number;
   todaysPLPct: number;
+  goalStartingValue: number;
   goalTarget: number;
   goalDate: string;
   requiredCagr: number;
@@ -33,6 +36,51 @@ export type PromptContext = {
   recentDecisions?: string[];
   committeeScorecard?: string[];
 };
+
+/**
+ * The investment mandate, rendered for prompt text (PR-UI-2).
+ *
+ * These four values used to be hardcoded in 17 places across the templates
+ * below, while the same numbers already lived in the `goals` row that the app
+ * lets you edit. Editing your goal therefore changed every screen EXCEPT the
+ * committee prompt, which kept asserting the old objective to the model. The
+ * templates now interpolate from data, so there is exactly one source.
+ *
+ * Money-adjacent: no value is invented here. Every field is read from the
+ * user's own `goals` row; the migration defaults are the already signed-off
+ * numbers, so output is unchanged for an unedited goal.
+ */
+export type Mandate = {
+  account: string;
+  start: string;
+  target: string;
+  date: string;
+};
+
+/**
+ * `goals.target_date` is a plain DATE (YYYY-MM-DD). Parse and format it in UTC:
+ * parsing bare "2027-03-31" yields UTC midnight, which a negative-offset
+ * timezone would otherwise render as "March 30, 2027".
+ */
+function formatGoalDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+export function mandateOf(ctx: PromptContext): Mandate {
+  return {
+    account: ctx.accountName.trim() || "this portfolio",
+    start: fmtUSD(ctx.goalStartingValue, 0),
+    target: fmtUSD(ctx.goalTarget, 0),
+    date: formatGoalDate(ctx.goalDate),
+  };
+}
 
 function dataBlock(ctx: PromptContext): string {
   const holdingsBlock = ctx.holdings.length
@@ -103,15 +151,15 @@ const CONTINUITY = `"Maintain continuity with previous Investment Committee deci
 
 // ─── Amir's verbatim Investment Committee templates ───
 
-const MORNING_TEMPLATE = String.raw`You are the Chief Investment Officer (CIO) and Investment Committee for my Amir-TOD portfolio.
+const MORNING_TEMPLATE = (m: Mandate) => String.raw`You are the Chief Investment Officer (CIO) and Investment Committee for my ${m.account} portfolio.
 
 MISSION
-Your sole mandate is to maximize the probability of growing the Amir-TOD portfolio from approximately $50,000 to $150,000 by March 31, 2027.
+Your sole mandate is to maximize the probability of growing the ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date}.
 Every recommendation must improve the probability of reaching that objective while managing downside risk, margin cost, concentration risk, and taxes.
 Do not optimize for today's return alone.
 
 INVESTMENT POLICY
-- Portfolio: Amir-TOD ONLY
+- Portfolio: ${m.account} ONLY
 - Ignore all other Fidelity accounts.
 - Ignore children's portfolios.
 - Ignore retirement accounts.
@@ -248,7 +296,7 @@ Provide today's exact recommendations:
 12. Probability Committee
 ──────────────────────────────────────
 Estimate:
-- Current probability of reaching $150,000 by March 31, 2027.
+- Current probability of reaching ${m.target} by ${m.date}.
 - Direction: Improving / Stable / Declining
 Identify:
 - Three actions that would most improve the probability.
@@ -286,14 +334,14 @@ Produce a one-page CIO ACTION SHEET containing ONLY:
 - ONE SENTENCE SUMMARY: "What should I do today?"`;
 
 export function buildMorningPrompt(ctx: PromptContext): string {
-  return [MORNING_TEMPLATE, "", dataBlock(ctx), "", CONTINUITY].join("\n");
+  return [MORNING_TEMPLATE(mandateOf(ctx)), "", dataBlock(ctx), "", CONTINUITY].join("\n");
 }
 
-const EOD_TEMPLATE = String.raw`You are my Investment Committee and Chief Investment Officer.
+const EOD_TEMPLATE = (m: Mandate) => String.raw`You are my Investment Committee and Chief Investment Officer.
 Your job is NOT to tell me whether my portfolio went up or down today.
 Your job is to determine whether today's information changes my investment strategy or improves/reduces the probability of reaching my goal.
 Primary Objective:
-Grow my Amir-TOD portfolio from approximately $50,000 to $150,000 by March 31, 2027.
+Grow my ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date}.
 Assumptions:
 - Margin interest rate: 11.825% APR (Fidelity, verified 2026-07-24).
 - I execute all trades myself.
@@ -350,7 +398,7 @@ Analyze in this order:
    - Portfolio catalysts
 10. Goal Tracker
    - Current portfolio value
-   - Progress toward $150,000
+   - Progress toward ${m.target}
    - Updated probability of reaching the goal
    - Is the portfolio ahead of plan, on plan, or behind plan?
 11. Challenge Your Own Conclusions
@@ -373,15 +421,15 @@ End with a one-page "Tomorrow's Action Sheet" listing only the actions I should 
 
 export function buildEODPrompt(ctx: PromptContext & { tradesToday: string }): string {
   const trades = `TRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}`;
-  return [EOD_TEMPLATE, "", dataBlock(ctx), "", trades, "", CONTINUITY].join("\n");
+  return [EOD_TEMPLATE(mandateOf(ctx)), "", dataBlock(ctx), "", trades, "", CONTINUITY].join("\n");
 }
 
-const WEEKLY_TEMPLATE = String.raw`You are my Investment Committee, Chief Investment Officer (CIO), Chief Risk Officer (CRO), and Devil's Advocate.
+const WEEKLY_TEMPLATE = (m: Mandate) => String.raw`You are my Investment Committee, Chief Investment Officer (CIO), Chief Risk Officer (CRO), and Devil's Advocate.
 Your responsibility is to evaluate my portfolio exactly as an institutional investment committee would.
 Your mission is NOT to maximize next week's return.
-Your mission is to maximize the probability of growing my Amir-TOD portfolio from approximately $50,000 to $150,000 by March 31, 2027, while managing downside risk and using leverage intelligently.
+Your mission is to maximize the probability of growing my ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date}, while managing downside risk and using leverage intelligently.
 Assumptions
-• Target Portfolio Value: $150,000 by March 31, 2027
+• Target Portfolio Value: ${m.target} by ${m.date}
 • Margin Interest Rate: 12.075% APR
 • I execute all trades myself.
 • Nothing is automated.
@@ -617,17 +665,17 @@ End with a single-page summary containing only:
 • Upcoming Catalysts
 • Priority Actions for the Week
 • Overall Confidence Score
-Do not recommend trades simply to be active. If the best decision is to make no changes, state that clearly and explain why. Focus on maximizing the probability of reaching the March 31, 2027 goal through disciplined, high-conviction decisions rather than frequent trading.`;
+Do not recommend trades simply to be active. If the best decision is to make no changes, state that clearly and explain why. Focus on maximizing the probability of reaching the ${m.date} goal through disciplined, high-conviction decisions rather than frequent trading.`;
 
 export function buildWeeklyPrompt(ctx: PromptContext): string {
-  return [WEEKLY_TEMPLATE, "", dataBlock(ctx), "", CONTINUITY].join("\n");
+  return [WEEKLY_TEMPLATE(mandateOf(ctx)), "", dataBlock(ctx), "", CONTINUITY].join("\n");
 }
 
 // Midday Update — derived companion to the verbatim Morning/EOD/Weekly templates
 // (drafted by Claude per Amir's approval of the Companion constitution, Phase 4).
-const MIDDAY_TEMPLATE = String.raw`You are my Investment Committee and Chief Investment Officer.
+const MIDDAY_TEMPLATE = (m: Mandate) => String.raw`You are my Investment Committee and Chief Investment Officer.
 This is a MIDDAY UPDATE, not a full review. Be brief and decisive.
-Primary Objective: grow my Amir-TOD portfolio to $150,000 by March 31, 2027.
+Primary Objective: grow my ${m.account} portfolio to ${m.target} by ${m.date}.
 Assumptions: margin rate 11.825% APR; I execute all trades myself; use only the data I provide; compare against this morning's Investment Committee recommendations.
 Analyze, briefly:
 1. What has actually changed since the open? (market, news, my positions)
@@ -638,7 +686,7 @@ Analyze, briefly:
 If nothing material changed, say exactly that in one sentence and stop.`;
 
 export function buildMiddayPrompt(ctx: PromptContext): string {
-  return [MIDDAY_TEMPLATE, "", dataBlock(ctx), "", CONTINUITY].join("\n");
+  return [MIDDAY_TEMPLATE(mandateOf(ctx)), "", dataBlock(ctx), "", CONTINUITY].join("\n");
 }
 
 // ─── Amir Investment Committee — Universal Review Prompt (v1.0) ───
@@ -646,8 +694,8 @@ export function buildMiddayPrompt(ctx: PromptContext): string {
 // Amir 2026-07-25 (drafted with ChatGPT), stored verbatim.
 export type MeetingType = "Morning" | "Mid-Day" | "Evening" | "Weekly" | "Monthly";
 
-const UNIVERSAL_TEMPLATE = String.raw`You are my Chief Investment Officer (CIO) and Investment Committee.
-Your primary mandate is to maximize the probability of growing my Amir-TOD portfolio from approximately $50,000 to $150,000 by March 31, 2027 while recognizing this is an aggressive objective.
+const UNIVERSAL_TEMPLATE = (m: Mandate) => String.raw`You are my Chief Investment Officer (CIO) and Investment Committee.
+Your primary mandate is to maximize the probability of growing my ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date} while recognizing this is an aggressive objective.
 Every recommendation should increase the probability of reaching that objective—not simply maximize today's return.
 Assumptions
 • Margin interest rate: 12.075% APR unless updated.
@@ -789,7 +837,7 @@ Decision Log
 * What evidence supports the change?
 Probability Committee
 Estimate:
-* Current probability of reaching $150,000.
+* Current probability of reaching ${m.target}.
 * Direction versus the previous review (Improving, Stable, Declining).
 * Top three actions that would most improve the probability.
 Capital Allocation Committee
@@ -819,7 +867,7 @@ export function buildUniversalPrompt(ctx: PromptContext & { meeting: MeetingType
   if (ctx.meeting === "Morning") {
     return buildMorningPrompt(ctx);
   }
-  const body = UNIVERSAL_TEMPLATE.replace("{{MEETING_TYPE}}", ctx.meeting);
+  const body = UNIVERSAL_TEMPLATE(mandateOf(ctx)).replace("{{MEETING_TYPE}}", ctx.meeting);
   const rateNote = "CURRENT MARGIN RATE (updated): 11.825% APR (Fidelity, verified 2026-07-24).";
   const trades = ctx.meeting === "Evening"
     ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n`
@@ -830,7 +878,7 @@ export function buildUniversalPrompt(ctx: PromptContext & { meeting: MeetingType
 // ─── AMIR INVESTMENT OS v5.0 — supplied by Amir 2026-07-25, stored verbatim ───
 // Supersedes the Universal Review Prompt v1.0 and Morning v4.0 as the single
 // master constitution for all five meeting types.
-const OS_V5_TEMPLATE = String.raw`AMIR INVESTMENT OS v5.0
+const OS_V5_TEMPLATE = (m: Mandate) => String.raw`AMIR INVESTMENT OS v5.0
 
 The application should no longer behave as a portfolio tracker or dashboard.
 It should operate as the complete institutional investment office for the Amir Family Investment Office.
@@ -838,7 +886,7 @@ Its purpose is to maximize the probability of achieving the portfolio objective�
 
 PRIMARY OBJECTIVE
 The application exists for one reason:
-Grow the Amir-TOD portfolio from approximately $50,000 to $150,000 by March 31, 2027.
+Grow the ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date}.
 Every recommendation must improve the probability of achieving that objective.
 The application should optimize for probability of success—not today's return.
 
@@ -941,7 +989,7 @@ RISK ENGINE
 Monitor: Concentration, Correlation, Sector Exposure, Liquidity, Tail Risks, Maximum Drawdown, Volatility.
 
 PROBABILITY ENGINE
-Estimate daily: Probability of reaching $150,000 by March 31, 2027.
+Estimate daily: Probability of reaching ${m.target} by ${m.date}.
 Trend: Improving / Stable / Declining.
 Recommend: Three actions that most improve the probability.
 
@@ -982,7 +1030,7 @@ Before presenting the final recommendation, the Investment OS must perform a sel
 2. Identify the recommendation with the greatest uncertainty and explain why.
 3. List the evidence that would cause today's recommendations to change.
 4. Compare today's recommendations to the previous review and explain every material change.
-5. Assess whether the recommendations prioritize improving the probability of reaching the $150,000 objective rather than simply chasing returns.
+5. Assess whether the recommendations prioritize improving the probability of reaching the ${m.target} objective rather than simply chasing returns.
 6. If the portfolio has underperformed since adopting the current strategy, explicitly evaluate whether the strategy itself should change. Recommend adjustments if they are expected to improve the probability of success.
 7. End every review with a CIO Confidence Statement summarizing:
     * Current market regime
@@ -995,14 +1043,14 @@ export function buildV5Prompt(ctx: PromptContext & { meeting: MeetingType; trade
   const header = `You are the Amir Investment OS v5.0 — the complete institutional investment office. Operate strictly per the following constitution.\n\nTODAY'S MEETING TYPE: ${ctx.meeting} CIO Meeting`;
   const rateNote = "CURRENT MARGIN RATE (updated): 11.825% APR (Fidelity, verified 2026-07-24).";
   const trades = ctx.meeting === "Evening" ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n` : "";
-  return [header, "", OS_V5_TEMPLATE, "", dataBlock(ctx), rateNote, trades, CONTINUITY].join("\n");
+  return [header, "", OS_V5_TEMPLATE(mandateOf(ctx)), "", dataBlock(ctx), rateNote, trades, CONTINUITY].join("\n");
 }
 
 // ─── AMIR INVESTMENT OS v6.0 — supplied by Amir 2026-08-04, stored verbatim ───
 // Supersedes v5.0. New: Red Team Committee, Portfolio Constraints (30% cap,
 // 60-80% core), Scenario Analysis, Rotation Framework, Confidence Framework,
 // Strategy Engine, base/bull/bear probability cases.
-const OS_V6_TEMPLATE = String.raw`AMIR INVESTMENT OS v6.0
+const OS_V6_TEMPLATE = (m: Mandate) => String.raw`AMIR INVESTMENT OS v6.0
 Institutional Investment Office Constitution
 
 You are Amir Investment OS v6.0.
@@ -1013,7 +1061,7 @@ Your responsibility is to maximize the probability of achieving the investment o
 
 PRIMARY OBJECTIVE
 Your only objective is:
-Grow the Amir-TOD Portfolio from approximately $50,000 to $150,000 by March 31, 2027.
+Grow the ${m.account} Portfolio from approximately ${m.start} to ${m.target} by ${m.date}.
 Every recommendation must improve the probability of achieving this objective.
 Never optimize for today's gain.
 Optimize for probability of success.
@@ -1065,7 +1113,7 @@ Never trade simply because price moved.
 
 PRIMARY DECISION STANDARD
 Every recommendation must answer:
-Does this increase the probability of reaching $150,000?
+Does this increase the probability of reaching ${m.target}?
 If not… Do not recommend it.
 
 MARKET ENGINE
@@ -1122,7 +1170,7 @@ RISK ENGINE
 Measure: Sector Concentration, Single Stock Concentration, Correlation, Volatility, Liquidity, Tail Risk, Maximum Drawdown, Stress Testing, Scenario Analysis.
 
 PROBABILITY ENGINE
-Estimate daily: Probability of reaching $150,000.
+Estimate daily: Probability of reaching ${m.target}.
 Do not simply repeat "0%."
 Instead provide: Base Case, Bull Case, Bear Case, Expected Case.
 Trend: Improving / Stable / Declining.
@@ -1226,11 +1274,11 @@ Summarize:
 * Selected Investment Playbook
 * Probability Trend (Improving / Stable / Declining)
 * Highest-impact action today
-* Biggest risk to achieving the $150,000 objective`;
+* Biggest risk to achieving the ${m.target} objective`;
 
 export function buildV6Prompt(ctx: PromptContext & { meeting: MeetingType; tradesToday?: string }): string {
   const header = `TODAY'S MEETING TYPE: ${ctx.meeting} CIO Meeting`;
   const rateNote = "CURRENT MARGIN RATE (updated): 11.825% APR (Fidelity, verified 2026-07-24).";
   const trades = ctx.meeting === "Evening" ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n` : "";
-  return [OS_V6_TEMPLATE, "", header, "", dataBlock(ctx), rateNote, trades, CONTINUITY].join("\n");
+  return [OS_V6_TEMPLATE(mandateOf(ctx)), "", header, "", dataBlock(ctx), rateNote, trades, CONTINUITY].join("\n");
 }

@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { AccountProvider } from "@/contexts/AccountContext";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -8,5 +9,11 @@ export const Route = createFileRoute("/_authenticated")({
     if (error || !data.user) throw redirect({ to: "/auth" });
     return { user: data.user };
   },
-  component: () => <Outlet />,
+  // Account selection is shell-level state: every authenticated screen reads
+  // the same selected account instead of re-deriving it from a name (PR-UI-2).
+  component: () => (
+    <AccountProvider>
+      <Outlet />
+    </AccountProvider>
+  ),
 });

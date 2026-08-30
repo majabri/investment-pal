@@ -127,3 +127,59 @@ per-entry. CI runs the unmodified gate.
 - **Item 3 — ADR-APP-007 (margin rate):** ⛔ blocked pending Amir's four sign-off
   values. Note the ADR number is **007**; 006 is taken.
 - **Item 4 — PR-UI-3:** decision card against `recommendation.schema.json`.
+
+## Session — 2026-08-30 — PR-UI-2: AccountContext + identity removal
+
+Handoff item 2 of 4. Closes gap **G1** (portfolio-agnostic violation) and folds
+in **G5**'s mobile blocker.
+
+- **AccountContext.** `src/contexts/AccountContext.tsx` holds the selected
+  account for every authenticated screen, mounted in `_authenticated/route.tsx`
+  and persisted to `localStorage`. Pure selection logic lives in
+  `src/lib/accountSelection.ts` so it is unit-testable without React or the
+  Supabase client.
+- **Fail loudly.** The silent `account_id == null` fallback is gone. On a
+  lookup miss screens now render `<AccountNotice>` and no figures, instead of
+  showing orphaned manual rows as if they were the portfolio. Screens that
+  already counted accountless manual adds *when resolved* still do
+  (`includeUnassigned`) — the change is only to the unresolved path.
+- **20 identity sites across 8 files** replaced with context reads. `grep -rn
+  "Amir - TOD\|Amir-TOD" src/` now returns nothing.
+- **Prompt de-hardcoding (money-adjacent).** The mandate was hardcoded in **17
+  places** in `prompts.ts` while the same numbers already lived in the `goals`
+  row the app lets you edit — so editing the goal changed every screen *except*
+  the prompt the model reads. All seven templates are now functions of a
+  `Mandate` derived from `goals` (`name`, `starting_value`, `target_value`,
+  `target_date`). **No value is invented**; for an unedited goal the rendered
+  prompt is byte-identical to before.
+- **Mobile drawer.** `AppShell`'s `.slice(0, 5)` left 13 of 18 routes
+  unreachable on a phone. Replaced with three thumb-reach primaries plus a More
+  sheet rendering every group. Nav model extracted to `src/lib/nav.ts` so
+  reachability is a tested property, not a visual one.
+- **Category scheme.** `accountCategory()` no longer keys off one account name;
+  the `"Amir"` category became `"Primary"`, derived from account shape.
+
+**Gate:** `bun install --frozen-lockfile` ✓ · `bun run typecheck` ✓ ·
+`bun run test:typecheck` ✓ · `bun test` **54 pass / 0 fail** (13 pre-existing
+unchanged + 41 new) ✓ · dev-server boot ✓ (`ready in 1012 ms`, `GET /auth`
+→ 200).
+
+Negative control run rather than assumed: re-hardcoding a single mandate value
+in one template **did** fail the "contains no hardcoded objective" test.
+Reverted.
+
+**Not done, deliberately:**
+- **Margin rates untouched** — `prompts.ts` carries `11.825%` in five places and
+  `12.075%` in two, and they disagree. That is ADR-APP-007 territory and blocked
+  pending sign-off; this PR does not touch a single rate.
+- **Mobile reachability verified structurally**, not by a live authenticated
+  render — the sandbox has no credentials for the signed-in shell and adding
+  Playwright inside a UI PR is out of policy. Worth one spot-check on device.
+- Kids' first names in `accountGroups.ts` / `familyPolicy.ts` left as-is: they
+  are family configuration, not an account-identity defect, and the Kids-route
+  consolidation is still open under OD-005.
+
+### Next
+- **Item 3 — ADR-APP-007 (margin rate):** ⛔ blocked pending Amir's four
+  sign-off values. The rate disagreement above strengthens the case.
+- **Item 4 — PR-UI-3:** decision card against `recommendation.schema.json`.
