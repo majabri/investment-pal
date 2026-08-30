@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getPricesFn } from "@/lib/marketServer";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 
 /** Yahoo symbol quirks (e.g. BRK.B → BRK-B). */
 const toYahoo = (s: string) => s.replace(".", "-");

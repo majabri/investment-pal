@@ -14,7 +14,7 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 import { activeBuybackBySymbol, type TrimDecision } from "@/lib/buybackZones";
 import { StatCard } from "@/components/app/StatCard";
 import { ProgressChart } from "@/components/app/ProgressChart";
