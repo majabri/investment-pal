@@ -183,3 +183,61 @@ Reverted.
 - **Item 3 — ADR-APP-007 (margin rate):** ⛔ blocked pending Amir's four
   sign-off values. The rate disagreement above strengthens the case.
 - **Item 4 — PR-UI-3:** decision card against `recommendation.schema.json`.
+
+## Session — 2026-09-01 — PR-UI-3 (part 1): decision card renders the evidence contract
+
+Handoff item 4, split. Closes gap **G2** — the audit's highest-ROI item: the
+evidence contract has been written to `decisions` since PR #63 and read by
+**nothing**.
+
+**Blocked first, then scoped.** Reading the certified contract turned up **two**
+`recommendation.schema.json` files, both titled `InvestmentRecommendation`, both
+created 2026-08-14T03:31:14Z, both inside `Investment_OS_Master_Repository_v1_0`
+— `08 APIs/contracts/` (14 required fields) and `24 Schemas/` (10). They disagree
+on the evidence shape, the risks field name, and provenance. Filed as **OD-008**
+(PR #99) per governing brief Part 0.1.
+
+On re-reading, that blocks less than first assumed: **the card reads the
+database, not the schema file.** The eight columns already exist with fixed
+names, and displaying them is required under either contract. What genuinely
+waits on OD-008 is the schema-conformance test, `objective_id` vs
+`model_version`/`prompt_version`, and the two OD-007 columns. So this PR ships
+the display; those wait.
+
+- **`src/lib/decisionEvidence.ts`** — pure parsers (no React, no Supabase).
+  `evidence` is accepted in **both** contract shapes (`[{source_id, claim}]` and
+  `string[]`), which is correct under either OD-008 outcome, so this file does
+  not change when the decision lands. Nothing is invented: an absent field reads
+  as absent, per AIOS §27.
+- **`src/components/app/DecisionCard.tsx`** — collapsed by default; expands to
+  all eight fields. Two rules it exists to hold:
+  - **Confidence and probability are never conflated.** Confidence sits alone in
+    the header, captioned *"how sure the reasoning is — not the odds of
+    success"*; `probability_impact` sits in the body under its own caption. They
+    never share a row, a bar, or a format — the migration comment is explicit
+    that these are different quantities.
+  - **Dissent is not de-emphasised.** The counterargument gets the same visual
+    weight as the thesis.
+  - An unsourced claim says *"Source not recorded"* rather than implying
+    provenance it does not have.
+- **`index.tsx`** — Today's Plan rendered `recommendation` as a bare sentence
+  beside a colour-only dot, and **never even selected** the eight columns. It now
+  selects them and renders cards. The dot is replaced by a text status label
+  (also clears a G7 colour-alone finding).
+- Null handling: rows predating the contract say so explicitly instead of
+  rendering six empty sections.
+
+**Gate:** `bun run typecheck` ✓ · `bun run test:typecheck` ✓ · `bun test`
+**85 pass / 0 fail** (55 pre-existing unchanged + 30 new) ✓ · dev-server boot ✓
+(`GET /auth` → 200).
+
+A real failure caught en route: four card tests initially called `.click()`
+directly on the DOM node, which bypasses React's `act()` and left state
+unflushed. Switched to `fireEvent.click`. Worth noting for future component
+tests in this harness.
+
+### Still waiting on OD-008
+- Schema-conformance test (which required-field list to assert)
+- `objective_id` (B) vs `model_version` / `prompt_version` / `ips_version` (A)
+- The two OD-007 columns (`alternatives_considered`, `do_nothing_outcome`) and
+  the divergence ADR

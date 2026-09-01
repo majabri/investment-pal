@@ -25,6 +25,7 @@ import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
 import { accountCategory, CATEGORY_ORDER } from "@/lib/data/accountGroups";
 import { useAccountContext, selectAccountHoldings } from "@/contexts/AccountContext";
 import { AccountNotice } from "@/components/app/AccountNotice";
+import { DecisionCard, type DecisionRow } from "@/components/app/DecisionCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -126,10 +127,17 @@ function Dashboard() {
     queryKey: ["decisions-today"],
     queryFn: async () => {
       const today = new Date().toISOString().slice(0, 10);
+      // The evidence-contract columns (PR #63) were never selected here, so the
+      // card had nothing to show even though the data was being written.
       const { data } = await supabase.from("decisions" as never)
-        .select("id,recommendation,decision").eq("decided_on", today)
+        .select(
+          "id,symbol,recommendation,decision,action,confidence,evidence," +
+            "counterargument,key_risks,portfolio_impact,probability_impact," +
+            "invalidation_conditions",
+        )
+        .eq("decided_on", today)
         .order("id", { ascending: true }).limit(12);
-      return (data ?? []) as unknown as { id: string; recommendation: string; decision: string }[];
+      return (data ?? []) as unknown as DecisionRow[];
     },
     refetchInterval: 5 * 60 * 1000,
   });
@@ -354,15 +362,12 @@ function Dashboard() {
       )}
       {todaysPlan.length > 0 && (
         <div className="mb-4 rounded-xl border bg-card/60 px-4 py-3">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today's Plan — committee Action Sheet</div>
-          <ul className="space-y-0.5 text-sm">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today's Plan — committee Action Sheet</div>
+          <div className="space-y-2">
             {todaysPlan.map((d) => (
-              <li key={d.id} className="flex items-center gap-2">
-                <span className={d.decision === "pending" ? "text-amber-500" : "text-emerald-500"}>●</span>
-                <span>{d.recommendation}</span>
-              </li>
+              <DecisionCard key={d.id} row={d} />
             ))}
-          </ul>
+          </div>
         </div>
       )}
       {buybackPlans.length > 0 && (
