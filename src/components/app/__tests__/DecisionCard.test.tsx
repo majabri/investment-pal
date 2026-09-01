@@ -84,10 +84,20 @@ describe("DecisionCard", () => {
     expect(screen.getAllByText("Not provided").length).toBeGreaterThan(0);
   });
 
-  test("a pre-contract row says so instead of showing empty sections", () => {
+  test("a row with no contract fields says so, without claiming why", () => {
     render(<DecisionCard row={row()} />);
-    expect(screen.getByText(/predates the evidence contract/i)).toBeInTheDocument();
+    expect(screen.getByText(/No evidence recorded for this decision/i)).toBeInTheDocument();
+    // Empty columns do not establish *why* they are empty: a post-migration row
+    // whose extractor skipped them looks identical to a pre-migration one.
+    expect(screen.queryByText(/predates/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  test("a null inside an impact array never renders as the word null", () => {
+    render(<DecisionCard row={row({ portfolio_impact: [null, "real entry"] })} />);
+    fireEvent.click(screen.getByRole("button", { expanded: false }));
+    expect(screen.getByText("real entry")).toBeInTheDocument();
+    expect(screen.queryByText("null")).not.toBeInTheDocument();
   });
 
   test("has no axe violations, collapsed and expanded", async () => {

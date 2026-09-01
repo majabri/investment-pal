@@ -115,28 +115,35 @@ export function parseImpact(raw: unknown): ImpactEntry[] {
   }
 
   if (Array.isArray(raw)) {
-    return raw
-      .map((v) => ({ label: "", value: typeof v === "string" ? v.trim() : JSON.stringify(v) }))
-      .filter((e) => e.value);
+    return raw.map((v) => ({ label: "", value: impactValue(v) })).filter((e) => e.value);
   }
 
   if (typeof raw === "object") {
     return Object.entries(raw as Record<string, unknown>)
-      .map(([k, v]) => ({
-        label: humaniseKey(k),
-        value:
-          v == null
-            ? ""
-            : typeof v === "string"
-              ? v.trim()
-              : typeof v === "number" || typeof v === "boolean"
-                ? String(v)
-                : JSON.stringify(v),
-      }))
+      .map(([k, v]) => ({ label: humaniseKey(k), value: impactValue(v) }))
       .filter((e) => e.value);
   }
 
   return [];
+}
+
+/**
+ * One stringifier for both branches, so "absent reads as absent" holds
+ * identically whether the impact arrived as an object or an array.
+ *
+ * `null` must map to "" and not to JSON.stringify's `"null"` — that string is
+ * truthy, so it survives the caller's filter and renders the literal word
+ * "null" on a governed decision. Missing data has to look missing.
+ */
+function impactValue(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v.trim();
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  try {
+    return JSON.stringify(v) ?? "";
+  } catch {
+    return "";
+  }
 }
 
 function humaniseKey(k: string): string {

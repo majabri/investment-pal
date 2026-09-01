@@ -214,7 +214,12 @@ export function DecisionCard({ row }: { row: DecisionRow }) {
         </>
       ) : (
         <div className="border-t px-4 py-2 text-xs text-muted-foreground">
-          No evidence recorded — this decision predates the evidence contract.
+          {/* Deliberately neutral: empty contract fields do not establish *why*
+              they are empty. A row written after the migration by an extractor
+              that skipped these columns looks identical to one that predates
+              it, and asserting the reason would be a claim the data does not
+              support — on a governed decision, of all places. */}
+          No evidence recorded for this decision.
         </div>
       )}
     </div>

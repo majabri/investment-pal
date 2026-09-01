@@ -88,6 +88,24 @@ describe("parseImpact", () => {
   test("empty for null", () => {
     expect(parseImpact(null)).toEqual([]);
   });
+
+  // JSON.stringify(null) is the truthy string "null", so an unguarded array
+  // branch renders the literal word "null" as an impact value.
+  test("null and undefined inside an array are absent, not the word null", () => {
+    expect(parseImpact([null, undefined, "kept"])).toEqual([{ label: "", value: "kept" }]);
+  });
+
+  test("array and object branches agree on what counts as absent", () => {
+    expect(parseImpact([null])).toEqual(parseImpact({ a: null }));
+    expect(parseImpact([""])).toEqual(parseImpact({ a: "" }));
+  });
+
+  test("zero and false survive in arrays as they do in objects", () => {
+    expect(parseImpact([0, false])).toEqual([
+      { label: "", value: "0" },
+      { label: "", value: "false" },
+    ]);
+  });
 });
 
 describe("formatConfidence — confidence is not a probability", () => {
