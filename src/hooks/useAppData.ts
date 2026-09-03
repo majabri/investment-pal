@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { MARGIN_POLICY_UNSET, type MarginPolicy } from "@/lib/marginCost";
 import { scopedRows, type AccountScope } from "@/lib/accountTotals";
 import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
+import { localIsoDate } from "@/lib/localDate";
 
 export type Goal = {
   id: string;
@@ -411,6 +412,90 @@ export function useRecordBalanceImport() {
       qc.invalidateQueries({ queryKey: ["account_balances"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
     },
+  });
+}
+
+/**
+ * Recorded balance snapshots for one account, oldest first.
+ *
+ * Scoped, like everything else after Stage 1. Rows recorded before Stage 5
+ * carry no `account_id` — they are an all-accounts blend and cannot be
+ * attributed to one account, so they are excluded here and counted separately
+ * by `useUnscopedSnapshotCount` so the chart can say they exist rather than
+ * silently drawing a household total on one account's line.
+ */
+export type SnapshotRow = {
+  id: string;
+  gross: number;
+  net: number;
+  margin_used: number;
+  created_at: string;
+  snapshot_date: string | null;
+};
+
+export function useSnapshots(scope: AccountScope, limit = 400) {
+  const accountId = scope.kind === "account" ? scope.accountId : null;
+  return useQuery({
+    queryKey: ["portfolio_snapshots", accountId, limit],
+    enabled: accountId !== null,
+    queryFn: async (): Promise<SnapshotRow[]> => {
+      const { data, error } = await supabase
+        .from("portfolio_snapshots" as never)
+        .select("id,gross,net,margin_used,created_at,snapshot_date")
+        .eq("account_id", accountId!)
+        .order("created_at", { ascending: true })
+        .limit(limit);
+      if (error) throw error;
+      return (data ?? []) as unknown as SnapshotRow[];
+    },
+  });
+}
+
+/** How many pre-Stage-5 snapshots exist, so the chart can account for them. */
+export function useUnscopedSnapshotCount() {
+  return useQuery({
+    queryKey: ["portfolio_snapshots", "unscoped-count"],
+    queryFn: async (): Promise<number> => {
+      const { count, error } = await supabase
+        .from("portfolio_snapshots" as never)
+        .select("id", { count: "exact", head: true })
+        .is("account_id", null);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+}
+
+/**
+ * Record today's snapshot for an account.
+ *
+ * At most one per account per calendar day, and the day is the OWNER's, not
+ * UTC. The database carries a matching unique index, so two open tabs racing
+ * cannot produce two rows for the same day — the client check below is the
+ * cheap path, not the guarantee.
+ */
+export function useRecordSnapshot() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: {
+      accountId: string;
+      gross: number;
+      net: number;
+      marginUsed: number;
+    }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not signed in");
+      const { error } = await supabase.from("portfolio_snapshots" as never).insert({
+        user_id: userData.user.id,
+        account_id: p.accountId,
+        snapshot_date: localIsoDate(),
+        gross: p.gross,
+        net: p.net,
+        margin_used: p.marginUsed,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["portfolio_snapshots"] }),
   });
 }
 

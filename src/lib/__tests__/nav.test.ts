@@ -13,7 +13,7 @@ describe("the collapse kept every page", () => {
   test("there are exactly seven sections", () => {
     expect(navSections).toHaveLength(7);
     expect(navSections.map((s) => s.label)).toEqual([
-      "Investment Office",
+      "Overview",
       "Portfolio",
       "Decisions",
       "Research",
@@ -128,8 +128,8 @@ describe("sectionForPath", () => {
     expect(sectionForPath("/watchlist")?.label).toBe("Research");
   });
 
-  test("root resolves to Investment Office and does not swallow other paths", () => {
-    expect(sectionForPath("/")?.label).toBe("Investment Office");
+  test("root resolves to Overview and does not swallow other paths", () => {
+    expect(sectionForPath("/")?.label).toBe("Overview");
     // "/" must not prefix-match everything.
     expect(sectionForPath("/settings")?.label).toBe("Settings");
   });

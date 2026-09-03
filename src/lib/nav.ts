@@ -31,10 +31,15 @@ export type NavSection = {
 
 export const navSections: NavSection[] = [
   {
+    // "Investment Office" was the old framing (Stage 5 retires it). The section
+    // is what it has always actually been: the daily brief plus the summary.
     to: "/",
-    label: "Investment Office",
+    label: "Overview",
     icon: LayoutDashboard,
-    tabs: [],
+    tabs: [
+      { to: "/", label: "Morning Brief" },
+      { to: "/summary", label: "Portfolio Summary" },
+    ],
   },
   {
     to: "/portfolio",
@@ -103,7 +108,7 @@ export const navSections: NavSection[] = [
  * away via More, which renders every section and every tab.
  */
 export const MOBILE_PRIMARY: Array<{ to: string; label: string; shortLabel: string; icon: typeof LayoutDashboard }> = [
-  { to: "/", label: "Investment Office", shortLabel: "Office", icon: LayoutDashboard },
+  { to: "/", label: "Overview", shortLabel: "Overview", icon: LayoutDashboard },
   { to: "/portfolio", label: "Portfolio", shortLabel: "Portfolio", icon: Briefcase },
   { to: "/decisions", label: "Decisions", shortLabel: "Decisions", icon: Gavel },
   { to: "/prompt-center", label: "Committee", shortLabel: "Committee", icon: Sparkles },
