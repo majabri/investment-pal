@@ -1,5 +1,6 @@
 // Prompt templates for ChatGPT morning + end-of-day reviews.
 import { fmtPct, fmtUSD } from "./finance";
+import { marginRatePromptLine, MARGIN_POLICY_UNSET, type MarginPolicy } from "./marginCost";
 
 export type PromptContext = {
   /** Name of the portfolio the mandate is written about (the goal's name). */
@@ -19,6 +20,8 @@ export type PromptContext = {
   ipsPositionCapPct?: number;
   ipsPositionCapHard?: boolean;
   ipsMarginCapPct?: number;
+  /** Margin policy from ips_lite (ADR-APP-007). Omitted = rate not set. */
+  marginPolicy?: MarginPolicy;
   holdings: Array<{
     symbol: string;
     quantity: number;
@@ -55,6 +58,9 @@ export type Mandate = {
   start: string;
   target: string;
   date: string;
+  /** Rendered margin-rate sentence. Says "NOT SET" when the rate is unset —
+   *  never a number, and never silently omitted (ADR-APP-007). */
+  marginRate: string;
 };
 
 /**
@@ -79,6 +85,7 @@ export function mandateOf(ctx: PromptContext): Mandate {
     start: fmtUSD(ctx.goalStartingValue, 0),
     target: fmtUSD(ctx.goalTarget, 0),
     date: formatGoalDate(ctx.goalDate),
+    marginRate: marginRatePromptLine(ctx.marginPolicy ?? MARGIN_POLICY_UNSET),
   };
 }
 
@@ -164,7 +171,7 @@ INVESTMENT POLICY
 - Ignore children's portfolios.
 - Ignore retirement accounts.
 - Ignore positions with less than $5 market value unless specifically evaluating tax-loss harvesting.
-- Current margin rate: 11.825% APR (unless updated).
+- ${m.marginRate}
 - I execute every trade manually.
 - Nothing is automated except public market data.
 - I am comfortable with above-average risk but expect institutional-quality, evidence-based recommendations.
@@ -343,7 +350,7 @@ Your job is to determine whether today's information changes my investment strat
 Primary Objective:
 Grow my ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date}.
 Assumptions:
-- Margin interest rate: 11.825% APR (Fidelity, verified 2026-07-24).
+- ${m.marginRate}
 - I execute all trades myself.
 - Nothing is automated.
 - Use only the portfolio and market data I provide.
@@ -430,7 +437,7 @@ Your mission is NOT to maximize next week's return.
 Your mission is to maximize the probability of growing my ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date}, while managing downside risk and using leverage intelligently.
 Assumptions
 • Target Portfolio Value: ${m.target} by ${m.date}
-• Margin Interest Rate: 12.075% APR
+• ${m.marginRate}
 • I execute all trades myself.
 • Nothing is automated.
 • Use only the portfolio and market data I provide.
@@ -676,7 +683,7 @@ export function buildWeeklyPrompt(ctx: PromptContext): string {
 const MIDDAY_TEMPLATE = (m: Mandate) => String.raw`You are my Investment Committee and Chief Investment Officer.
 This is a MIDDAY UPDATE, not a full review. Be brief and decisive.
 Primary Objective: grow my ${m.account} portfolio to ${m.target} by ${m.date}.
-Assumptions: margin rate 11.825% APR; I execute all trades myself; use only the data I provide; compare against this morning's Investment Committee recommendations.
+Assumptions: ${m.marginRate} I execute all trades myself; use only the data I provide; compare against this morning's Investment Committee recommendations.
 Analyze, briefly:
 1. What has actually changed since the open? (market, news, my positions)
 2. Do any of this morning's recommendations change? If yes, exactly which and why.
@@ -698,7 +705,7 @@ const UNIVERSAL_TEMPLATE = (m: Mandate) => String.raw`You are my Chief Investmen
 Your primary mandate is to maximize the probability of growing my ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date} while recognizing this is an aggressive objective.
 Every recommendation should increase the probability of reaching that objective—not simply maximize today's return.
 Assumptions
-• Margin interest rate: 12.075% APR unless updated.
+• ${m.marginRate}
 • I make every investment decision manually.
 • Nothing is automated except public market data.
 • I am comfortable with above-average risk but require disciplined, evidence-based recommendations.
@@ -868,7 +875,7 @@ export function buildUniversalPrompt(ctx: PromptContext & { meeting: MeetingType
     return buildMorningPrompt(ctx);
   }
   const body = UNIVERSAL_TEMPLATE(mandateOf(ctx)).replace("{{MEETING_TYPE}}", ctx.meeting);
-  const rateNote = "CURRENT MARGIN RATE (updated): 11.825% APR (Fidelity, verified 2026-07-24).";
+  const rateNote = marginRatePromptLine(ctx.marginPolicy ?? MARGIN_POLICY_UNSET);
   const trades = ctx.meeting === "Evening"
     ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n`
     : "";
@@ -1041,7 +1048,7 @@ Before presenting the final recommendation, the Investment OS must perform a sel
 
 export function buildV5Prompt(ctx: PromptContext & { meeting: MeetingType; tradesToday?: string }): string {
   const header = `You are the Amir Investment OS v5.0 — the complete institutional investment office. Operate strictly per the following constitution.\n\nTODAY'S MEETING TYPE: ${ctx.meeting} CIO Meeting`;
-  const rateNote = "CURRENT MARGIN RATE (updated): 11.825% APR (Fidelity, verified 2026-07-24).";
+  const rateNote = marginRatePromptLine(ctx.marginPolicy ?? MARGIN_POLICY_UNSET);
   const trades = ctx.meeting === "Evening" ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n` : "";
   return [header, "", OS_V5_TEMPLATE(mandateOf(ctx)), "", dataBlock(ctx), rateNote, trades, CONTINUITY].join("\n");
 }
@@ -1278,7 +1285,7 @@ Summarize:
 
 export function buildV6Prompt(ctx: PromptContext & { meeting: MeetingType; tradesToday?: string }): string {
   const header = `TODAY'S MEETING TYPE: ${ctx.meeting} CIO Meeting`;
-  const rateNote = "CURRENT MARGIN RATE (updated): 11.825% APR (Fidelity, verified 2026-07-24).";
+  const rateNote = marginRatePromptLine(ctx.marginPolicy ?? MARGIN_POLICY_UNSET);
   const trades = ctx.meeting === "Evening" ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n` : "";
   return [OS_V6_TEMPLATE(mandateOf(ctx)), "", header, "", dataBlock(ctx), rateNote, trades, CONTINUITY].join("\n");
 }

@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { fmtUSD } from "@/lib/finance";
+import { useIpsLite } from "@/hooks/useAppData";
+import { marginRateLabel } from "@/lib/marginCost";
 
 export function MarginCard({ accountId, marginUsed }: {
   /** A resolved account is required. This used to accept null and create an
@@ -23,6 +25,7 @@ export function MarginCard({ accountId, marginUsed }: {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(String(marginUsed || ""));
   const [busy, setBusy] = useState(false);
+  const { data: ipsLite } = useIpsLite();
 
   async function save() {
     const n = parseFloat(val.replace(/[$,]/g, ""));
@@ -67,7 +70,7 @@ export function MarginCard({ accountId, marginUsed }: {
             {marginUsed > 0 ? fmtUSD(marginUsed) : "Not set — click ✎"}
           </div>
           <div className="text-[11px] text-muted-foreground">
-            {marginUsed > 0 ? "Owed to Fidelity at 11.825% APR" : "From Fidelity → Balances → Cash & Credits (as a positive number)"}
+            {marginUsed > 0 ? `Owed to Fidelity — ${marginRateLabel(ipsLite)}` : "From Fidelity → Balances → Cash & Credits (as a positive number)"}
           </div>
         </>
       )}

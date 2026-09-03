@@ -30,6 +30,7 @@ import {
 } from "@/hooks/useAppData";
 import { useQueryClient } from "@tanstack/react-query";
 import { fmtUSD } from "@/lib/finance";
+import { rateStatus } from "@/lib/marginCost";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -119,6 +120,125 @@ function IpsLiteCard() {
   );
 }
 
+// Margin rate (ADR-APP-007). The rate is IPS policy, not app config, and it is
+// entered here rather than committed to source: Fidelity's rate is tiered by
+// debit balance and floats with the base rate, so any value baked into code is
+// wrong over time. Unset is a valid, shipped state — the app suppresses the
+// cost figure rather than computing with a fallback.
+function MarginRateCard() {
+  const { data: ips, save } = useIpsLite();
+  const [rate, setRate] = useState("");
+  const [asOf, setAsOf] = useState("");
+  const [floating, setFloating] = useState("floating");
+  const [staleDays, setStaleDays] = useState("");
+
+  useEffect(() => {
+    setRate(ips.margin_rate_annual_pct == null ? "" : String(ips.margin_rate_annual_pct));
+    setAsOf(ips.margin_rate_as_of ?? "");
+    setFloating(ips.margin_rate_is_floating ? "floating" : "fixed");
+    setStaleDays(String(ips.margin_rate_stale_days));
+  }, [
+    ips.margin_rate_annual_pct,
+    ips.margin_rate_as_of,
+    ips.margin_rate_is_floating,
+    ips.margin_rate_stale_days,
+  ]);
+
+  const status = rateStatus(ips);
+
+  const onSave = () => {
+    const trimmed = rate.trim();
+    // Clearing the field un-sets the rate. That has to stay possible: if the
+    // stored value is known to be wrong, "no rate" is the honest state and is
+    // safer than leaving a stale number driving a cost figure.
+    const r = trimmed === "" ? null : Number(trimmed);
+    if (r != null && (!Number.isFinite(r) || r < 0 || r > 100)) {
+      return toast.error("Margin rate must be 0–100%, or blank to clear it");
+    }
+    if (r != null && !asOf) {
+      return toast.error("Enter the date you verified this rate");
+    }
+    const days = Number(staleDays);
+    if (!Number.isFinite(days) || days < 1) {
+      return toast.error("Staleness threshold must be at least 1 day");
+    }
+    save.mutate(
+      {
+        margin_rate_annual_pct: r,
+        margin_rate_as_of: r == null ? null : asOf,
+        margin_rate_is_floating: floating === "floating",
+        margin_rate_stale_days: Math.round(days),
+      },
+      {
+        onSuccess: () => toast.success(r == null ? "Margin rate cleared" : "Margin rate saved"),
+        onError: (e) => toast.error((e as Error).message),
+      },
+    );
+  };
+
+  return (
+    <section className="mb-4 rounded-2xl border bg-card p-5">
+      <div className="mb-1 text-sm font-medium">Margin rate</div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Your current Fidelity margin rate. Nothing in the app supplies a default: while this
+        is blank, the dashboard shows no interest cost and the committee is told the rate is
+        not set. Fidelity tiers by debit balance and floats with the base rate, so enter the
+        tier that applies to your balance and re-check it periodically.
+      </p>
+      {status.kind === "stale" ? (
+        <p className="mb-3 text-xs font-medium text-amber-500">
+          Verified {status.ageDays} days ago — older than your {ips.margin_rate_stale_days}-day
+          threshold.
+        </p>
+      ) : null}
+      <div className="grid gap-3 sm:grid-cols-[160px_180px_160px_160px_auto]">
+        <div>
+          <Label className="text-xs">Annual rate (%)</Label>
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            step="0.001"
+            placeholder="not set"
+            value={rate}
+            onChange={(e) => setRate(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label className="text-xs">Verified on</Label>
+          <Input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-xs">Rate type</Label>
+          <Select value={floating} onValueChange={setFloating}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="floating">Floating</SelectItem>
+              <SelectItem value="fixed">Fixed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs">Flag as stale after (days)</Label>
+          <Input
+            type="number"
+            min={1}
+            value={staleDays}
+            onChange={(e) => setStaleDays(e.target.value)}
+          />
+        </div>
+        <div className="flex items-end">
+          <Button onClick={onSave} disabled={save.isPending}>
+            Save rate
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SettingsPage() {
   const qc = useQueryClient();
   const { data: priorities = [], add: addPriority, dismiss: dismissP } = usePriorities();
@@ -141,6 +261,7 @@ function SettingsPage() {
         <PortfolioCsvImport />
       </div>
       <IpsLiteCard />
+      <MarginRateCard />
       {/* ACCOUNTS */}
       <section className="rounded-2xl border bg-card p-5">
         <div className="mb-3 flex items-center justify-between">

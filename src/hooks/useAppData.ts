@@ -1,6 +1,7 @@
 // Central data hooks for the Investment Companion (all RLS-scoped to auth.uid()).
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
+import { MARGIN_POLICY_UNSET, type MarginPolicy } from "@/lib/marginCost";
 
 export type Goal = {
   id: string;
@@ -397,7 +398,7 @@ export type IpsLite = {
   position_cap_pct: number;
   position_cap_hard: boolean;
   margin_cap_pct: number;
-};
+} & MarginPolicy;
 
 /**
  * The stored investment universe.
@@ -425,6 +426,10 @@ export const IPS_LITE_DEFAULTS: IpsLite = {
   position_cap_pct: 30,
   position_cap_hard: false,
   margin_cap_pct: 25,
+  // The caps have signed-off defaults (ADR-APP-004). The margin RATE does not
+  // and must not (ADR-APP-007): unset means unset, and the UI suppresses the
+  // cost figure rather than computing with a fallback.
+  ...MARGIN_POLICY_UNSET,
 };
 
 // IPS-lite policy record (one row per user). Falls back to the signed-off
@@ -436,7 +441,9 @@ export function useIpsLite() {
     queryFn: async (): Promise<IpsLite> => {
       const { data, error } = await supabase
         .from("ips_lite" as never)
-        .select("position_cap_pct,position_cap_hard,margin_cap_pct")
+        .select(
+          "position_cap_pct,position_cap_hard,margin_cap_pct,margin_rate_annual_pct,margin_rate_as_of,margin_rate_is_floating,margin_rate_stale_days",
+        )
         .limit(1);
       const rows = (data ?? []) as unknown as Partial<IpsLite>[];
       if (error || rows.length === 0) return IPS_LITE_DEFAULTS;
@@ -445,6 +452,17 @@ export function useIpsLite() {
         position_cap_pct: Number(row.position_cap_pct ?? IPS_LITE_DEFAULTS.position_cap_pct),
         position_cap_hard: Boolean(row.position_cap_hard ?? IPS_LITE_DEFAULTS.position_cap_hard),
         margin_cap_pct: Number(row.margin_cap_pct ?? IPS_LITE_DEFAULTS.margin_cap_pct),
+        // No `??` fallback on the rate — a null rate stays null all the way to
+        // the screen. Coercing it to a number here is how a fallback sneaks in.
+        margin_rate_annual_pct:
+          row.margin_rate_annual_pct == null ? null : Number(row.margin_rate_annual_pct),
+        margin_rate_as_of: row.margin_rate_as_of ?? null,
+        margin_rate_is_floating: Boolean(
+          row.margin_rate_is_floating ?? IPS_LITE_DEFAULTS.margin_rate_is_floating,
+        ),
+        margin_rate_stale_days: Number(
+          row.margin_rate_stale_days ?? IPS_LITE_DEFAULTS.margin_rate_stale_days,
+        ),
       };
     },
   });
