@@ -1,23 +1,20 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
-import {
-  Wallet,
-  TrendingUp,
-  TrendingDown,
-  Target as TargetIcon,
-  ShieldAlert,
-  RefreshCw,
-  Sparkles,
-  Plus,
-} from "lucide-react";
+import { RefreshCw, Sparkles, Plus } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/lib/supabaseClient";
 import { activeBuybackBySymbol, type TrimDecision } from "@/lib/buybackZones";
-import { StatCard } from "@/components/app/StatCard";
-import { ProgressChart } from "@/components/app/ProgressChart";
+import {
+  AllocationPanel,
+  BalanceOverTime,
+  EventsPanel,
+  PerformancePanel,
+  SummaryHeader,
+  SummaryMetricRow,
+} from "@/components/app/summary/SummaryPanels";
 import { SnapshotRecorder } from "@/components/app/SnapshotRecorder";
 import { WorkflowButtons } from "@/components/app/WorkflowButtons";
 import { useQuery } from "@tanstack/react-query";
@@ -30,6 +27,7 @@ import { ReconciliationBanner } from "@/components/app/ReconciliationBanner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { interestProvenanceShort, marginInterestFigure, rateStatus } from "@/lib/marginCost";
+import { balanceSeries, dayChange } from "@/lib/portfolioSummary";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
 import {
   useGoal,
@@ -38,6 +36,8 @@ import {
   useScopedHoldings,
   useScopedAccount,
   useLatestBalance,
+  useSnapshots,
+  useUnscopedSnapshotCount,
   useAccounts,
   usePriorities,
   useRecommendedActions,
@@ -47,13 +47,11 @@ import {
 import {
   fmtUSD,
   fmtPct,
-  requiredCAGR,
   requiredCAGRWithContrib,
   yearsBetween,
   probabilityOfReachingTarget,
   riskToVol,
   riskToExpectedReturn,
-  marginStatus,
 } from "@/lib/finance";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -99,6 +97,9 @@ function Dashboard() {
   // The broker's own accrued-interest figure, when a balance has been
   // imported. Preferred over the app's estimate below (Stage 3 delta).
   const { data: latestBalance } = useLatestBalance(scope);
+  const { data: snapshots = [], isError: snapshotsError } = useSnapshots(scope);
+  const { data: unscopedCount = 0 } = useUnscopedSnapshotCount();
+  const series = useMemo(() => balanceSeries(snapshots), [snapshots]);
   const { data: priorities = [], dismiss: dismissPriority } = usePriorities();
   const { data: actions = [], dismiss: dismissAction } = useRecommendedActions();
   const logSync = useLogSync();
@@ -112,15 +113,6 @@ function Dashboard() {
     refetchInterval: 60 * 1000,
   });
   const px = (h: { symbol: string; current_price: number }) => liveQuotes?.[h.symbol]?.price ?? h.current_price;
-  const dailyPL = useMemo(() => {
-    if (!liveQuotes) return null;
-    let sum = 0, covered = 0;
-    for (const h of holdings) {
-      const q = liveQuotes[h.symbol];
-      if (q && q.prevClose > 0) { sum += h.quantity * (q.price - q.prevClose); covered++; }
-    }
-    return covered > 0 ? { sum, covered, total: holdings.length } : null;
-  }, [liveQuotes, holdings]);
   const week = new Date(); week.setDate(week.getDate() + 7);
   const weekEnd = week.toISOString().slice(0, 10);
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -181,9 +173,20 @@ function Dashboard() {
   // positions and the scoped balance, priced live where a quote exists.
   // `cash ?? account?.cash` used to fall through to the household aggregate.
   const totals = useMemo(() => accountTotals(holdings, balance, px), [holdings, balance, liveQuotes]);
-  const { positionsValue, cash, marginDebit: marginUsed, grossValue, totalAccountValue: portfolioValue, unrealizedPL: totalPL, unrealizedPLPct } = totals;
+  const { cash, marginDebit: marginUsed, grossValue, totalAccountValue: portfolioValue } = totals;
   const scopeName = scopeLabel(scope);
   const noScope = scopeIsEmpty(scope) || balance === null;
+  const day = useMemo(() => dayChange(holdings, liveQuotes), [holdings, liveQuotes]);
+  // From IPS policy (ADR-APP-007), never a constant — and superseded by
+  // Fidelity's own accrued figure when a balance has been imported. The two are
+  // never blended and never shown without saying which is which.
+  const interest = marginInterestFigure({
+    accruedMtd: latestBalance?.margin_interest_accrued_mtd ?? null,
+    importedAt: latestBalance?.imported_at ?? null,
+    hasImport: Boolean(latestBalance),
+    marginUsed,
+    policy: ipsLite,
+  });
 
   const goalMetrics = useMemo(() => {
     if (!goal) return null;
@@ -213,9 +216,6 @@ function Dashboard() {
     return { years, cagr, prob, progress };
   }, [goal, portfolioValue]);
 
-  const margin = balance ? marginStatus(balance.margin_used, balance.margin_limit) : "ok";
-  const marginTone =
-    margin === "high" ? "negative" : margin === "elevated" ? "warning" : "default";
 
   const now = new Date();
   const hour = now.getHours();
@@ -225,7 +225,7 @@ function Dashboard() {
   return (
     <AppShell
       title={displayName ? `${greeting}, ${displayName}` : greeting}
-      subtitle="What changed. What matters. What to do."
+      subtitle="Portfolio summary, then what changed, what matters, and what to do."
       actions={
         <>
           <Button
@@ -270,16 +270,6 @@ function Dashboard() {
         const gross = grossValue;
         const net = portfolioValue;
         const equityPct = totals.equityPct ?? 1;
-        // From IPS policy (ADR-APP-007), never a constant — and superseded by
-        // Fidelity's own accrued figure when a balance has been imported. The
-        // two are never blended and never shown without saying which is which.
-        const interest = marginInterestFigure({
-          accruedMtd: latestBalance?.margin_interest_accrued_mtd ?? null,
-          importedAt: latestBalance?.imported_at ?? null,
-          hasImport: Boolean(latestBalance),
-          marginUsed,
-          policy: ipsLite,
-        });
         const rateState = rateStatus(ipsLite);
         const lastUpdate = amirHs.reduce<string | null>((m, h) => {
           const u = (h as { updated_at?: string }).updated_at ?? null;
@@ -455,78 +445,41 @@ function Dashboard() {
           ))}
         </div>
       )}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {/* Every card names its scope. An unlabelled figure is what let one
-            account's number pass for another's. */}
-        <StatCard
-          label="Total account value"
-          value={noScope ? "—" : fmtUSD(portfolioValue)}
-          hint={
-            noScope
-              ? scopeName
-              : `${scopeName} · ${marginUsed > 0 ? `gross − margin loan ${fmtUSD(marginUsed)}` : "no margin loan recorded"}`
+      {/* The Portfolio Summary panels (Stage 5b), shared with /summary rather
+          than re-implemented. The dashboard's own six stat cards said the same
+          things in different words, and two wordings for one figure is how the
+          two screens start disagreeing. The decision-support blocks below are
+          what this page adds on top of the summary. */}
+      <SummaryHeader scope={scope} totals={totals} day={day} />
+      <SummaryMetricRow scope={scope} totals={totals} interest={interest} policy={ipsLite} />
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <BalanceOverTime
+            scope={scope}
+            series={series}
+            unscopedCount={unscopedCount}
+            isError={snapshotsError}
+          />
+        </div>
+        <PerformancePanel
+          series={series}
+          totals={totals}
+          objective={
+            goal
+              ? {
+                  starting_value: Number(goal.starting_value),
+                  target_value: Number(goal.target_value),
+                  target_date: goal.target_date,
+                }
+              : null
           }
-          tone={noScope ? "warning" : marginUsed > 0 ? "default" : "warning"}
-          icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
-        />
-        <StatCard
-          label="Gross value (long + cash)"
-          value={noScope ? "—" : fmtUSD(grossValue)}
-          hint={
-            noScope
-              ? scopeName
-              : `${scopeName} · ${holdings.length} positions${cash > 0 ? ` + cash ${fmtUSD(cash)}` : ""} · before the margin loan`
-          }
-          icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
-        />
-        {/* "$0.00" with a green up-arrow is a claim that the account is flat.
-            An unresolved scope has no P/L to report, so it reports none. */}
-        <StatCard
-          label="Unrealized P/L"
-          value={noScope ? "—" : fmtUSD(totalPL)}
-          hint={noScope ? scopeName : `${scopeName} · ${unrealizedPLPct == null ? "no cost basis recorded" : fmtPct(unrealizedPLPct)}`}
-          tone={noScope ? "default" : totalPL >= 0 ? "positive" : "negative"}
-          icon={
-            noScope ? undefined : totalPL >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-success" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-destructive" />
-            )
-          }
-        />
-        <StatCard
-          label="Today's P/L"
-          value={dailyPL ? fmtUSD(dailyPL.sum) : "—"}
-          hint={dailyPL ? `vs prev close · ${dailyPL.covered}/${dailyPL.total} quoted` : "Awaiting live quotes"}
-          tone={dailyPL ? (dailyPL.sum >= 0 ? "positive" : "negative") : "default"}
-        />
-        <StatCard
-          label="Goal progress"
-          value={goalMetrics ? fmtPct(goalMetrics.progress) : "—"}
-          hint={
-            !goal
-              ? "Set a goal"
-              : noScope
-                ? `${scopeName} · target ${fmtUSD(goal.target_value)} by ${goal.target_date}`
-                : `${scopeName} · ${fmtUSD(portfolioValue)} → ${fmtUSD(goal.target_value)} by ${goal.target_date}`
-          }
-          icon={<TargetIcon className="h-4 w-4 text-primary" />}
-        />
-        <StatCard
-          label="Margin status"
-          value={balance ? (margin === "ok" ? "Healthy" : margin === "elevated" ? "Elevated" : "High") : "—"}
-          hint={
-            balance
-              ? `${scopeName} · ${fmtUSD(balance.margin_used)} used / ${fmtUSD(balance.margin_limit)} limit`
-              : scopeName
-          }
-          tone={marginTone}
-          icon={<ShieldAlert className="h-4 w-4" />}
         />
       </div>
 
-      <div className="mt-4">
-        <ProgressChart />
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <AllocationPanel positions={holdings} priceOf={px} noScope={noScope} />
+        <EventsPanel earnings={liveEarn} isLoading={false} heldCount={holdings.length} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">

@@ -126,35 +126,62 @@ const stripComments = (src: string) =>
   src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 
 describe("the objective has exactly one home", () => {
-  // Generated Supabase types and the Account row type must still describe the
-  // deprecated columns — the data is still there. What must not exist is code
-  // that WRITES them, which is what re-creates the second objective.
-  const EXEMPT = ["src/integrations/supabase/types.ts", "src/hooks/useAppData.ts"];
+  const OBJECTIVE_FIELDS = ["target_value", "target_date", "starting_value"];
 
-  test("nothing writes an objective onto an account any more", () => {
+  /**
+   * Where a file writes to the `accounts` table.
+   *
+   * The naive check — "does this file mention `target_value:` anywhere?" —
+   * flags every file that READS the objective into a prop or a memo, which is
+   * most of the summary surface and none of the defect. The defect is
+   * specifically these fields being SENT TO THE ACCOUNTS TABLE, so the guard
+   * looks only at the text following an accounts write.
+   */
+  // Both editors call something named `update.mutate(`, one from `useGoal` and
+  // one from `useAccounts`, so the call site alone cannot tell them apart. What
+  // can: the SHAPE of the payload. `account_type` and `broker` are unmistakably
+  // account columns and appear in no goal write, so an objective field sharing
+  // an object with either of them is an objective being written onto an account
+  // — which is exactly the defect, and exactly what the old Settings form did.
+  const ACCOUNT_SHAPE = /(^|[^.\w])(account_type|broker)\s*:/g;
+  const WINDOW = 700;
+
+  function accountPayloads(code: string): string[] {
+    const out: string[] = [];
+    for (const m of code.matchAll(ACCOUNT_SHAPE)) {
+      out.push(code.slice(Math.max(0, m.index - WINDOW), m.index + WINDOW));
+    }
+    return out;
+  }
+
+  test("nothing sends an objective field to the accounts table", () => {
     const offenders: string[] = [];
     for (const file of productionSources()) {
-      if (EXEMPT.some((e) => file.replace(/\\/g, "/").endsWith(e))) continue;
+      const path = file.replace(/\\/g, "/");
+      // The two files that DECLARE the row shape must still describe the
+      // deprecated columns — the data is still there, and a type that denied it
+      // would be lying about the database. Neither constructs a payload:
+      // `useAccounts().update` takes a `Partial<Account>` and passes it
+      // through, so every payload is built at a call site, which is what this
+      // scan covers.
+      if (
+        path.endsWith("src/integrations/supabase/types.ts") ||
+        path.endsWith("src/hooks/useAppData.ts")
+      ) {
+        continue;
+      }
       const code = stripComments(readFileSync(file, "utf8"));
-      // A write looks like `target_value:` in an object literal. A read looks
-      // like `account.target_value`. Only the write re-opens the divergence.
-      for (const field of ["target_value", "target_date", "starting_value"]) {
-        const write = new RegExp(`(^|[^.\\w])${field}\\s*:`, "m");
-        if (write.test(code)) offenders.push(`${file} writes ${field}`);
+      for (const payload of accountPayloads(code)) {
+        for (const field of OBJECTIVE_FIELDS) {
+          if (new RegExp(`(^|[^.\\w])${field}\\s*:`, "m").test(payload)) {
+            offenders.push(`${path} writes ${field} to an account`);
+          }
+        }
       }
     }
-    // goals.tsx and settings.tsx both write these — to the GOAL row, through
-    // `useGoal().update`. That is the single home, so they are named here
-    // rather than exempted silently: if a third file appears, this fails.
-    const allowed = new Set([
-      "src/routes/_authenticated/goals.tsx writes target_value",
-      "src/routes/_authenticated/goals.tsx writes target_date",
-      "src/routes/_authenticated/goals.tsx writes starting_value",
-      "src/routes/_authenticated/settings.tsx writes target_value",
-      "src/routes/_authenticated/settings.tsx writes target_date",
-      "src/routes/_authenticated/settings.tsx writes starting_value",
-    ]);
-    expect(offenders.filter((o) => !allowed.has(o.replace(/\\/g, "/")))).toEqual([]);
+    // settings.tsx and goals.tsx write these through `useGoal().update` — the
+    // goal row, not the accounts table — so nothing should appear here at all.
+    expect([...new Set(offenders)]).toEqual([]);
   });
 
   test("both objective editors reach the goal row through useGoal", () => {

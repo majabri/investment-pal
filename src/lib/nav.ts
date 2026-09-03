@@ -31,10 +31,12 @@ export type NavSection = {
 
 export const navSections: NavSection[] = [
   {
-    // "Investment Office" was the old framing (Stage 5 retires it). The section
-    // is what it has always actually been: the daily brief plus the summary.
+    // Stage 8's table names this section "Investment Office" and gives it the
+    // Stage 5 dashboard. Both tabs now render the Portfolio Summary panels —
+    // `/` adds the decision-support blocks beneath them, `/summary` is the
+    // summary alone.
     to: "/",
-    label: "Overview",
+    label: "Investment Office",
     icon: LayoutDashboard,
     tabs: [
       { to: "/", label: "Morning Brief" },
@@ -108,7 +110,7 @@ export const navSections: NavSection[] = [
  * away via More, which renders every section and every tab.
  */
 export const MOBILE_PRIMARY: Array<{ to: string; label: string; shortLabel: string; icon: typeof LayoutDashboard }> = [
-  { to: "/", label: "Overview", shortLabel: "Overview", icon: LayoutDashboard },
+  { to: "/", label: "Investment Office", shortLabel: "Office", icon: LayoutDashboard },
   { to: "/portfolio", label: "Portfolio", shortLabel: "Portfolio", icon: Briefcase },
   { to: "/decisions", label: "Decisions", shortLabel: "Decisions", icon: Gavel },
   { to: "/prompt-center", label: "Committee", shortLabel: "Committee", icon: Sparkles },

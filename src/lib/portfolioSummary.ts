@@ -76,19 +76,25 @@ export function balanceSeries(snapshots: readonly SnapshotLike[]): BalancePoint[
   return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
-export type PerformanceWindow = {
-  label: string;
-  /** Days back from the latest point. `null` = the whole recorded history. */
-  days: number | null;
-};
+/**
+ * A comparison period.
+ *
+ * `days` counts back from the latest point. `ytd` anchors to 1 January of the
+ * latest point's year instead — year-to-date is not "365 days", and on
+ * 3 January the difference between the two is the entire figure.
+ */
+export type PerformanceWindow =
+  | { label: string; kind: "days"; days: number }
+  | { label: string; kind: "ytd" }
+  | { label: string; kind: "all" };
 
 /** The windows the summary reports. Deliberately short — each needs real data. */
 export const PERFORMANCE_WINDOWS: PerformanceWindow[] = [
-  { label: "1 day", days: 1 },
-  { label: "1 week", days: 7 },
-  { label: "1 month", days: 30 },
-  { label: "3 months", days: 90 },
-  { label: "All time", days: null },
+  { label: "Today", kind: "days", days: 1 },
+  { label: "1 week", kind: "days", days: 7 },
+  { label: "1 month", kind: "days", days: 30 },
+  { label: "Year to date", kind: "ytd" },
+  { label: "All time", kind: "all" },
 ];
 
 export type PerformanceEntry = {
@@ -139,14 +145,19 @@ export function performance(
   const spanDays = Math.round((latestMs - Date.parse(`${earliest.date}T00:00:00Z`)) / 86_400_000);
 
   return windows.map((w) => {
-    const truncated = w.days !== null && w.days > spanDays;
-    // The first point at or after the window start. Falls back to the oldest
-    // point we have, with `truncated` flagging that the window is longer than
-    // the history — never silently reporting a shorter period as a longer one.
+    // Where the window starts. All three kinds are compared as calendar dates,
+    // so the arithmetic never turns on a timezone.
     const cutoff =
-      w.days === null
+      w.kind === "all"
         ? earliest.date
-        : new Date(latestMs - w.days * 86_400_000).toISOString().slice(0, 10);
+        : w.kind === "ytd"
+          ? `${latest.date.slice(0, 4)}-01-01`
+          : new Date(latestMs - w.days * 86_400_000).toISOString().slice(0, 10);
+    const truncated = w.kind !== "all" && cutoff < earliest.date;
+    // The first point at or after the window start. Falls back to the oldest
+    // point we have, with `truncated` flagging that the window reaches further
+    // back than the history — never silently reporting a shorter period under
+    // a longer label.
     const start = series.find((p) => p.date >= cutoff) ?? earliest;
 
     // A single day of history compared with itself is not 0% performance, it is
@@ -274,6 +285,58 @@ export const EVENT_SOURCES: EventSourceStatus[] = [
   },
 ];
 
+/** Selectable spans for the balance chart. `null` = the whole series. */
+export type ChartRange = { label: string; months: number | null };
+
+export const CHART_RANGES: ChartRange[] = [
+  { label: "1M", months: 1 },
+  { label: "3M", months: 3 },
+  { label: "6M", months: 6 },
+  { label: "1Y", months: 12 },
+  { label: "All", months: null },
+];
+
+/**
+ * The tail of the series covered by a range.
+ *
+ * Never empty when the series is not: a range shorter than the gap between the
+ * last two points would otherwise clip the chart to nothing and read as "no
+ * history", which is a different fact from "no history in the last month".
+ */
+export function seriesInRange(
+  series: readonly BalancePoint[],
+  range: ChartRange,
+): BalancePoint[] {
+  if (range.months === null || series.length === 0) return [...series];
+  const latest = series[series.length - 1];
+  const cutoffDate = new Date(`${latest.date}T00:00:00Z`);
+  cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - range.months);
+  const cutoff = cutoffDate.toISOString().slice(0, 10);
+  const within = series.filter((p) => p.date >= cutoff);
+  return within.length > 0 ? within : [latest];
+}
+
+/**
+ * Progress from the objective's starting value towards its target.
+ *
+ * `null` — not a number — whenever the objective cannot define progress:
+ * no objective, or a target at or below the start. A progress bar at 0% claims
+ * the account has made none, which is a different statement from "there is no
+ * target to measure against".
+ */
+export function goalProgress(
+  currentValue: number | null,
+  objective: { starting_value: number; target_value: number } | null | undefined,
+): number | null {
+  if (currentValue === null || !objective) return null;
+  const span = num(objective.target_value) - num(objective.starting_value);
+  if (span <= 0) return null;
+  const raw = (currentValue - num(objective.starting_value)) / span;
+  // Clamped for display. Past the target is 100% of a bar, not 140% of one —
+  // but the underlying value is still shown as a figure beside it.
+  return Math.max(0, Math.min(1, raw));
+}
+
 /** Headline figures for the metric row, straight off `accountTotals`. */
 export type SummaryMetric = { label: string; value: number | null; kind: "money" | "percent" };
 
@@ -286,10 +349,37 @@ export type SummaryMetric = { label: string; value: number | null; kind: "money"
 export function summaryMetrics(totals: AccountTotals | null): SummaryMetric[] {
   return [
     { label: "Total account value", value: totals?.totalAccountValue ?? null, kind: "money" },
-    { label: "Gross value", value: totals?.grossValue ?? null, kind: "money" },
+    { label: "Investments", value: totals?.positionsValue ?? null, kind: "money" },
     { label: "Cash", value: totals?.cash ?? null, kind: "money" },
-    { label: "Margin loan", value: totals?.marginDebit ?? null, kind: "money" },
+    { label: "Margin debit", value: totals?.marginDebit ?? null, kind: "money" },
     { label: "Unrealized P/L", value: totals?.unrealizedPL ?? null, kind: "money" },
     { label: "Equity", value: totals?.equityPct ?? null, kind: "percent" },
   ];
+}
+
+/**
+ * Today's change from live quotes, over the same positions as the totals.
+ *
+ * `null` when no quote carries a previous close — a day change of 0 would say
+ * the account did not move, which is not the same as "the market data has not
+ * arrived". `covered` says how many positions the figure actually accounts for,
+ * because a day change over 3 of 11 holdings is not the account's day change.
+ */
+export type DayChange = { amount: number; covered: number; total: number } | null;
+
+export function dayChange(
+  positions: readonly { symbol: string; quantity: number }[],
+  quotes: Record<string, { price: number; prevClose: number }> | undefined,
+): DayChange {
+  if (!quotes) return null;
+  let amount = 0;
+  let covered = 0;
+  for (const p of positions) {
+    const q = quotes[p.symbol];
+    if (q && Number.isFinite(q.prevClose) && q.prevClose > 0) {
+      amount += num(p.quantity) * (num(q.price) - num(q.prevClose));
+      covered++;
+    }
+  }
+  return covered > 0 ? { amount, covered, total: positions.length } : null;
 }

@@ -6,7 +6,11 @@ import { accountTotals } from "../accountTotals";
 import {
   allocation,
   balanceSeries,
+  dayChange,
+  goalProgress,
   performance,
+  seriesInRange,
+  CHART_RANGES,
   summaryMetrics,
   summaryReadiness,
   EVENT_SOURCES,
@@ -101,11 +105,35 @@ describe("performance never reports 0% for a window it cannot measure", () => {
   });
 
   test("a window longer than the history is flagged, not silently shortened", () => {
-    // "3 months: +$3,938" over 29 days of history is a number that means
+    // "1 month: +$3,938" over 29 days of history is a number that means
     // something quite different from what its label says.
-    const q = performance(series).find((p) => p.label === "3 months")!;
-    expect(q.truncated).toBe(true);
-    expect(q.change).toBeCloseTo(3_938.35, 2);
+    const m = performance(series).find((p) => p.label === "1 month")!;
+    expect(m.truncated).toBe(true);
+    expect(m.change).toBeCloseTo(3_938.35, 2);
+  });
+
+  test("year to date anchors to 1 January, not to 365 days back", () => {
+    // On 3 January these differ by the whole figure. A YTD window computed as
+    // a day count silently reports last year's growth as this year's.
+    const spanning = balanceSeries([
+      snap("2025-11-01T10:00:00Z", 40_000),
+      snap("2026-01-02T10:00:00Z", 50_000),
+      snap("2026-09-03T10:00:00Z", 53_938.35),
+    ]);
+    const ytd = performance(spanning).find((p) => p.label === "Year to date")!;
+    expect(ytd.from).toBe("2026-01-02");
+    expect(ytd.change).toBeCloseTo(3_938.35, 2);
+    // All time reaches back into the previous year, and is larger.
+    const all = performance(spanning).find((p) => p.label === "All time")!;
+    expect(all.change).toBeCloseTo(13_938.35, 2);
+  });
+
+  test("year to date is truncated when the history starts mid-year", () => {
+    const midYear = balanceSeries([
+      snap("2026-08-05T10:00:00Z", 50_000),
+      snap("2026-09-03T10:00:00Z", 53_938.35),
+    ]);
+    expect(performance(midYear).find((p) => p.label === "Year to date")!.truncated).toBe(true);
   });
 
   test("all-time is never truncated, whatever the history", () => {
@@ -255,7 +283,8 @@ describe("the metric row", () => {
     const metrics = summaryMetrics(totals);
     const value = (label: string) => metrics.find((m) => m.label === label)!.value;
     expect(value("Total account value")!).toBeCloseTo(53_938.35, 2);
-    expect(value("Margin loan")!).toBeCloseTo(6_664.33, 2);
+    expect(value("Investments")!).toBeCloseTo(60_602.3, 2);
+    expect(value("Margin debit")!).toBeCloseTo(6_664.33, 2);
     expect(value("Equity")!).toBeCloseTo(0.89, 3);
   });
 
@@ -269,5 +298,96 @@ describe("the metric row", () => {
     // The row formats by `kind`; mislabelling equity as money renders 0.89 as
     // $0.89 rather than 89%.
     expect(summaryMetrics(null).find((m) => m.label === "Equity")!.kind).toBe("percent");
+  });
+});
+
+describe("chart ranges", () => {
+  const series = balanceSeries([
+    snap("2025-09-03T10:00:00Z", 30_000),
+    snap("2026-03-03T10:00:00Z", 45_000),
+    snap("2026-08-20T10:00:00Z", 52_000),
+    snap("2026-09-03T10:00:00Z", 53_938.35),
+  ]);
+
+  test("a range keeps only the points inside it", () => {
+    const oneMonth = seriesInRange(series, { label: "1M", months: 1 });
+    expect(oneMonth.map((p) => p.date)).toEqual(["2026-08-20", "2026-09-03"]);
+  });
+
+  test("All keeps everything", () => {
+    expect(seriesInRange(series, { label: "All", months: null })).toHaveLength(4);
+  });
+
+  test("a range with no points inside still shows the latest, not nothing", () => {
+    // Clipping to empty would render "no history", which is a different fact
+    // from "no history in the last month".
+    const sparse = balanceSeries([snap("2025-01-01T10:00:00Z", 10_000)]);
+    expect(seriesInRange(sparse, { label: "1M", months: 1 })).toHaveLength(1);
+  });
+
+  test("an empty series stays empty", () => {
+    expect(seriesInRange([], { label: "1M", months: 1 })).toEqual([]);
+  });
+
+  test("every offered range is selectable and named", () => {
+    expect(CHART_RANGES.map((r) => r.label)).toEqual(["1M", "3M", "6M", "1Y", "All"]);
+  });
+});
+
+describe("goal progress", () => {
+  const objective = { starting_value: 50_000, target_value: 150_000 };
+
+  test("halfway is a half", () => {
+    expect(goalProgress(100_000, objective)).toBeCloseTo(0.5, 10);
+  });
+
+  test("no objective is null, never zero", () => {
+    // A progress bar at 0% claims the account has made none. "There is no
+    // target to measure against" is a different statement.
+    expect(goalProgress(100_000, null)).toBeNull();
+  });
+
+  test("no current value is null", () => {
+    expect(goalProgress(null, objective)).toBeNull();
+  });
+
+  test("a target at or below the start cannot define progress", () => {
+    expect(goalProgress(60_000, { starting_value: 150_000, target_value: 150_000 })).toBeNull();
+    expect(goalProgress(60_000, { starting_value: 150_000, target_value: 100_000 })).toBeNull();
+  });
+
+  test("clamped to [0,1] for the bar", () => {
+    expect(goalProgress(200_000, objective)).toBe(1);
+    expect(goalProgress(10_000, objective)).toBe(0);
+  });
+});
+
+describe("day change", () => {
+  const positions = [
+    { symbol: "AAA", quantity: 10 },
+    { symbol: "BBB", quantity: 5 },
+    { symbol: "CCC", quantity: 2 },
+  ];
+
+  test("sums quantity times the move, and says what it covered", () => {
+    const d = dayChange(positions, {
+      AAA: { price: 110, prevClose: 100 },
+      BBB: { price: 90, prevClose: 100 },
+    })!;
+    expect(d.amount).toBe(50); // +100 on AAA, −50 on BBB
+    expect(d.covered).toBe(2);
+    expect(d.total).toBe(3);
+  });
+
+  test("no quotes at all is null, not zero", () => {
+    // Zero says the account did not move. Null says the data has not arrived.
+    expect(dayChange(positions, undefined)).toBeNull();
+    expect(dayChange(positions, {})).toBeNull();
+  });
+
+  test("a quote with no previous close does not count as covered", () => {
+    // Treating prevClose 0 as a valid baseline would report the full position
+    // value as today's gain.
+    expect(dayChange(positions, { AAA: { price: 110, prevClose: 0 } })).toBeNull();
   });
 });
