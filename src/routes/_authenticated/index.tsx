@@ -27,6 +27,7 @@ import { useAccountContext, selectAccountHoldings } from "@/contexts/AccountCont
 import { AccountNotice } from "@/components/app/AccountNotice";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { marginRateLabel } from "@/lib/marginRate";
 import {
   useGoal,
   useProfile,
@@ -266,7 +267,12 @@ function Dashboard() {
         const gross = amirHs.reduce((x, h) => x + h.quantity * px(h), 0) + Number(selectedAccount?.cash ?? 0);
         const net = gross - marginUsed;
         const equityPct = gross > 0 ? net / gross : 1;
-        const dailyInterest = (marginUsed * 0.11825) / 365;
+        // The daily-interest figure that used to sit here was computed from a
+        // hardcoded 0.11825 (OD-009, site 10) — the only place the guessed rate
+        // became a dollar amount on screen. Amir confirmed the rate has changed
+        // and did not supply the replacement, so there is nothing to compute
+        // with. The strip now reports the rate's absence instead of a precise
+        // number derived from a stale one. Restoring it is ADR-APP-007.
         const lastUpdate = amirHs.reduce<string | null>((m, h) => {
           const u = (h as { updated_at?: string }).updated_at ?? null;
           return u && (!m || u > m) ? u : m;
@@ -293,7 +299,7 @@ function Dashboard() {
             </span>
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground">
-              Margin {marginUsed > 0 ? `${fmtUSD(marginUsed)} · ~${fmtUSD(dailyInterest, 2)}/day interest · equity ${fmtPct(equityPct)}` : "not set"}
+              Margin {marginUsed > 0 ? `${fmtUSD(marginUsed)} · ${marginRateLabel()} · equity ${fmtPct(equityPct)}` : "not set"}
             </span>
             <span className="text-muted-foreground">·</span>
             {breaches.length === 0 ? (
