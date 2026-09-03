@@ -2,7 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { LayoutDashboard, LogOut, Menu } from "lucide-react";
 import { MarketTape } from "./MarketTape";
-import { navGroups, MOBILE_PRIMARY } from "@/lib/nav";
+import { navSections, MOBILE_PRIMARY, sectionForPath } from "@/lib/nav";
 import { APP_VERSION } from "@/lib/version";
 
 import { cn } from "@/lib/utils";
@@ -29,6 +29,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const section = sectionForPath(pathname);
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -42,35 +43,25 @@ export function AppShell({
         <div className="px-3 pb-2">
           <AccountSwitcher className="h-8 w-full text-xs" />
         </div>
-        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-2">
-          {navGroups.map((g) => (
-            <div key={g.group}>
-              <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
-                {g.group}
-              </div>
-              <div className="space-y-0.5">
-                {g.items.map((item) => {
-                  const active =
-                    item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
-                  return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                        active
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
-                      )}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
+          {navSections.map((s) => {
+            const active = section?.to === s.to;
+            return (
+              <Link
+                key={s.to}
+                to={s.to}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                  active
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                )}
+              >
+                <s.icon className="h-4 w-4" />
+                {s.label}
+              </Link>
+            );
+          })}
         </nav>
         <div className="border-t p-3">
           <button
@@ -102,6 +93,35 @@ export function AppShell({
           </div>
           {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
         </header>
+
+        {/* Section tabs. Every page the old flat nav listed is still here —
+            it is a tab in the section it belongs to rather than a peer of
+            everything else. Scrolls horizontally so a six-tab section (Research)
+            stays usable at 390px without truncating labels. */}
+        {section && section.tabs.length > 0 ? (
+          <div className="overflow-x-auto border-b bg-background/60">
+            <nav className="flex min-w-max gap-1 px-6 py-2" aria-label={`${section.label} pages`}>
+              {section.tabs.map((t) => {
+                const active = pathname === t.to;
+                return (
+                  <Link
+                    key={t.to}
+                    to={t.to}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors",
+                      active
+                        ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {t.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        ) : null}
 
         <main className="flex-1 px-6 py-6">{children}</main>
 
@@ -143,32 +163,38 @@ export function AppShell({
                 <SheetTitle>All sections</SheetTitle>
               </SheetHeader>
               <div className="mt-4 space-y-4 pb-6">
-                {navGroups.map((g) => (
-                  <div key={g.group}>
-                    <div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                      {g.group}
-                    </div>
-                    <div className="grid grid-cols-2 gap-1">
-                      {g.items.map((item) => {
-                        const active =
-                          item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
-                        return (
+                {navSections.map((sec) => (
+                  <div key={sec.to}>
+                    <Link
+                      to={sec.to}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium",
+                        section?.to === sec.to
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-foreground",
+                      )}
+                    >
+                      <sec.icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{sec.label}</span>
+                    </Link>
+                    {sec.tabs.length > 0 ? (
+                      <div className="mt-1 grid grid-cols-2 gap-1 pl-6">
+                        {sec.tabs.map((t) => (
                           <Link
-                            key={item.to}
-                            to={item.to}
+                            key={t.to}
+                            to={t.to}
                             className={cn(
-                              "flex items-center gap-2 rounded-lg px-3 py-2 text-sm",
-                              active
+                              "truncate rounded-md px-2 py-1.5 text-sm",
+                              pathname === t.to
                                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                                 : "text-muted-foreground",
                             )}
                           >
-                            <item.icon className="h-4 w-4 shrink-0" />
-                            <span className="truncate">{item.label}</span>
+                            {t.label}
                           </Link>
-                        );
-                      })}
-                    </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
