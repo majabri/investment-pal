@@ -47,6 +47,39 @@ describe("balanceSeries", () => {
     expect(s.map((p) => p.date)).toEqual(["2026-09-01"]);
   });
 
+  test("the owner's recorded day wins over the UTC day of the timestamp", () => {
+    // The whole reason `snapshot_date` exists. A 22:30 local snapshot west of
+    // Greenwich is stamped the NEXT day in UTC; bucketing by the timestamp
+    // would file it under tomorrow and reintroduce the defect Stage 5 removed.
+    const s = balanceSeries([
+      { ...snap("2026-09-04T03:30:00Z", 100), snapshot_date: "2026-09-03" },
+    ]);
+    expect(s.map((p) => p.date)).toEqual(["2026-09-03"]);
+  });
+
+  test("two snapshots the owner calls one day collapse to one point", () => {
+    const s = balanceSeries([
+      { ...snap("2026-09-03T14:00:00Z", 100), snapshot_date: "2026-09-03" },
+      { ...snap("2026-09-04T03:30:00Z", 180), snapshot_date: "2026-09-03" },
+    ]);
+    expect(s).toHaveLength(1);
+    expect(s[0].net).toBe(180);
+  });
+
+  test("a legacy row with no recorded day falls back to the timestamp", () => {
+    // Rows written before the column existed. The UTC day is the best fact
+    // available about them, and it is better than dropping them.
+    const s = balanceSeries([{ ...snap("2026-09-01T10:00:00Z", 100), snapshot_date: null }]);
+    expect(s.map((p) => p.date)).toEqual(["2026-09-01"]);
+  });
+
+  test("a malformed recorded day falls back rather than becoming the bucket", () => {
+    const s = balanceSeries([
+      { ...snap("2026-09-01T10:00:00Z", 100), snapshot_date: "not-a-date" },
+    ]);
+    expect(s.map((p) => p.date)).toEqual(["2026-09-01"]);
+  });
+
   test("no snapshots is an empty series, not a zero point", () => {
     // A single point at zero would draw a portfolio worth nothing.
     expect(balanceSeries([])).toEqual([]);

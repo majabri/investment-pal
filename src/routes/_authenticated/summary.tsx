@@ -36,7 +36,7 @@ import {
   useSnapshots,
   useUnscopedSnapshotCount,
 } from "@/hooks/useAppData";
-import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
+import { accountTotals, scopeIsEmpty, scopeLabel, type AccountScope } from "@/lib/accountTotals";
 import { getEarningsCalendarFn } from "@/lib/calendarServer";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtPct, fmtUSD } from "@/lib/finance";
@@ -69,7 +69,13 @@ const CHART_COLORS = [
 
 function SummaryPage() {
   const { status: accountStatus } = useAccountContext();
-  const scope = useAccountScope();
+  const selected = useAccountScope();
+  // This page is about ONE account, and its title says so. Anything that is
+  // not a single account resolves to no scope rather than being allowed to
+  // blend: otherwise the metric row would show a household total while the
+  // chart and performance panels — which require an account_id — reported no
+  // data, and the two halves of the page would be describing different things.
+  const scope: AccountScope = selected.kind === "account" ? selected : { kind: "none" };
   const scopeName = scopeLabel(scope);
   const noScope = scopeIsEmpty(scope);
 

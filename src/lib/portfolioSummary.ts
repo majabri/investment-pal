@@ -18,7 +18,16 @@ export type SnapshotLike = {
   /** Net: Fidelity's total account value. */
   net: number;
   margin_used: number;
-  /** ISO timestamp. */
+  /**
+   * The calendar day the snapshot represents, in the OWNER's timezone.
+   *
+   * Authoritative over `created_at` for bucketing. Deriving the day from the
+   * timestamp means deriving it in UTC, which rolls over hours early west of
+   * Greenwich — the exact defect Stage 5 added this column to remove. `null`
+   * only on rows written before the column existed.
+   */
+  snapshot_date?: string | null;
+  /** ISO timestamp. The fallback day, and the tie-break within a day. */
   created_at: string;
 };
 
@@ -41,12 +50,22 @@ const num = (v: number | null | undefined): number =>
  * recent observation of that day, and averaging them would invent a value that
  * was never the account's balance at any moment.
  */
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The owner's day where recorded, the UTC day of the timestamp otherwise. */
+function dayOf(s: SnapshotLike): string | null {
+  const stored = s.snapshot_date?.slice(0, 10);
+  if (stored && ISO_DAY.test(stored)) return stored;
+  const derived = s.created_at.slice(0, 10);
+  return ISO_DAY.test(derived) ? derived : null;
+}
+
 export function balanceSeries(snapshots: readonly SnapshotLike[]): BalancePoint[] {
   const byDay = new Map<string, BalancePoint>();
   const sorted = [...snapshots].sort((a, b) => a.created_at.localeCompare(b.created_at));
   for (const s of sorted) {
-    const date = s.created_at.slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue; // unparseable timestamp: skip, never guess
+    const date = dayOf(s);
+    if (date === null) continue; // no usable day: skip, never guess
     byDay.set(date, {
       date,
       gross: num(s.gross),

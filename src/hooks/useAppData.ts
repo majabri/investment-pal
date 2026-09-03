@@ -443,6 +443,10 @@ export function useSnapshots(scope: AccountScope, limit = 400) {
         .from("portfolio_snapshots" as never)
         .select("id,gross,net,margin_used,created_at,snapshot_date")
         .eq("account_id", accountId!)
+        // By the owner's calendar day, which is what the series is bucketed by
+        // and what the (account_id, snapshot_date) index covers. `created_at`
+        // breaks ties within a day, where the later row wins.
+        .order("snapshot_date", { ascending: true })
         .order("created_at", { ascending: true })
         .limit(limit);
       if (error) throw error;
