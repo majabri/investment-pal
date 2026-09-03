@@ -1,74 +1,141 @@
-// Navigation model (PR-UI-2). Extracted from AppShell so mobile reachability is
-// a testable property rather than a visual one.
+// Navigation model.
 //
-// The bug this guards: the mobile bar was `navGroups.flatMap(...).slice(0, 5)`,
-// so 13 of 18 routes were unreachable on a phone — all of Kids, all research,
-// and Settings — and reordering the array silently changed which. Amir approves
-// from an iPhone, so unreachable routes block approvals.
+// Stage 3 collapsed 18 flat entries into 7 sections. This is subtraction of
+// navigation, not of features: every page that existed still exists and is
+// still reachable — it is now a tab inside the section it belongs to, rather
+// than a peer of every other page in a list nobody could scan.
+//
+// The property this file exists to keep testable: every route in the app is
+// reachable at 390px. The bug it replaced was `flatMap(...).slice(0, 5)` in
+// AppShell, which left 13 of 18 routes unreachable on a phone — and Amir
+// approves from a phone, so an unreachable route blocked approvals.
 import {
   LayoutDashboard,
   Briefcase,
   Sparkles,
-  BookOpen,
-  Target,
   Settings as SettingsIcon,
-  Eye,
   Users,
-  Newspaper,
-  TrendingUp,
-  CalendarClock,
-  CalendarDays,
-  Globe,
-  PiggyBank,
+  Telescope,
+  Gavel,
 } from "lucide-react";
 
-export type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
-export type NavGroup = { group: string; items: NavItem[] };
+export type NavTab = { to: string; label: string };
+export type NavSection = {
+  /** Where the section itself lands. Always the first tab when tabs exist. */
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  /** Pages inside the section. Empty when the section is a single page. */
+  tabs: NavTab[];
+};
 
-export const navGroups: NavGroup[] = [
+export const navSections: NavSection[] = [
   {
-    group: "Portfolio",
-    items: [
-      { to: "/", label: "Investment Office", icon: LayoutDashboard },
-      { to: "/prompt-center", label: "Prompt Center", icon: Sparkles },
-      { to: "/portfolio", label: "Portfolio", icon: Briefcase },
-      { to: "/journal", label: "Trade Journal", icon: BookOpen },
-      { to: "/watchlist", label: "Investment Watchlist", icon: Eye },
-      { to: "/goals", label: "Goals", icon: Target },
-      { to: "/ira", label: "IRA", icon: PiggyBank },
+    to: "/",
+    label: "Investment Office",
+    icon: LayoutDashboard,
+    tabs: [],
+  },
+  {
+    to: "/portfolio",
+    label: "Portfolio",
+    icon: Briefcase,
+    tabs: [
+      { to: "/portfolio", label: "Holdings" },
+      { to: "/ira", label: "IRA" },
     ],
   },
   {
-    group: "Kids",
-    items: [
-      { to: "/kids", label: "Kids Trading Dashboard", icon: Users },
-      { to: "/kids-529", label: "Kids 529 Dashboard", icon: Users },
-      { to: "/kids-crypto", label: "Kids Crypto Dashboard", icon: Users },
-      { to: "/kids-prompt-center", label: "Kids Prompt Center", icon: Sparkles },
-      { to: "/kids-watchlist", label: "Kids Watchlist", icon: Eye },
+    to: "/decisions",
+    label: "Decisions",
+    icon: Gavel,
+    tabs: [
+      { to: "/decisions", label: "Committee decisions" },
+      { to: "/journal", label: "Journal" },
     ],
   },
   {
-    group: "General",
-    items: [
-      { to: "/news", label: "News", icon: Newspaper },
-      { to: "/opportunities", label: "Opportunities", icon: TrendingUp },
-      { to: "/earnings", label: "Earnings", icon: CalendarClock },
-      { to: "/economic-calendar", label: "Economic Calendar", icon: CalendarDays },
-      { to: "/geopolitics", label: "Geopolitics", icon: Globe },
-      { to: "/settings", label: "Settings", icon: SettingsIcon },
+    to: "/watchlist",
+    label: "Research",
+    icon: Telescope,
+    tabs: [
+      { to: "/watchlist", label: "Watchlist" },
+      { to: "/opportunities", label: "Opportunities" },
+      { to: "/news", label: "News" },
+      { to: "/earnings", label: "Earnings" },
+      { to: "/economic-calendar", label: "Economic calendar" },
+      { to: "/geopolitics", label: "Geopolitics" },
+    ],
+  },
+  {
+    to: "/prompt-center",
+    label: "Committee",
+    icon: Sparkles,
+    // The committee scorecard is rendered inside the Prompt Center rather than
+    // being its own route, so the section is a single page with no tab strip.
+    tabs: [],
+  },
+  {
+    to: "/kids",
+    label: "Family",
+    icon: Users,
+    tabs: [
+      { to: "/kids", label: "Trading" },
+      { to: "/kids-category/529", label: "529" },
+      { to: "/kids-category/crypto", label: "Crypto" },
+      { to: "/kids-watchlist", label: "Watchlist" },
+      { to: "/kids-prompt-center", label: "Prompts" },
+    ],
+  },
+  {
+    to: "/settings",
+    label: "Settings",
+    icon: SettingsIcon,
+    tabs: [
+      { to: "/settings", label: "Settings" },
+      { to: "/goals", label: "Goals" },
     ],
   },
 ];
 
-/** The three sections worth a permanent thumb-reach slot. Everything else is
- *  one tap away in the More sheet, which renders `navGroups` in full. */
-export const MOBILE_PRIMARY: Array<NavItem & { shortLabel: string }> = [
+/**
+ * The sections worth a permanent thumb-reach slot. Everything else is one tap
+ * away via More, which renders every section and every tab.
+ */
+export const MOBILE_PRIMARY: Array<{ to: string; label: string; shortLabel: string; icon: typeof LayoutDashboard }> = [
   { to: "/", label: "Investment Office", shortLabel: "Office", icon: LayoutDashboard },
   { to: "/portfolio", label: "Portfolio", shortLabel: "Portfolio", icon: Briefcase },
-  { to: "/prompt-center", label: "Prompt Center", shortLabel: "Prompts", icon: Sparkles },
+  { to: "/decisions", label: "Decisions", shortLabel: "Decisions", icon: Gavel },
+  { to: "/prompt-center", label: "Committee", shortLabel: "Committee", icon: Sparkles },
 ];
 
+/** Every route the navigation can reach, sections and tabs alike. */
 export function allNavRoutes(): string[] {
-  return navGroups.flatMap((g) => g.items.map((i) => i.to));
+  const out: string[] = [];
+  for (const s of navSections) {
+    if (!out.includes(s.to)) out.push(s.to);
+    for (const t of s.tabs) if (!out.includes(t.to)) out.push(t.to);
+  }
+  return out;
+}
+
+/**
+ * The section that owns a pathname, so the shell can highlight it and show the
+ * right tab strip. Longest match wins: `/kids-watchlist` must resolve to Family
+ * on its own tab entry, not to Research because `/watchlist` is a substring.
+ */
+export function sectionForPath(pathname: string): NavSection | null {
+  let best: NavSection | null = null;
+  let bestLen = -1;
+  for (const s of navSections) {
+    for (const route of [s.to, ...s.tabs.map((t) => t.to)]) {
+      const exact = pathname === route;
+      const child = route !== "/" && pathname.startsWith(`${route}/`);
+      if ((exact || child) && route.length > bestLen) {
+        best = s;
+        bestLen = route.length;
+      }
+    }
+  }
+  return best;
 }
