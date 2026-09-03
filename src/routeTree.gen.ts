@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedDecisionsRouteImport } from './routes/_authenticated/decisions'
 import { Route as AuthenticatedEarningsRouteImport } from './routes/_authenticated/earnings'
 import { Route as AuthenticatedEconomicCalendarRouteImport } from './routes/_authenticated/economic-calendar'
 import { Route as AuthenticatedGeopoliticsRouteImport } from './routes/_authenticated/geopolitics'
@@ -42,6 +43,11 @@ const AuthRoute = AuthRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDecisionsRoute = AuthenticatedDecisionsRouteImport.update({
+  id: '/decisions',
+  path: '/decisions',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedEarningsRoute = AuthenticatedEarningsRouteImport.update({
@@ -139,6 +145,7 @@ const AuthenticatedWatchlistRoute = AuthenticatedWatchlistRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
+  '/decisions': typeof AuthenticatedDecisionsRoute
   '/earnings': typeof AuthenticatedEarningsRoute
   '/economic-calendar': typeof AuthenticatedEconomicCalendarRoute
   '/geopolitics': typeof AuthenticatedGeopoliticsRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
+  '/decisions': typeof AuthenticatedDecisionsRoute
   '/earnings': typeof AuthenticatedEarningsRoute
   '/economic-calendar': typeof AuthenticatedEconomicCalendarRoute
   '/geopolitics': typeof AuthenticatedGeopoliticsRoute
@@ -182,6 +190,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/decisions': typeof AuthenticatedDecisionsRoute
   '/_authenticated/earnings': typeof AuthenticatedEarningsRoute
   '/_authenticated/economic-calendar': typeof AuthenticatedEconomicCalendarRoute
   '/_authenticated/geopolitics': typeof AuthenticatedGeopoliticsRoute
@@ -206,6 +215,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/decisions'
     | '/earnings'
     | '/economic-calendar'
     | '/geopolitics'
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
+    | '/decisions'
     | '/earnings'
     | '/economic-calendar'
     | '/geopolitics'
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/auth'
+    | '/_authenticated/decisions'
     | '/_authenticated/earnings'
     | '/_authenticated/economic-calendar'
     | '/_authenticated/geopolitics'
@@ -294,6 +306,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/decisions': {
+      id: '/_authenticated/decisions'
+      path: '/decisions'
+      fullPath: '/decisions'
+      preLoaderRoute: typeof AuthenticatedDecisionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/earnings': {
@@ -419,6 +438,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedDecisionsRoute: typeof AuthenticatedDecisionsRoute
   AuthenticatedEarningsRoute: typeof AuthenticatedEarningsRoute
   AuthenticatedEconomicCalendarRoute: typeof AuthenticatedEconomicCalendarRoute
   AuthenticatedGeopoliticsRoute: typeof AuthenticatedGeopoliticsRoute
@@ -440,6 +460,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedDecisionsRoute: AuthenticatedDecisionsRoute,
   AuthenticatedEarningsRoute: AuthenticatedEarningsRoute,
   AuthenticatedEconomicCalendarRoute: AuthenticatedEconomicCalendarRoute,
   AuthenticatedGeopoliticsRoute: AuthenticatedGeopoliticsRoute,
