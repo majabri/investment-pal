@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
 import { MARGIN_POLICY_UNSET, type MarginPolicy } from "@/lib/marginCost";
 import { scopedRows, type AccountScope } from "@/lib/accountTotals";
+import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 
 export type Goal = {
   id: string;
@@ -315,6 +316,103 @@ export function useScopedAccount(scope: AccountScope) {
   return { data, isLoading, upsert };
 }
 
+
+/**
+ * The most recent balance import for a scope, and the write path for a new one.
+ *
+ * `account_balances` is append-only (Stage 2): every import inserts a row and
+ * nothing is ever updated in place, because day change and accrued interest
+ * only mean anything against previous observations. `accounts` still holds the
+ * current figures the app computes with; this is the record of what the broker
+ * said and when.
+ */
+export type AccountBalanceRow = BalanceSnapshotInsert & {
+  id: string;
+  imported_at: string;
+};
+
+export function useLatestBalance(scope: AccountScope) {
+  const accountId = scope.kind === "account" ? scope.accountId : null;
+  return useQuery({
+    queryKey: ["account_balances", "latest", accountId],
+    // No account, no query. A household-wide "latest balance" would be a blend
+    // of different accounts' statements taken at different times.
+    enabled: accountId !== null,
+    queryFn: async (): Promise<AccountBalanceRow | null> => {
+      const { data, error } = await supabase
+        .from("account_balances" as never)
+        .select("*")
+        .eq("account_id", accountId!)
+        .order("imported_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as unknown as AccountBalanceRow | null;
+    },
+  });
+}
+
+/** Every balance import for a scope, newest first. The history, for the chart. */
+export function useBalanceHistory(scope: AccountScope, limit = 90) {
+  const accountId = scope.kind === "account" ? scope.accountId : null;
+  return useQuery({
+    queryKey: ["account_balances", "history", accountId, limit],
+    enabled: accountId !== null,
+    queryFn: async (): Promise<AccountBalanceRow[]> => {
+      const { data, error } = await supabase
+        .from("account_balances" as never)
+        .select("*")
+        .eq("account_id", accountId!)
+        .order("imported_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return (data ?? []) as unknown as AccountBalanceRow[];
+    },
+  });
+}
+
+/**
+ * Record one balance import.
+ *
+ * Two writes, in this order: the append-only snapshot first, then the patch to
+ * `accounts`. If the second fails the history still holds what the broker said,
+ * which is recoverable; the reverse would leave the app's live figures updated
+ * with no record of where they came from.
+ *
+ * The patch carries only the columns the paste actually supplied — writing a
+ * zero for a figure the paste omitted is the silent partial accept this whole
+ * stage exists to prevent.
+ */
+export function useRecordBalanceImport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      snapshot,
+      patch,
+    }: {
+      snapshot: BalanceSnapshotInsert;
+      patch: Record<string, number>;
+    }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not signed in");
+      const { error: insertError } = await supabase
+        .from("account_balances" as never)
+        .insert({ ...snapshot, user_id: userData.user.id } as never);
+      if (insertError) throw insertError;
+      if (Object.keys(patch).length > 0) {
+        const { error } = await supabase
+          .from("accounts")
+          .update({ ...patch, last_synced_at: new Date().toISOString() })
+          .eq("id", snapshot.account_id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["account_balances"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+    },
+  });
+}
 
 export function usePriorities() {
   const qc = useQueryClient();

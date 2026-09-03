@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
 import { AppShell } from "@/components/app/AppShell";
+import { BalanceImport } from "@/components/app/BalanceImport";
 import { PortfolioCsvImport } from "@/components/app/PortfolioCsvImport";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -271,6 +272,11 @@ function SettingsPage() {
     <AppShell title="Settings" subtitle="Accounts, targets, priorities, and imports.">
       <div className="mb-4">
         <PortfolioCsvImport />
+      </div>
+      {/* Positions come in as a CSV; the balances beside them come in as the
+          pasted block. Both are imports, so they sit together. */}
+      <div className="mb-4">
+        <BalanceImport />
       </div>
       <IpsLiteCard />
       <MarginRateCard />
