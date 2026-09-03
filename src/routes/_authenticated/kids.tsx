@@ -5,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { fmtUSD, fmtPct, yearsBetween } from "@/lib/finance";
 import { FAMILY_POLICY, ageOf, approvedSymbols, nextContributionDate, requiredCagrWithContributions, fvWithContributions } from "@/lib/data/familyPolicy";
 import { KIDS_SEED, type KidAccount } from "@/lib/data/kidsSeed";
-import { useAccounts, useHoldings } from "@/hooks/useAppData";
+import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
@@ -17,7 +17,7 @@ const KID_NAMES = ["Karim", "Zain", "Jude"];
 
 function KidsPage() {
   const { data: accounts = [] } = useAccounts();
-  const { data: allHoldings = [] } = useHoldings();
+  const { data: allHoldings = [] } = useAllHoldings();
   const dbKidAccounts = accounts.filter((a) => KID_NAMES.includes(a.name));
 
   // Database-first: imported kid accounts win; seed is the pre-import fallback.

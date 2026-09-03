@@ -23,16 +23,18 @@ import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
 import { accountCategory, CATEGORY_ORDER } from "@/lib/data/accountGroups";
-import { useAccountContext, selectAccountHoldings } from "@/contexts/AccountContext";
+import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
 import { AccountNotice } from "@/components/app/AccountNotice";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { dailyMarginInterest, rateStatus } from "@/lib/marginCost";
+import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
 import {
   useGoal,
   useProfile,
-  useHoldings,
-  useAccount,
+  useAllHoldings,
+  useScopedHoldings,
+  useScopedAccount,
   useAccounts,
   usePriorities,
   useRecommendedActions,
@@ -77,31 +79,24 @@ function Dashboard() {
   const { data: goal } = useGoal();
   const { data: profile } = useProfile();
   const displayName = profile?.display_name?.trim() ?? "";
-  const { data: allHoldings = [] } = useHoldings();
+  // Household-wide, and only for the quote request below — every figure on
+  // this page is scoped. Reading `allHoldings` into a total is the bug.
+  const { data: allHoldings = [] } = useAllHoldings();
   const { data: accountsList = [] } = useAccounts();
   const { data: ipsLite } = useIpsLite();
   // The dashboard tracks the selected account only (each other account has its
   // own screen). An unresolved selection yields no holdings and an explicit
-  // notice — it must never fall back to accountless rows, which used to render
-  // a plausible but wrong portfolio with no error.
-  const { selectedAccount, status: accountStatus } = useAccountContext();
-  const holdings = useMemo(
-    () => selectAccountHoldings(allHoldings, selectedAccount?.id ?? null),
-    [allHoldings, selectedAccount],
-  );
-  const { data: account } = useAccount();
+  // notice — it must never fall back to accountless rows or to the household
+  // aggregate, both of which rendered a plausible but wrong portfolio with no
+  // error.
+  const { status: accountStatus } = useAccountContext();
+  const scope = useAccountScope();
+  const { data: holdings } = useScopedHoldings(scope);
+  const { data: balance } = useScopedAccount(scope);
   const { data: priorities = [], dismiss: dismissPriority } = usePriorities();
   const { data: actions = [], dismiss: dismissAction } = useRecommendedActions();
   const logSync = useLogSync();
 
-  const positionsValue = useMemo(
-    () => holdings.reduce((sum, h) => sum + h.quantity * h.current_price, 0),
-    [holdings],
-  );
-  const costBasisTotal = useMemo(
-    () => holdings.reduce((sum, h) => sum + h.quantity * h.cost_basis, 0),
-    [holdings],
-  );
   const householdSymbols = useMemo(() => [...new Set(allHoldings.map((h) => h.symbol))], [allHoldings]);
   const heldSymbols = useMemo(() => holdings.map((h) => h.symbol), [holdings]);
   const { data: liveQuotes } = useQuery({
@@ -176,13 +171,13 @@ function Dashboard() {
     return [...econ, ...earn].sort((a, b) => a.date.localeCompare(b.date))
       .filter((a) => { const k = a.text; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 6);
   }, [liveEcon, liveEarn, todayStr, weekEnd]);
-  const cash = Number(selectedAccount?.cash ?? account?.cash ?? 0);
-  const marginUsed = Number(selectedAccount?.margin_used ?? 0);
-  // Net account value (what Fidelity shows as account value): equity, not gross.
-  const portfolioValue = positionsValue + cash - marginUsed;
-  // Simple "today" P/L proxy: (current - cost) delta. Real intraday requires last-close snapshot.
-  const totalPL = positionsValue - costBasisTotal;
-  const totalPLPct = costBasisTotal > 0 ? totalPL / costBasisTotal : 0;
+  // One reconcilable arithmetic for every figure below, over the scoped
+  // positions and the scoped balance, priced live where a quote exists.
+  // `cash ?? account?.cash` used to fall through to the household aggregate.
+  const totals = useMemo(() => accountTotals(holdings, balance, px), [holdings, balance, liveQuotes]);
+  const { positionsValue, cash, marginDebit: marginUsed, grossValue, totalAccountValue: portfolioValue, unrealizedPL: totalPL, unrealizedPLPct } = totals;
+  const scopeName = scopeLabel(scope);
+  const noScope = scopeIsEmpty(scope) || balance === null;
 
   const goalMetrics = useMemo(() => {
     if (!goal) return null;
@@ -212,9 +207,7 @@ function Dashboard() {
     return { years, cagr, prob, progress };
   }, [goal, portfolioValue]);
 
-  const margin = account
-    ? marginStatus(account.margin_used, account.margin_limit)
-    : "ok";
+  const margin = balance ? marginStatus(balance.margin_used, balance.margin_limit) : "ok";
   const marginTone =
     margin === "high" ? "negative" : margin === "elevated" ? "warning" : "default";
 
@@ -262,11 +255,12 @@ function Dashboard() {
       </div>
       {(() => {
         // ── Command-center strip: freshness · margin meter · constitution check ──
-        const marginUsed = Number(selectedAccount?.margin_used ?? 0);
+        // Same `totals` as the stat cards — recomputing here is how the strip
+        // and the cards used to disagree about the same account.
         const amirHs = holdings;
-        const gross = amirHs.reduce((x, h) => x + h.quantity * px(h), 0) + Number(selectedAccount?.cash ?? 0);
-        const net = gross - marginUsed;
-        const equityPct = gross > 0 ? net / gross : 1;
+        const gross = grossValue;
+        const net = portfolioValue;
+        const equityPct = totals.equityPct ?? 1;
         // From IPS policy (ADR-APP-007), never a constant. null when the rate
         // is unset, and the strip then suppresses the figure rather than
         // showing a cost computed from a fallback.
@@ -327,7 +321,12 @@ function Dashboard() {
                 <span className="text-muted-foreground">·</span>
               </>
             ) : null}
-            {breaches.length === 0 ? (
+            {/* "Constitution: clean" over an unresolved scope asserts that
+                nothing breached, having checked nothing. Say which scope
+                instead. */}
+            {noScope ? (
+              <span className="text-muted-foreground">Constitution: {scopeName.toLowerCase()}</span>
+            ) : breaches.length === 0 ? (
               <span className="text-emerald-500">Constitution: clean</span>
             ) : (
               <span className="font-medium text-red-500">⚠ {breaches.join(" · ")}</span>
@@ -437,26 +436,38 @@ function Dashboard() {
         </div>
       )}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {/* Every card names its scope. An unlabelled figure is what let one
+            account's number pass for another's. */}
         <StatCard
           label="Total account value"
-          value={fmtUSD(portfolioValue)}
-          hint={marginUsed > 0 ? `Investments − margin loan ${fmtUSD(marginUsed)}` : "No margin set — click ✎ on the Portfolio's Margin loan card"}
-          tone={marginUsed > 0 ? "default" : "warning"}
+          value={noScope ? "—" : fmtUSD(portfolioValue)}
+          hint={
+            noScope
+              ? scopeName
+              : `${scopeName} · ${marginUsed > 0 ? `gross − margin loan ${fmtUSD(marginUsed)}` : "no margin loan recorded"}`
+          }
+          tone={noScope ? "warning" : marginUsed > 0 ? "default" : "warning"}
           icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
         />
         <StatCard
-          label="Investments (long)"
-          value={fmtUSD(positionsValue + cash)}
-          hint={`${holdings.length} positions${cash > 0 ? ` + cash ${fmtUSD(cash)}` : ""} · Fidelity "Long"`}
+          label="Gross value (long + cash)"
+          value={noScope ? "—" : fmtUSD(grossValue)}
+          hint={
+            noScope
+              ? scopeName
+              : `${scopeName} · ${holdings.length} positions${cash > 0 ? ` + cash ${fmtUSD(cash)}` : ""} · before the margin loan`
+          }
           icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
         />
+        {/* "$0.00" with a green up-arrow is a claim that the account is flat.
+            An unresolved scope has no P/L to report, so it reports none. */}
         <StatCard
           label="Unrealized P/L"
-          value={fmtUSD(totalPL)}
-          hint={fmtPct(totalPLPct)}
-          tone={totalPL >= 0 ? "positive" : "negative"}
+          value={noScope ? "—" : fmtUSD(totalPL)}
+          hint={noScope ? scopeName : `${scopeName} · ${unrealizedPLPct == null ? "no cost basis recorded" : fmtPct(unrealizedPLPct)}`}
+          tone={noScope ? "default" : totalPL >= 0 ? "positive" : "negative"}
           icon={
-            totalPL >= 0 ? (
+            noScope ? undefined : totalPL >= 0 ? (
               <TrendingUp className="h-4 w-4 text-success" />
             ) : (
               <TrendingDown className="h-4 w-4 text-destructive" />
@@ -473,19 +484,21 @@ function Dashboard() {
           label="Goal progress"
           value={goalMetrics ? fmtPct(goalMetrics.progress) : "—"}
           hint={
-            goal
-              ? `${fmtUSD(portfolioValue)} → ${fmtUSD(goal.target_value)} by ${goal.target_date}`
-              : "Set a goal"
+            !goal
+              ? "Set a goal"
+              : noScope
+                ? `${scopeName} · target ${fmtUSD(goal.target_value)} by ${goal.target_date}`
+                : `${scopeName} · ${fmtUSD(portfolioValue)} → ${fmtUSD(goal.target_value)} by ${goal.target_date}`
           }
           icon={<TargetIcon className="h-4 w-4 text-primary" />}
         />
         <StatCard
           label="Margin status"
-          value={margin === "ok" ? "Healthy" : margin === "elevated" ? "Elevated" : "High"}
+          value={balance ? (margin === "ok" ? "Healthy" : margin === "elevated" ? "Elevated" : "High") : "—"}
           hint={
-            account
-              ? `${fmtUSD(account.margin_used)} used / ${fmtUSD(account.margin_limit)} limit`
-              : "No margin configured"
+            balance
+              ? `${scopeName} · ${fmtUSD(balance.margin_used)} used / ${fmtUSD(balance.margin_limit)} limit`
+              : scopeName
           }
           tone={marginTone}
           icon={<ShieldAlert className="h-4 w-4" />}
@@ -493,7 +506,7 @@ function Dashboard() {
       </div>
 
       <div className="mt-4">
-        <ProgressChart gross={positionsValue + cash} net={portfolioValue} marginUsed={marginUsed} />
+        <ProgressChart gross={grossValue} net={portfolioValue} marginUsed={marginUsed} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">

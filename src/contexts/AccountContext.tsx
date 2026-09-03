@@ -15,6 +15,7 @@ import {
 } from "react";
 
 import { useAccounts, type Account } from "@/hooks/useAppData";
+import type { AccountScope } from "@/lib/accountTotals";
 import {
   defaultAccountId,
   selectAccountHoldings,
@@ -126,3 +127,26 @@ export function useAccountContext(): AccountContextValue {
   return ctx;
 }
 
+
+/**
+ * The selected account as an `AccountScope`, for the data hooks.
+ *
+ * Every state other than `ready` maps to `{ kind: "none" }` — loading, no
+ * accounts, and an unresolved selection all mean "we do not know which account
+ * this is", and the answer to that is an empty state (`AccountNotice` renders
+ * which one), never a fallback to the household total.
+ */
+export function useAccountScope(): AccountScope {
+  const { selectedAccount } = useAccountContext();
+  return useMemo<AccountScope>(
+    () =>
+      selectedAccount
+        ? {
+            kind: "account",
+            accountId: selectedAccount.id,
+            accountName: selectedAccount.name,
+          }
+        : { kind: "none" },
+    [selectedAccount],
+  );
+}

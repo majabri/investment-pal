@@ -6,7 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recha
 
 import { AppShell } from "@/components/app/AppShell";
 import { AccountNotice } from "@/components/app/AccountNotice";
-import { useAccountContext, selectAccountHoldings } from "@/contexts/AccountContext";
+import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
 import { StatCard } from "@/components/app/StatCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,8 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { supabase } from "@/lib/supabaseClient";
-import { useHoldings, useAccount, useLogSync, type Holding } from "@/hooks/useAppData";
+import { useScopedHoldings, useScopedAccount, useLogSync, type Holding } from "@/hooks/useAppData";
+import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { PriceHistoryRecorder } from "@/components/app/PriceHistoryRecorder";
 import { SwingScoreBadge } from "@/components/app/SwingScoreBadge";
@@ -54,17 +55,18 @@ export const Route = createFileRoute("/_authenticated/portfolio")({
 
 function PortfolioPage() {
   const qc = useQueryClient();
-  const { data: allHoldings = [] } = useHoldings();
   // This page shows the selected account only — other accounts have their own
   // screens. Resolved: its rows plus accountless manual adds (unchanged).
   // Unresolved: empty plus an explicit notice, never the accountless rows
   // standing in for a portfolio.
   const { selectedAccount, status: accountStatus } = useAccountContext();
-  const holdings = useMemo(
-    () => selectAccountHoldings(allHoldings, selectedAccount?.id ?? null, { includeUnassigned: true }),
-    [allHoldings, selectedAccount],
-  );
-  const { data: account, upsert } = useAccount();
+  const scope = useAccountScope();
+  const { data: holdings } = useScopedHoldings(scope, { includeUnassigned: true });
+  // Scoped, not aggregated. `account` here used to be every account summed,
+  // and `upsert` wrote to whichever account happened to be first.
+  const { data: balance, upsert } = useScopedAccount(scope);
+  const scopeName = scopeLabel(scope);
+  const noScope = scopeIsEmpty(scope) || balance === null;
   const logSync = useLogSync();
   const [selected, setSelected] = useState<Holding | null>(null);
 
@@ -130,10 +132,11 @@ function PortfolioPage() {
   const liveHoldings = useMemo(() => holdings.map((h) =>
     liveQuotes?.[h.symbol] ? { ...h, current_price: liveQuotes[h.symbol].price } : h,
   ), [holdings, liveQuotes]);
-  const positionsValue = liveHoldings.reduce((s, h) => s + h.quantity * h.current_price, 0);
-  const costBasis = liveHoldings.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
-  const pl = positionsValue - costBasis;
-  const plPct = costBasis > 0 ? pl / costBasis : 0;
+  // One arithmetic for the whole page. The account value was spelled out from
+  // `selectedAccount` in five separate places; they agreed only by luck.
+  const totals = useMemo(() => accountTotals(liveHoldings, balance), [liveHoldings, balance]);
+  const { positionsValue, cash, marginDebit, grossValue, totalAccountValue, unrealizedPL: pl, unrealizedPLPct } = totals;
+  const plPct = unrealizedPLPct ?? 0;
 
   const sectorData = useMemo(() => {
     const map = new Map<string, number>();
@@ -174,8 +177,12 @@ function PortfolioPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard
           label="Gross — investments"
-          value={fmtUSD(positionsValue + Number(selectedAccount?.cash ?? 0))}
-          hint={`${holdings.length} positions${Number(selectedAccount?.cash ?? 0) > 0 ? ` + cash ${fmtUSD(Number(selectedAccount?.cash ?? 0))}` : ""}`}
+          value={noScope ? "—" : fmtUSD(grossValue)}
+          hint={
+            noScope
+              ? scopeName
+              : `${scopeName} · ${holdings.length} positions${cash > 0 ? ` + cash ${fmtUSD(cash)}` : ""}`
+          }
           icon={<Wallet className="h-4 w-4" />}
         />
         {selectedAccount ? (
@@ -192,11 +199,23 @@ function PortfolioPage() {
         )}
         <StatCard
           label="Net — actual account value"
-          value={fmtUSD(positionsValue + Number(selectedAccount?.cash ?? 0) - Number(selectedAccount?.margin_used ?? 0))}
-          hint="Gross − margin loan · matches Fidelity's Total account value"
+          value={noScope ? "—" : fmtUSD(totalAccountValue)}
+          hint={noScope ? scopeName : `${scopeName} · gross − margin loan · matches Fidelity's Total account value`}
         />
-        <StatCard label="Total Gain/Loss" value={`${fmtUSD(pl)} (${fmtPct(plPct)})`} tone={pl >= 0 ? "positive" : "negative"} />
-        <StatCard label="Buying power" value={fmtUSD(Number(selectedAccount?.buying_power ?? account?.buying_power ?? 0))} />
+        {/* Same rule as the cards above: no scope, no figure. "$0.00 (0.00%)"
+            reads as "this account is flat", which is a different claim from
+            "no account is selected". */}
+        <StatCard
+          label="Total Gain/Loss"
+          value={noScope ? "—" : `${fmtUSD(pl)} (${unrealizedPLPct == null ? "—" : fmtPct(plPct)})`}
+          hint={scopeName}
+          tone={noScope ? "default" : pl >= 0 ? "positive" : "negative"}
+        />
+        <StatCard
+          label="Buying power"
+          value={noScope ? "—" : fmtUSD(balance!.buying_power)}
+          hint={scopeName}
+        />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -266,8 +285,7 @@ function PortfolioPage() {
                   const dayPct = q && q.prevClose > 0 ? (price - q.prevClose) / q.prevClose : null;
                   // Fidelity divides % of Acct by TOTAL ACCOUNT VALUE (net equity) —
                   // verified against real statements (CRWD 32.24%, LRCX 26.84%, ...).
-                  const netAcct = positionsValue + Number(selectedAccount?.cash ?? 0) - Number(selectedAccount?.margin_used ?? 0);
-                  const pctOfAcct = netAcct > 0 ? value / netAcct : 0;
+                  const pctOfAcct = totalAccountValue > 0 ? value / totalAccountValue : 0;
                   const unpriced = !q;
                   return (
                     <TableRow key={h.id} className="cursor-pointer" onClick={() => setSelected(h)}>
@@ -324,13 +342,16 @@ function PortfolioPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between py-2">
-                <span className="font-semibold uppercase tracking-wide text-muted-foreground">Pending activity</span>
-                <span className="tabular">{fmtUSD(-Number(selectedAccount?.margin_used ?? 0))}</span>
+                {/* This row is the margin debit. Labelling it "Pending activity"
+                    described the wrong thing entirely — Fidelity's pending
+                    activity is settling trades, not the loan. */}
+                <span className="font-semibold uppercase tracking-wide text-muted-foreground">Margin loan</span>
+                <span className="tabular">{fmtUSD(-marginDebit)}</span>
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="font-semibold uppercase tracking-wide">Total account value</span>
                 <span className="tabular font-semibold">
-                  {fmtUSD(positionsValue + Number(selectedAccount?.cash ?? 0) - Number(selectedAccount?.margin_used ?? 0))}
+                  {noScope ? "—" : fmtUSD(totalAccountValue)}
                 </span>
               </div>
               <div className="flex items-center justify-between py-2">
@@ -341,8 +362,7 @@ function PortfolioPage() {
                       const q = liveQuotes?.[h.symbol];
                       return q && q.prevClose > 0 ? sum + h.quantity * (q.price - q.prevClose) : sum;
                     }, 0);
-                    const net = positionsValue + Number(selectedAccount?.cash ?? 0) - Number(selectedAccount?.margin_used ?? 0);
-                    const prior = net - day; // Fidelity: % vs yesterday's account value
+                    const prior = totalAccountValue - day; // Fidelity: % vs yesterday's account value
                     return (
                       <span className={day >= 0 ? "text-success" : "text-destructive"}>
                         {day >= 0 ? "+" : ""}{fmtUSD(day)} ({prior > 0 ? fmtPct(day / prior) : "—"})
@@ -398,10 +418,31 @@ function PortfolioPage() {
 
       <div className="mt-4 rounded-2xl border bg-card p-5">
         <div className="mb-3 flex items-center justify-between">
-          <div className="text-sm font-medium">Cash & margin</div>
+          <div className="text-sm font-medium">Cash & margin — {scopeName}</div>
           <span className="text-xs text-muted-foreground">User-entered</span>
         </div>
-        <AccountForm account={account} onSave={(patch) => upsert.mutate(patch, { onSuccess: () => toast.success("Saved") })} />
+        {/* No account selected → no form. The form used to be seeded from the
+            household aggregate and saved onto whichever account was first, so
+            editing it while looking at one account rewrote another's cash and
+            margin. Keyed by account id so switching accounts reloads the
+            fields instead of leaving the previous account's numbers in them. */}
+        {selectedAccount ? (
+          <AccountForm
+            key={selectedAccount.id}
+            account={balance}
+            onSave={(patch) =>
+              upsert.mutate(patch, {
+                onSuccess: () => toast.success(`Saved to ${selectedAccount.name}`),
+                onError: (e) => toast.error((e as Error).message),
+              })
+            }
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Select a single account to record its cash and margin. These figures belong to one
+            account, so there is nothing to edit while none is selected.
+          </p>
+        )}
       </div>
 
 

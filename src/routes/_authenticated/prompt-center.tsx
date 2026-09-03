@@ -9,8 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   useGoal,
-  useHoldings,
-  useAccount,
+  useScopedHoldings,
+  useScopedAccount,
   usePriorities,
   useAddJournal,
   useIpsLite,
@@ -23,7 +23,7 @@ import {
   riskToExpectedReturn,
 } from "@/lib/finance";
 import { buildV6Prompt, type MeetingType, type PromptContext } from "@/lib/prompts";
-import { useAccountContext, selectAccountHoldings } from "@/contexts/AccountContext";
+import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
 import { AccountNotice } from "@/components/app/AccountNotice";
 import { scorecardByAction, formatScorecardLines } from "@/lib/committeeScorecard";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -89,9 +89,13 @@ export const Route = createFileRoute("/_authenticated/prompt-center")({
 
 function PromptCenter() {
   const { data: goal } = useGoal();
-  const { data: allHoldings = [] } = useHoldings();
-  const { data: account } = useAccount();
   const { selectedAccount, status: accountStatus } = useAccountContext();
+  // The prompt describes one account to the committee. `useAccount()` — the
+  // household aggregate — was read here and passed into the memo's dependency
+  // list, so a change to any other account's cash re-rendered this prompt.
+  const scope = useAccountScope();
+  const { data: amirHoldings } = useScopedHoldings(scope, { includeUnassigned: true });
+  const { data: balance } = useScopedAccount(scope);
   const { data: priorities = [] } = usePriorities();
   const { data: ipsLite } = useIpsLite();
   const addJournal = useAddJournal();
@@ -132,12 +136,6 @@ function PromptCenter() {
   const [tab, setTab] = useState<string>(urlTab ?? "morning");
   useEffect(() => { if (urlTab) setTab(urlTab); }, [urlTab]);
 
-  // Resolved: this account's rows plus accountless manual adds (unchanged).
-  // Unresolved: empty — never the accountless rows standing in for a portfolio.
-  const amirHoldings = useMemo(
-    () => selectAccountHoldings(allHoldings, selectedAccount?.id ?? null, { includeUnassigned: true }),
-    [allHoldings, selectedAccount],
-  );
   const { data: liveQuotes } = useQuery({
     queryKey: ["pc-quotes", amirHoldings.map((h) => h.symbol).join(",")],
     queryFn: () => getQuotesFn({ data: { symbols: amirHoldings.map((h) => h.symbol) } }),
@@ -160,8 +158,8 @@ function PromptCenter() {
     const positionsValue = holdings.reduce((s, h) => s + h.quantity * h.current_price, 0);
     const cost = holdings.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
     const pl = positionsValue - cost;
-    const cash = Number(selectedAccount?.cash ?? 0);
-    const marginUsed = Number(selectedAccount?.margin_used ?? 0);
+    const cash = Number(balance?.cash ?? 0);
+    const marginUsed = Number(balance?.margin_used ?? 0);
     const grossValue = positionsValue + cash;
     const portfolioValue = grossValue - marginUsed; // NET — Fidelity's Total account value
     const dayPL = holdings.reduce((sum, h) => {
@@ -219,7 +217,7 @@ function PromptCenter() {
         `${j.created_at.slice(0, 10)}: ${(j.title ?? j.body ?? "").slice(0, 120)}`),
       committeeScorecard,
     };
-  }, [amirHoldings, liveQuotes, selectedAccount, account, goal, priorities, ipsLite, userNotes, news, journalEntries, decisions, committeeScorecard, liveEconCal, liveEarnCal]);
+  }, [amirHoldings, liveQuotes, selectedAccount, balance, goal, priorities, ipsLite, userNotes, news, journalEntries, decisions, committeeScorecard, liveEconCal, liveEarnCal]);
 
   const MEETING: Record<string, MeetingType> = {
     morning: "Morning", midday: "Mid-Day", evening: "Evening", weekly: "Weekly", monthly: "Monthly",

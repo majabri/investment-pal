@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
-import { useAccounts, useHoldings } from "@/hooks/useAppData";
+import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { accountCategory } from "@/lib/data/accountGroups";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD, fmtPct } from "@/lib/finance";
@@ -20,7 +20,7 @@ function reviewDue(): boolean { return new Date().getDate() <= 5; }
 
 function Page() {
   const { data: accounts = [] } = useAccounts();
-  const { data: allHoldings = [] } = useHoldings();
+  const { data: allHoldings = [] } = useAllHoldings();
   const iraAccounts = accounts.filter((a) => accountCategory(a.name) === "IRA");
   const symbols = useMemo(() => [...new Set(allHoldings
     .filter((h) => iraAccounts.some((a) => a.id === h.account_id))

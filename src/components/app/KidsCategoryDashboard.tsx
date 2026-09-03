@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAccounts, useHoldings } from "@/hooks/useAppData";
+import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,7 @@ export function KidsCategoryDashboard({ title, subtitle, matchAccount, emptyHint
   emptyHint: string;
 }) {
   const { data: accounts = [] } = useAccounts();
-  const { data: allHoldings = [] } = useHoldings();
+  const { data: allHoldings = [] } = useAllHoldings();
 
   const kidAccounts = accounts
     .map((a) => ({ a, kid: matchAccount(a.name) }))
