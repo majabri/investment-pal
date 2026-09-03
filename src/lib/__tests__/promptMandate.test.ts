@@ -157,16 +157,26 @@ describe("the objective has exactly one home", () => {
     expect(offenders.filter((o) => !allowed.has(o.replace(/\\/g, "/")))).toEqual([]);
   });
 
-  test("both objective editors go through the goal row, not the accounts table", () => {
-    // The distinguishing evidence: the two files that write these fields also
-    // call `useGoal`, and neither reaches `from("accounts")` to do it.
+  test("both objective editors reach the goal row through useGoal", () => {
+    // Necessary, not sufficient — a file could call `useGoal` and still write
+    // an objective elsewhere. The sufficient half is the writer allow-list
+    // above; this pins that each permitted writer has the goal hook to write
+    // through at all.
     for (const file of [
       "src/routes/_authenticated/goals.tsx",
       "src/routes/_authenticated/settings.tsx",
     ]) {
-      const code = readFileSync(file, "utf8");
-      expect(code).toContain("useGoal");
+      expect(readFileSync(file, "utf8")).toContain("useGoal");
     }
+  });
+
+  test("the goal screen never touches the accounts table", () => {
+    // Settings legitimately does — it manages accounts. The goal screen has no
+    // business there, and if it acquired one that would be the second
+    // objective growing back.
+    const code = stripComments(readFileSync("src/routes/_authenticated/goals.tsx", "utf8"));
+    expect(code).not.toContain('from("accounts")');
+    expect(code).not.toContain("useAccounts");
   });
 
   test("the mandate the committee reads comes from the goal, not an account", () => {

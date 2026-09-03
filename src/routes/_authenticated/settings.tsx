@@ -174,10 +174,12 @@ function ObjectiveCard() {
     if (!Number.isFinite(s) || s < 0) return toast.error("Starting value cannot be negative");
     if (!Number.isFinite(m) || m < 0) return toast.error("Monthly contribution cannot be negative");
     if (!date) return toast.error("Set a target date");
-    // A target date in the past makes every CAGR and probability figure
-    // divide by a negative horizon. Reject it here rather than rendering one.
+    // Today is rejected along with the past, deliberately. A zero horizon is
+    // as unusable as a negative one: `yearsBetween` clamps it to 0.01 years,
+    // and every CAGR and probability figure downstream is then computed over
+    // roughly three days — an absurd number rendered with full confidence.
     if (!isFutureLocalDate(date)) {
-      return toast.error("The target date must be in the future");
+      return toast.error("The target date must be later than today");
     }
     update.mutate(
       {
@@ -204,7 +206,16 @@ function ObjectiveCard() {
       <div className="grid gap-3 sm:grid-cols-[180px_180px_180px_180px_auto]">
         <div>
           <Label className="text-xs">Target value ($)</Label>
-          <Input type="number" min={0} value={target} onChange={(e) => setTarget(e.target.value)} />
+          {/* `min` matches the check in onSave. A browser constraint that
+              disagrees with the validation produces an error message the form
+              itself said was fine. */}
+          <Input
+            type="number"
+            min={0.01}
+            step="0.01"
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+          />
         </div>
         <div>
           <Label className="text-xs">Target date</Label>
