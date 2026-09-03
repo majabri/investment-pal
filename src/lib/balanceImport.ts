@@ -157,6 +157,22 @@ export function parseAmount(text: string): number | null {
 }
 
 /**
+ * Dates, times and "as of" stamps.
+ *
+ * These carry digits, so `parseAmount` reads one out of them ("09" from
+ * 09/03/2026). Without this they would be reported as unrecognised lines, and a
+ * warning that fires on every ordinary paste is a warning the user learns to
+ * scroll past — which is how the real unrecognised line, the renamed field,
+ * gets missed.
+ */
+const DATE_OR_TIME = /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}:\d{2}\s*(am|pm|et|ct|pt)?\b/i;
+
+/** True for a fragment that is a timestamp rather than a figure. */
+export function isDateOrTime(fragment: string): boolean {
+  return DATE_OR_TIME.test(fragment);
+}
+
+/**
  * Split a paste into label/value fragments.
  *
  * Fidelity's balances copy out as one line per field on the web, as
@@ -177,9 +193,13 @@ export function parseBalanceBlock(input: string): BalanceParse {
   const unrecognised: string[] = [];
 
   for (const fragment of balanceFragments(input)) {
+    // A timestamp is not a figure. Skipped before parsing, because the digits
+    // in a date parse perfectly well into a plausible-looking amount.
+    if (isDateOrTime(fragment)) continue;
+
     const amount = parseAmount(fragment);
-    // A fragment with no number is a heading, a date, or a disclaimer. Not an
-    // error, and not something to report as unrecognised.
+    // A fragment with no number is a heading or a disclaimer. Not an error, and
+    // not something to report as unrecognised.
     if (amount === null) continue;
 
     // Match against the label part only. Searching the whole fragment lets a

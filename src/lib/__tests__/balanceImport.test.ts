@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import {
   accountPatch,
   balanceFragments,
+  isDateOrTime,
   parseAmount,
   parseBalanceBlock,
   reconcile,
@@ -157,9 +158,28 @@ describe("a partial paste is reported, never completed", () => {
   test("headings and dates are ignored without being flagged", () => {
     const p = parseBalanceBlock("Balances\nAs of 09/03/2026\nTotal account value $53,938.35");
     expect(p.fields.totalAccountValue).toBe(53_938.35);
-    // "As of 09/03/2026" carries digits but no known label. It is noise, and
-    // flagging it as unrecognised would train the user to ignore the warning.
-    expect(p.unrecognised.some((u) => u.includes("Total"))).toBe(false);
+    // The date carries digits that parse perfectly well as "09". Flagging it as
+    // unrecognised would fire the warning on every ordinary paste, and a
+    // warning that always fires is one the user scrolls past — which is how the
+    // real unrecognised line, the renamed field, gets missed.
+    expect(p.unrecognised).toEqual([]);
+  });
+
+  test("every shape of timestamp is skipped, not read as a figure", () => {
+    for (const stamp of [
+      "As of 09/03/2026",
+      "as of 2026-09-03",
+      "Updated 4:15 PM ET",
+      "Last updated 09-03-26",
+    ]) {
+      const p = parseBalanceBlock(`${stamp}\nTotal account value $53,938.35`);
+      expect(p.unrecognised).toEqual([]);
+      expect(p.fields.totalAccountValue).toBe(53_938.35);
+    }
+  });
+
+  test("a timestamp alone is an empty parse, not a figure of 9", () => {
+    expect(parseBalanceBlock("As of 09/03/2026").empty).toBe(true);
   });
 });
 
@@ -175,6 +195,22 @@ describe("paste shapes", () => {
 
   test("fragments drop blanks and keep the label with its number", () => {
     expect(balanceFragments("a $1\n\n  \nb $2")).toEqual(["a $1", "b $2"]);
+  });
+});
+
+describe("isDateOrTime", () => {
+  test("timestamps are timestamps", () => {
+    expect(isDateOrTime("As of 09/03/2026")).toBe(true);
+    expect(isDateOrTime("4:15 PM ET")).toBe(true);
+    expect(isDateOrTime("2026-09-03")).toBe(true);
+  });
+
+  test("money is not a timestamp", () => {
+    // The guard must not swallow a real figure. A dollar amount with a comma
+    // and a decimal must never look like a date to it.
+    expect(isDateOrTime("Total account value $53,938.35")).toBe(false);
+    expect(isDateOrTime("Margin interest rate 11.325%")).toBe(false);
+    expect(isDateOrTime("Net debit −$6,664.33")).toBe(false);
   });
 });
 

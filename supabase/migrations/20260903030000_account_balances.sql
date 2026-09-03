@@ -60,7 +60,10 @@ CREATE TABLE IF NOT EXISTS public.account_balances (
   -- The paste, verbatim. Kept so a mis-parse can be diagnosed against what was
   -- actually pasted, rather than re-derived from a figure that is already
   -- wrong. Not displayed; read when something disagrees.
-  raw_text    TEXT NOT NULL DEFAULT '',
+  -- NOT NULL and NO DEFAULT, like the money columns and for the same reason:
+  -- a row that slipped in without its paste cannot be diagnosed against
+  -- anything, and an empty-string default makes that silently possible.
+  raw_text    TEXT NOT NULL,
 
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -98,17 +101,49 @@ END $$;
 CREATE INDEX IF NOT EXISTS account_balances_account_imported_idx
   ON public.account_balances (account_id, imported_at DESC);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.account_balances TO authenticated;
+-- Append-only is enforced, not just described: SELECT and INSERT only, with no
+-- UPDATE and no DELETE for the signed-in role. Granting them and relying on the
+-- app never to call them makes the invariant a convention, and a convention
+-- cannot protect a history whose whole value is that it was not rewritten.
+-- Deleting the account still removes its rows, via the ON DELETE CASCADE above.
+GRANT SELECT, INSERT ON public.account_balances TO authenticated;
 GRANT ALL ON public.account_balances TO service_role;
 ALTER TABLE public.account_balances ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (
+  IF EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'account_balances' AND policyname = 'own account balances'
   ) THEN
-    CREATE POLICY "own account balances" ON public.account_balances
-      FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+    -- An earlier FOR ALL policy would keep permitting UPDATE and DELETE at the
+    -- row level even with the grants withdrawn. Replace it rather than leaving
+    -- two policies disagreeing about what this table allows.
+    DROP POLICY "own account balances" ON public.account_balances;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'account_balances' AND policyname = 'read own account balances'
+  ) THEN
+    CREATE POLICY "read own account balances" ON public.account_balances
+      FOR SELECT USING (auth.uid() = user_id);
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'account_balances' AND policyname = 'insert own account balances'
+  ) THEN
+    -- `user_id = auth.uid()` alone would let a row be filed against someone
+    -- else's account_id if one were ever guessed. The account must be the
+    -- caller's too, or the balance is attached to an account they cannot see.
+    CREATE POLICY "insert own account balances" ON public.account_balances
+      FOR INSERT WITH CHECK (
+        auth.uid() = user_id
+        AND EXISTS (
+          SELECT 1 FROM public.accounts a
+          WHERE a.id = account_id AND a.user_id = auth.uid()
+        )
+      );
   END IF;
 END $$;
