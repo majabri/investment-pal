@@ -117,6 +117,19 @@ describe("what the committee is told", () => {
     expect(line).toContain("verified 2026-09-01");
   });
 
+  test("a malformed date is never echoed as a verification claim", () => {
+    // Post-merge Copilot finding: the line read "verified not-a-date", handing
+    // the committee provenance the data does not support (AIOS §27).
+    const line = marginRatePromptLine({ ...SET, margin_rate_as_of: "not-a-date" });
+    expect(line).not.toContain("verified not-a-date");
+    expect(line).toContain("verification date not recorded");
+  });
+
+  test("a missing date says so rather than claiming verification", () => {
+    const line = marginRatePromptLine({ ...SET, margin_rate_as_of: null });
+    expect(line).toContain("verification date not recorded");
+  });
+
   test("a stale rate is flagged to the model, not passed off as current", () => {
     const line = marginRatePromptLine({ ...SET, margin_rate_as_of: "2026-01-01" });
     expect(line.toLowerCase()).toContain("may be out of date");

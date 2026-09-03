@@ -127,13 +127,27 @@ export function allNavRoutes(): string[] {
 export function sectionForPath(pathname: string): NavSection | null {
   let best: NavSection | null = null;
   let bestLen = -1;
+  const consider = (s: NavSection, route: string) => {
+    const exact = pathname === route;
+    const child = route !== "/" && pathname.startsWith(`${route}/`);
+    if ((exact || child) && route.length > bestLen) {
+      best = s;
+      bestLen = route.length;
+    }
+  };
+
   for (const s of navSections) {
-    for (const route of [s.to, ...s.tabs.map((t) => t.to)]) {
-      const exact = pathname === route;
-      const child = route !== "/" && pathname.startsWith(`${route}/`);
-      if ((exact || child) && route.length > bestLen) {
-        best = s;
-        bestLen = route.length;
+    consider(s, s.to);
+    for (const t of s.tabs) {
+      consider(s, t.to);
+      // A multi-segment tab route stands in for its whole subtree, so a value
+      // the tabs do not enumerate still resolves to the owning section.
+      // Without this, /kids-category/<anything-else> lost its highlight and
+      // its tab strip — including the route's own "unknown category" page,
+      // which is exactly where a lost reader needs the nav most.
+      const parent = t.to.slice(0, t.to.lastIndexOf("/"));
+      if (parent && parent !== "" && pathname.startsWith(`${parent}/`)) {
+        consider(s, parent);
       }
     }
   }

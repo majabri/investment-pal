@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getQuotesFn } from "@/lib/marketServer";
 import { useHoldings, useUniverse } from "@/hooks/useAppData";
-import { resolveUniverse, universeEmptyReason } from "@/lib/universe";
+import { resolveUniverse, universeEmptyReason, heldSymbolSet, normaliseSymbol } from "@/lib/universe";
 import { fmtUSD } from "@/lib/finance";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,9 @@ export const Route = createFileRoute("/_authenticated/opportunities")({ componen
 function Page() {
   const { data: holdings = [] } = useHoldings();
   const { data: universe = [], isLoading: universeLoading } = useUniverse();
-  const held = new Set(holdings.map((h) => h.symbol));
+  // Same normalisation as the scan list, or the "Held" badge silently
+  // disappears for a symbol stored as "msft" (Copilot, post-merge review).
+  const held = heldSymbolSet(holdings.map((h) => h.symbol));
   const universeSymbols = universe.map((u) => u.symbol);
   const heldSymbols = holdings.map((h) => h.symbol);
   const symbols = resolveUniverse(universeSymbols, heldSymbols);
@@ -37,7 +39,7 @@ function Page() {
           <div key={r.sym} className="flex items-center justify-between border-b py-1.5 text-sm last:border-0">
             <span className="flex items-center gap-2 font-medium">
               {r.sym}
-              {held.has(r.sym) && <Badge className="px-1.5 py-0 text-[10px]">Held</Badge>}
+              {held.has(normaliseSymbol(r.sym)) && <Badge className="px-1.5 py-0 text-[10px]">Held</Badge>}
             </span>
             <span className="flex gap-3 tabular-nums">
               <span>{fmtUSD(r.price, 2)}</span>

@@ -138,6 +138,19 @@ describe("sectionForPath", () => {
     expect(sectionForPath("/kids-category/529")?.label).toBe("Family");
   });
 
+  test("an unknown category still resolves to Family", () => {
+    // Post-merge Copilot finding: /kids-category/<unknown> returned null, so
+    // the route's own "no such category" page rendered with no section
+    // highlight and no tab strip — exactly where a lost reader needs the nav.
+    expect(sectionForPath("/kids-category/bogus")?.label).toBe("Family");
+    expect(sectionForPath("/kids-category/constructor")?.label).toBe("Family");
+  });
+
+  test("prefix matching does not leak across sections", () => {
+    // /kids-category owning its subtree must not make it own unrelated paths.
+    expect(sectionForPath("/kids-categoryX")).toBeNull();
+  });
+
   test("an unknown path resolves to nothing rather than guessing", () => {
     expect(sectionForPath("/nonexistent")).toBeNull();
   });

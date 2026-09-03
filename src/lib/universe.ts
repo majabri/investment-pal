@@ -8,6 +8,23 @@
 //
 // Pure so the union rules are testable without a database.
 
+/**
+ * Canonical form of a ticker.
+ *
+ * Exported because callers that build a "held" set from raw holdings MUST use
+ * it too. `holdings.symbol` has no casing constraint, so a set built from raw
+ * values missed normalised scan symbols and the "Held" badge silently vanished
+ * — the position was still owned, the screen just stopped saying so.
+ */
+export function normaliseSymbol(raw: unknown): string {
+  return typeof raw === "string" ? raw.trim().toUpperCase() : "";
+}
+
+/** A lookup set of held symbols, in the same form the scan list uses. */
+export function heldSymbolSet(heldSymbols: readonly string[]): Set<string> {
+  return new Set(heldSymbols.map(normaliseSymbol).filter(Boolean));
+}
+
 /** The scanned set: the stored universe plus everything currently held. */
 export function resolveUniverse(
   universeSymbols: readonly string[],
@@ -17,7 +34,7 @@ export function resolveUniverse(
   const seen = new Set<string>();
   // Held names come first: a position you own is never merely a candidate.
   for (const raw of [...heldSymbols, ...universeSymbols]) {
-    const symbol = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+    const symbol = normaliseSymbol(raw);
     if (!symbol || seen.has(symbol)) continue;
     seen.add(symbol);
     out.push(symbol);
