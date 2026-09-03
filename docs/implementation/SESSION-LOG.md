@@ -306,3 +306,102 @@ Negative controls were run rather than assumed on each new guard:
 an unset rate falling back to zero, a `DEFAULT` in the margin migration, a
 reintroduced rate constant, and a nav tab removed from the model all fail their
 respective tests.
+
+---
+
+## 2026-09-03 (evening) — Master Brief 2026-09-03, five stages
+
+Brief: `CLAUDE-CODE-MASTER-BRIEF-2026-09-03.md` (Drive), verified against
+`main @ 287dd5d` — stale by the time it ran; `main` was at `8fae571`. Eight
+stages; three were already on `main` and are recorded as such below.
+
+| Stage | PR | Outcome |
+|---|---|---|
+| 1 · Account-scoped totals | #114 | Merged |
+| 2 · Balance import | #115 | Merged |
+| 3 · Margin rate governance (delta) | #116 | Merged |
+| 4 · One objective | #117 | Merged |
+| 5 · Portfolio Summary | #118, #119 | Merged |
+| 6 · Decisions surface | — | Already on `main` (#105, ADR-APP-008) |
+| 7 · Investment universe | — | Already on `main` (#104) |
+| 8 · IA collapse | — | Already on `main` (#103) |
+
+### Where the brief and `main` disagreed
+
+1. **Stage 1: "The app currently omits the debit."** It did not. Both
+   `index.tsx` and `portfolio.tsx` already computed `positions + cash −
+   margin_used`. The formula was right; the *scope* was wrong.
+2. **Stage 1, undocumented and worse:** `useAccount().upsert` wrote to
+   `accounts[0]` regardless of selection. Editing "Cash & margin" while looking
+   at the IRA wrote those figures onto the first account — a silent
+   data-corruption path the brief does not mention.
+3. **Stage 3 was already done** (#106 / ADR-APP-007). The rate had already
+   moved out of the two constants the brief still names at `index.tsx:269` and
+   `MarginCard.tsx:70`. Only the two additions on top of it were outstanding.
+4. **Stage 4: the objective was never in three places.** `prompts.ts` was
+   already data-driven via `mandateOf` (with `promptMandate.test.ts` pinning
+   it). The live duplication was `goals` versus `accounts.target_value`, where
+   the latter was editable in Settings and read by nothing.
+5. **Stage 5 named `portfolio_snapshots` as the chart source** without noticing
+   it carried `scope = 'amir'` — one hardcoded series across every account. The
+   same defect Stage 1 removed from every live figure, surviving in the
+   recorded history.
+
+### Deliberate departures
+
+- **`accounts.target_value` / `target_date` / `starting_value` are deprecated,
+  not dropped.** The brief says delete. Dropping destroys the values
+  irreversibly on a database that deploys live on merge. The migration marks
+  them with `COMMENT`s and carries the exact `DROP` to run once they are
+  confirmed dead. **Amir's call.**
+- **The objective stayed in `goals` rather than moving to `ips_lite`.** The
+  brief's own alternative ("or make Settings write to the IPS row") applied to
+  `main`'s shape: Settings now writes to the goal row, which is what the
+  dashboard and the prompts already read. Moving one live objective between
+  tables would have dragged money-adjacent `prompts.ts` through a rename.
+- **The dashboard was not deleted.** Stage 5 says the summary "replaces the
+  Investment Office page". Both surfaces now render the same Portfolio Summary
+  panels; `/` keeps buy-back zones, the constitution strip, priorities,
+  recommended actions and the workflow launcher beneath them. The brief never
+  asked for those to go.
+- **Dividends are declared unavailable, with the reason.** No free source
+  supplies them (OD-002). The panel says so and warns against reading a blank
+  panel as "no dividends due" — as the brief instructs.
+
+### Money-adjacent changes merged under the brief's standing instruction
+
+Stages 1, 3 and 5 all touch money display or a rate. The brief's operating mode
+grants self-merge on a green gate, and Amir restated it. Flagged rather than
+buried: **the margin rate can now be adopted from a balance import**, as a
+separate ticked line item showing the exact value and the date, defaulted on.
+
+### Gate
+
+Every merged stage passed `bun install --frozen-lockfile` → `bun run typecheck`
+→ `bun run test:typecheck` → `bun test` → dev-server boot on `/auth`, `/`,
+`/summary`, `/portfolio`, `/settings`, `/goals`. Tests went 154 → 255.
+
+Copilot review was awaited on every PR before merging — the lesson from #104/
+#105/#106, where merging on a green gate alone put nine defects onto live
+`main`. Thirteen review findings across the five PRs, all genuine, all fixed
+before merge.
+
+Negative controls run rather than assumed: restoring the unfiltered holdings
+select fails six scope tests; re-adding an objective field to the account
+payload fails the single-home guard; a `target_value:` write in a third file
+fails it too.
+
+### Still outstanding for Amir
+
+- **Apply the three new migrations** (`account_balances`,
+  `deprecate_account_objective`, `portfolio_snapshots_account_scope`). Until
+  then the reconciliation banner reads "no balances imported" and the summary
+  chart records nothing — both degrade honestly rather than erroring.
+- **Decide on dropping the deprecated `accounts` objective columns.**
+- **Paste a Fidelity balance block** to seed the reconciliation and set the
+  margin rate with a real as-of date. The rate ships unset by design.
+- **Pre-Stage-5 snapshots stay unattributed.** They are an all-accounts blend;
+  the chart says how many exist rather than guessing an account for them.
+- **~10 remaining `toISOString().slice(0, 10)` UTC-date uses** (calendar
+  windows, price-history "today", the `decisions.decided_on` filter). Same
+  class as the bug fixed in #116; the decisions one is money-adjacent.
