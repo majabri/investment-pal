@@ -27,7 +27,10 @@ function matchKid(pattern: RegExp) {
   };
 }
 
-const CATEGORIES: Record<string, CategoryConfig> = {
+// Null-prototype: a crafted param like /kids-category/constructor would
+// otherwise return an inherited property, make `config` truthy, and then throw
+// on `config.title`. Unknown values must reach the explicit unknown state.
+const CATEGORIES: Record<string, CategoryConfig> = Object.assign(Object.create(null), {
   "529": {
     title: "Kids 529 Dashboard",
     subtitle:
@@ -43,11 +46,25 @@ const CATEGORIES: Record<string, CategoryConfig> = {
     emptyHint:
       "No kids crypto accounts yet — they're created automatically by a Fidelity import with 'Create accounts for everything in the file' switched on.",
   },
-};
+});
+
+/**
+ * Known category names, for the unknown-category message.
+ *
+ * Derived, not retyped: a hand-written copy drifts the moment a category is
+ * added or removed, and the drift shows up as an error message that lies about
+ * what is available. Safe on a null-prototype object.
+ */
+export const KIDS_CATEGORIES = Object.keys(CATEGORIES);
+
+/** Own-property lookup only. Belt and braces alongside the null prototype. */
+export function categoryConfig(category: string): CategoryConfig | null {
+  return Object.hasOwn(CATEGORIES, category) ? CATEGORIES[category] : null;
+}
 
 function Page() {
   const { category } = Route.useParams();
-  const config = CATEGORIES[category];
+  const config = categoryConfig(category);
 
   // An unknown category is a broken link, not a crash and not an empty
   // portfolio — the difference matters when the screen shows money.
@@ -56,7 +73,7 @@ function Page() {
       <AppShell title="Unknown category" subtitle="This family category does not exist">
         <div className="rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
           No family category named “{category}”. Known categories:{" "}
-          {Object.keys(CATEGORIES).join(", ")}.
+          {KIDS_CATEGORIES.join(", ")}.
         </div>
       </AppShell>
     );

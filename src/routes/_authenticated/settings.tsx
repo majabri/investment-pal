@@ -158,6 +158,18 @@ function MarginRateCard() {
     if (r != null && !asOf) {
       return toast.error("Enter the date you verified this rate");
     }
+    // A malformed or future date produces a negative age in rateStatus and a
+    // provenance claim the data does not support. Reject it here rather than
+    // letting it reach the committee prompt.
+    if (r != null) {
+      const parsed = new Date(`${asOf}T00:00:00Z`);
+      if (Number.isNaN(parsed.getTime())) {
+        return toast.error("Verified-on must be a real date (YYYY-MM-DD)");
+      }
+      if (parsed.getTime() > Date.now()) {
+        return toast.error("Verified-on cannot be in the future");
+      }
+    }
     const days = Number(staleDays);
     if (!Number.isFinite(days) || days < 1) {
       return toast.error("Staleness threshold must be at least 1 day");

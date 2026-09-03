@@ -110,7 +110,14 @@ export function marginRatePromptLine(policy: MarginPolicy): string {
     ? "floating with the broker base rate"
     : "fixed";
   const status = rateStatus(policy);
-  const asOf = policy.margin_rate_as_of ? `, verified ${policy.margin_rate_as_of}` : ", verification date not recorded";
+  // Claim a verification date ONLY when the date actually parsed. A malformed
+  // value used to be echoed as "verified not-a-date", which is worse than
+  // saying nothing: it hands the committee a provenance claim the data does
+  // not support, which is precisely what AIOS §27 forbids.
+  const asOf =
+    status.kind === "unverified"
+      ? ", verification date not recorded"
+      : `, verified ${policy.margin_rate_as_of}`;
   const stale = status.kind === "stale" ? ` This value is ${status.ageDays} days old and may be out of date.` : "";
   return `Margin interest rate: ${policy.margin_rate_annual_pct}% APR (${kind}${asOf}).${stale}`;
 }

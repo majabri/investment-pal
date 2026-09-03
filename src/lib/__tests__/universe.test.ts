@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { resolveUniverse, universeEmptyReason } from "../universe";
+import { resolveUniverse, universeEmptyReason, heldSymbolSet, normaliseSymbol } from "../universe";
 
 describe("resolveUniverse", () => {
   test("unions the stored universe with current holdings", () => {
@@ -30,6 +30,27 @@ describe("resolveUniverse", () => {
   test("an empty universe yields exactly the holdings — never a fallback list", () => {
     // The whole defect: falling back to a baked-in set of names.
     expect(resolveUniverse([], ["AAPL"])).toEqual(["AAPL"]);
+  });
+});
+
+describe("held lookup uses the same form as the scan list", () => {
+  // Post-merge Copilot finding, reproduced before fixing: the scan list is
+  // normalised to uppercase but `held` was built from raw holdings symbols, so
+  // a position stored as "msft" stopped showing its Held badge. The position
+  // was still owned — the screen just quietly stopped saying so.
+  test("a lowercase holding still matches the normalised scan symbol", () => {
+    const symbols = resolveUniverse([], ["msft"]);
+    const held = heldSymbolSet(["msft"]);
+    expect(symbols).toEqual(["MSFT"]);
+    expect(held.has(symbols[0])).toBe(true);
+  });
+
+  test("whitespace does not break the match either", () => {
+    expect(heldSymbolSet([" aapl "]).has(normaliseSymbol("AAPL"))).toBe(true);
+  });
+
+  test("blank holdings do not enter the set", () => {
+    expect(heldSymbolSet(["", "  "]).size).toBe(0);
   });
 });
 
@@ -78,6 +99,17 @@ describe("no hardcoded ticker universe survives on the scanning pages", () => {
       expect(src).toContain("resolveUniverse");
       expect(src).not.toMatch(/const (WATCH|UNIVERSE)\s*=/);
     }
+  });
+
+  test("the Earnings page no longer claims to scan a watchlist", () => {
+    // It reads holdings + investment_universe now. Copy that names a source the
+    // page does not use is misleading on a screen about real money.
+    const src = readFileSync("src/routes/_authenticated/earnings.tsx", "utf8");
+    const subtitle = src.match(/subtitle="([^"]*)"/)?.[1] ?? "";
+    expect(subtitle.toLowerCase()).not.toContain("watchlist");
+    expect(subtitle.toLowerCase()).toContain("investment universe");
+    // The per-row badge said "Watchlist" for universe-only names too.
+    expect(src).not.toContain(">Watchlist<");
   });
 
   test("the Opportunities subtitle does not claim committee involvement", () => {
