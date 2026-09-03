@@ -28,7 +28,7 @@ import { AccountNotice } from "@/components/app/AccountNotice";
 import { ReconciliationBanner } from "@/components/app/ReconciliationBanner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { dailyMarginInterest, rateStatus } from "@/lib/marginCost";
+import { interestProvenanceShort, marginInterestFigure, rateStatus } from "@/lib/marginCost";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
 import {
   useGoal,
@@ -36,6 +36,7 @@ import {
   useAllHoldings,
   useScopedHoldings,
   useScopedAccount,
+  useLatestBalance,
   useAccounts,
   usePriorities,
   useRecommendedActions,
@@ -94,6 +95,9 @@ function Dashboard() {
   const scope = useAccountScope();
   const { data: holdings } = useScopedHoldings(scope);
   const { data: balance } = useScopedAccount(scope);
+  // The broker's own accrued-interest figure, when a balance has been
+  // imported. Preferred over the app's estimate below (Stage 3 delta).
+  const { data: latestBalance } = useLatestBalance(scope);
   const { data: priorities = [], dismiss: dismissPriority } = usePriorities();
   const { data: actions = [], dismiss: dismissAction } = useRecommendedActions();
   const logSync = useLogSync();
@@ -263,10 +267,16 @@ function Dashboard() {
         const gross = grossValue;
         const net = portfolioValue;
         const equityPct = totals.equityPct ?? 1;
-        // From IPS policy (ADR-APP-007), never a constant. null when the rate
-        // is unset, and the strip then suppresses the figure rather than
-        // showing a cost computed from a fallback.
-        const dailyInterest = dailyMarginInterest(marginUsed, ipsLite);
+        // From IPS policy (ADR-APP-007), never a constant — and superseded by
+        // Fidelity's own accrued figure when a balance has been imported. The
+        // two are never blended and never shown without saying which is which.
+        const interest = marginInterestFigure({
+          accruedMtd: latestBalance?.margin_interest_accrued_mtd ?? null,
+          importedAt: latestBalance?.imported_at ?? null,
+          hasImport: Boolean(latestBalance),
+          marginUsed,
+          policy: ipsLite,
+        });
         const rateState = rateStatus(ipsLite);
         const lastUpdate = amirHs.reduce<string | null>((m, h) => {
           const u = (h as { updated_at?: string }).updated_at ?? null;
@@ -295,12 +305,17 @@ function Dashboard() {
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground">
               Margin{" "}
+              {/* Provenance wording comes from marginCost, never from here —
+                  a call site that writes its own is how "(estimate)" quietly
+                  stops appearing on one screen. */}
               {marginUsed > 0
                 ? `${fmtUSD(marginUsed)} · ${
-                    dailyInterest == null
-                      ? "margin rate not set"
-                      : `~${fmtUSD(dailyInterest, 2)}/day interest`
-                  } · equity ${fmtPct(equityPct)}`
+                    interest.kind === "actual"
+                      ? `${fmtUSD(interest.accruedMtd, 2)} interest this month`
+                      : interest.kind === "estimate"
+                        ? `~${fmtUSD(interest.daily, 2)}/day interest`
+                        : "no interest figure"
+                  } (${interestProvenanceShort(interest)}) · equity ${fmtPct(equityPct)}`
                 : "not set"}
             </span>
             <span className="text-muted-foreground">·</span>

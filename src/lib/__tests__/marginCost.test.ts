@@ -14,6 +14,9 @@ import {
   MARGIN_POLICY_UNSET,
   annualMarginInterest,
   dailyMarginInterest,
+  interestProvenance,
+  interestProvenanceShort,
+  marginInterestFigure,
   marginRateLabel,
   marginRatePromptLine,
   rateStatus,
@@ -219,5 +222,121 @@ describe("no margin rate survives anywhere in production source", () => {
     );
     expect(sql).toMatch(/margin_rate_annual_pct\s+NUMERIC\s*,/);
     expect(sql).not.toMatch(/margin_rate_annual_pct\s+NUMERIC[^,]*DEFAULT/);
+  });
+});
+
+describe("observed interest beats computed interest", () => {
+  // Stage 3 delta. The app computes a daily estimate from the IPS rate; the
+  // balance import carries what Fidelity has actually charged. An estimate
+  // shown next to an available actual is a worse number with equal authority.
+  const policy: MarginPolicy = {
+    margin_rate_annual_pct: 11.325,
+    margin_rate_as_of: "2026-09-03",
+    margin_rate_is_floating: true,
+    margin_rate_stale_days: 30,
+  };
+
+  test("the broker's figure wins when both exist", () => {
+    const f = marginInterestFigure({
+      accruedMtd: 91.22,
+      importedAt: "2026-09-03T14:00:00Z",
+      marginUsed: 6_664.33,
+      policy,
+    });
+    expect(f.kind).toBe("actual");
+    expect(f.kind === "actual" && f.accruedMtd).toBe(91.22);
+  });
+
+  test("a broker figure of zero is still the broker's figure", () => {
+    // "Fidelity has charged nothing this month" is a fact. Replacing it with an
+    // estimate of what it might charge would be inventing a broker state.
+    const f = marginInterestFigure({ accruedMtd: 0, marginUsed: 6_664.33, policy });
+    expect(f.kind).toBe("actual");
+    expect(f.kind === "actual" && f.accruedMtd).toBe(0);
+  });
+
+  test("with no import, the estimate is offered as an estimate", () => {
+    const f = marginInterestFigure({ accruedMtd: null, marginUsed: 6_664.33, policy });
+    expect(f.kind).toBe("estimate");
+    // 6,664.33 × 11.325% ÷ 365
+    expect(f.kind === "estimate" && f.daily).toBeCloseTo(2.0676, 3);
+  });
+
+  test("no rate and no import shows nothing, not zero", () => {
+    const f = marginInterestFigure({
+      accruedMtd: null,
+      marginUsed: 6_664.33,
+      policy: MARGIN_POLICY_UNSET,
+    });
+    expect(f.kind).toBe("unavailable");
+    expect(f.kind === "unavailable" && f.reason).toBe("no-import");
+    expect(interestProvenance(f)).toContain("no balance imported");
+  });
+
+  test("an import that omitted the accrued line says so, not \"never imported\"", () => {
+    // Two different facts. Claiming no balance was ever imported, when one was
+    // and simply did not carry the line, is itself an assertion the data does
+    // not support — the same defect class as the figures it guards.
+    const f = marginInterestFigure({
+      accruedMtd: null,
+      hasImport: true,
+      marginUsed: 6_664.33,
+      policy: MARGIN_POLICY_UNSET,
+    });
+    expect(f.kind === "unavailable" && f.reason).toBe("import-omitted-accrued");
+    expect(interestProvenance(f)).toContain("did not include accrued interest");
+    expect(interestProvenance(f)).not.toContain("no balance imported");
+  });
+
+  test("the short form exists for every case and never loses the qualifier", () => {
+    // The strip has no room for the long sentence, so it gets a short one from
+    // the same module. A call site writing its own is how "(estimate)" quietly
+    // stops appearing on one screen.
+    const estimate = marginInterestFigure({ accruedMtd: null, marginUsed: 1, policy });
+    expect(interestProvenanceShort(estimate)).toBe("estimate");
+    const actual = marginInterestFigure({ accruedMtd: 91.22, marginUsed: 1, policy });
+    expect(interestProvenanceShort(actual)).toBe("per Fidelity");
+    for (const hasImport of [false, true]) {
+      const none = marginInterestFigure({
+        accruedMtd: null,
+        hasImport,
+        marginUsed: 1,
+        policy: MARGIN_POLICY_UNSET,
+      });
+      expect(interestProvenanceShort(none).length).toBeGreaterThan(0);
+    }
+  });
+
+  test("an unset rate does not suppress an imported actual", () => {
+    // The observation stands on its own. It does not need the app's rate to be
+    // set, because it was not computed from it.
+    const f = marginInterestFigure({
+      accruedMtd: 91.22,
+      marginUsed: 6_664.33,
+      policy: MARGIN_POLICY_UNSET,
+    });
+    expect(f.kind).toBe("actual");
+  });
+
+  test("every figure says where it came from, and an estimate says so", () => {
+    const actual = marginInterestFigure({
+      accruedMtd: 91.22,
+      importedAt: "2026-09-03T14:00:00Z",
+      marginUsed: 1,
+      policy,
+    });
+    expect(interestProvenance(actual)).toContain("Fidelity");
+    expect(interestProvenance(actual)).toContain("2026-09-03");
+
+    const estimate = marginInterestFigure({ accruedMtd: null, marginUsed: 1, policy });
+    // The word has to be there. An estimate that does not say it is an estimate
+    // reads as the broker's number.
+    expect(interestProvenance(estimate)).toContain("estimated");
+    expect(interestProvenance(estimate)).not.toContain("Fidelity");
+  });
+
+  test("a non-finite accrued figure falls back to the estimate, not to NaN", () => {
+    const f = marginInterestFigure({ accruedMtd: Number.NaN, marginUsed: 6_664.33, policy });
+    expect(f.kind).toBe("estimate");
   });
 });
