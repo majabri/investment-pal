@@ -300,7 +300,9 @@ not symbols — a false positive.)
 
 Every stage passed `bun install --frozen-lockfile` → `bun run typecheck` →
 `bun run test:typecheck` → `bun test` → dev-server boot. Test count went from
-55 to 131 (114 after stage 4, plus 17 regression tests in #107). Negative controls were run rather than assumed on each new guard:
+55 to 131 (114 after stage 4, plus 17 regression tests in #107).
+
+Negative controls were run rather than assumed on each new guard:
 an unset rate falling back to zero, a `DEFAULT` in the margin migration, a
 reintroduced rate constant, and a nav tab removed from the model all fail their
 respective tests.
