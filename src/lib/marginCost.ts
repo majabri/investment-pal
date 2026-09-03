@@ -140,14 +140,26 @@ export type InterestFigure =
   | { kind: "actual"; accruedMtd: number; importedAt: string | null }
   /** Computed from the IPS rate. Always presented as an estimate. */
   | { kind: "estimate"; daily: number; annual: number }
-  /** No rate set and no import — nothing honest to show. */
-  | { kind: "unavailable" };
+  /**
+   * Nothing honest to show. The reason matters: "no balance imported" and
+   * "the import did not carry an accrued figure" are different facts, and
+   * stating the wrong one is itself a claim the data does not support.
+   */
+  | { kind: "unavailable"; reason: "no-import" | "import-omitted-accrued" };
 
 export function marginInterestFigure(args: {
   /** From the latest balance import. `null` = no import, or the paste omitted it. */
   accruedMtd: number | null;
   /** When that import was taken, for the provenance label. */
   importedAt?: string | null;
+  /**
+   * Whether a balance import exists at all.
+   *
+   * Distinct from `accruedMtd != null`: an import can exist and simply not have
+   * carried the accrued line. Without this the "nothing to show" message would
+   * claim no balance had ever been imported, which may be false.
+   */
+  hasImport?: boolean;
   marginUsed: number;
   policy: MarginPolicy;
 }): InterestFigure {
@@ -158,7 +170,12 @@ export function marginInterestFigure(args: {
     return { kind: "actual", accruedMtd: args.accruedMtd, importedAt: args.importedAt ?? null };
   }
   const daily = dailyMarginInterest(args.marginUsed, args.policy);
-  if (daily == null) return { kind: "unavailable" };
+  if (daily == null) {
+    return {
+      kind: "unavailable",
+      reason: args.hasImport ? "import-omitted-accrued" : "no-import",
+    };
+  }
   return { kind: "estimate", daily, annual: daily * 365 };
 }
 
@@ -178,6 +195,27 @@ export function interestProvenance(figure: InterestFigure): string {
     case "estimate":
       return "estimated from your IPS margin rate — not the broker's figure";
     case "unavailable":
-      return "margin rate not set and no balance imported";
+      return figure.reason === "import-omitted-accrued"
+        ? "the last balance import did not include accrued interest, and no margin rate is set"
+        : "no balance imported and no margin rate set";
+  }
+}
+
+/**
+ * The same provenance, short enough for a one-line strip.
+ *
+ * A second wording rather than a second source: both live here, so a screen
+ * that needs a compact label still cannot invent its own. Hardcoding
+ * "(estimate)" at a call site is how the long and short forms drift until one
+ * screen stops saying the figure is an estimate at all.
+ */
+export function interestProvenanceShort(figure: InterestFigure): string {
+  switch (figure.kind) {
+    case "actual":
+      return "per Fidelity";
+    case "estimate":
+      return "estimate";
+    case "unavailable":
+      return figure.reason === "import-omitted-accrued" ? "not in last import" : "rate not set";
   }
 }

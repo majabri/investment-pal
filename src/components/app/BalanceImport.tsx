@@ -24,6 +24,7 @@ import {
 import { fmtUSD } from "@/lib/finance";
 import { useIpsLite, useRecordBalanceImport } from "@/hooks/useAppData";
 import { marginRateLabel } from "@/lib/marginCost";
+import { localIsoDate } from "@/lib/localDate";
 
 /** Percentages print as percentages; everything else is money. */
 function displayValue(key: BalanceFieldKey, value: number): string {
@@ -57,8 +58,11 @@ export function BalanceImport() {
   const pastedRate = parse.fields.marginInterestRatePct;
   const rateDiffers = pastedRate !== null && pastedRate !== ips.margin_rate_annual_pct;
   // The date the rate was observed at the broker, which is today — this paste
-  // came off the balances page now. Stored as ADR-APP-007's verification date.
-  const rateAsOf = new Date().toISOString().slice(0, 10);
+  // came off the balances page now. Stored as ADR-APP-007's verification date,
+  // in the OWNER's calendar: the UTC date rolls over hours early west of
+  // Greenwich, so an evening import would record itself as verified tomorrow,
+  // which `rateStatus` then ages as a negative number of days.
+  const rateAsOf = localIsoDate();
 
   const found = BALANCE_FIELD_ORDER.filter((k) => parse.fields[k] !== null);
   const partial = !parse.empty && parse.missing.length > 0;

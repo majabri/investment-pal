@@ -28,7 +28,7 @@ import { AccountNotice } from "@/components/app/AccountNotice";
 import { ReconciliationBanner } from "@/components/app/ReconciliationBanner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { interestProvenance, marginInterestFigure, rateStatus } from "@/lib/marginCost";
+import { interestProvenanceShort, marginInterestFigure, rateStatus } from "@/lib/marginCost";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
 import {
   useGoal,
@@ -273,6 +273,7 @@ function Dashboard() {
         const interest = marginInterestFigure({
           accruedMtd: latestBalance?.margin_interest_accrued_mtd ?? null,
           importedAt: latestBalance?.imported_at ?? null,
+          hasImport: Boolean(latestBalance),
           marginUsed,
           policy: ipsLite,
         });
@@ -304,14 +305,17 @@ function Dashboard() {
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground">
               Margin{" "}
+              {/* Provenance wording comes from marginCost, never from here —
+                  a call site that writes its own is how "(estimate)" quietly
+                  stops appearing on one screen. */}
               {marginUsed > 0
                 ? `${fmtUSD(marginUsed)} · ${
                     interest.kind === "actual"
-                      ? `${fmtUSD(interest.accruedMtd, 2)} interest ${interestProvenance(interest)}`
+                      ? `${fmtUSD(interest.accruedMtd, 2)} interest this month`
                       : interest.kind === "estimate"
-                        ? `~${fmtUSD(interest.daily, 2)}/day interest (estimate)`
-                        : "margin rate not set"
-                  } · equity ${fmtPct(equityPct)}`
+                        ? `~${fmtUSD(interest.daily, 2)}/day interest`
+                        : "no interest figure"
+                  } (${interestProvenanceShort(interest)}) · equity ${fmtPct(equityPct)}`
                 : "not set"}
             </span>
             <span className="text-muted-foreground">·</span>

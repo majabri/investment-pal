@@ -32,6 +32,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { fmtUSD } from "@/lib/finance";
 import { rateStatus } from "@/lib/marginCost";
+import { isFutureLocalDate } from "@/lib/localDate";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -167,7 +168,10 @@ function MarginRateCard() {
       if (Number.isNaN(parsed.getTime())) {
         return toast.error("Verified-on must be a real date (YYYY-MM-DD)");
       }
-      if (parsed.getTime() > Date.now()) {
+      // Compared as a LOCAL calendar date. `parsed > Date.now()` rejects
+      // today's date for anyone east of Greenwich after their local midnight,
+      // because midnight-UTC of that day has not arrived yet.
+      if (isFutureLocalDate(asOf)) {
         return toast.error("Verified-on cannot be in the future");
       }
     }

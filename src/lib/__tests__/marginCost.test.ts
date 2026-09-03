@@ -15,6 +15,7 @@ import {
   annualMarginInterest,
   dailyMarginInterest,
   interestProvenance,
+  interestProvenanceShort,
   marginInterestFigure,
   marginRateLabel,
   marginRatePromptLine,
@@ -268,6 +269,42 @@ describe("observed interest beats computed interest", () => {
       policy: MARGIN_POLICY_UNSET,
     });
     expect(f.kind).toBe("unavailable");
+    expect(f.kind === "unavailable" && f.reason).toBe("no-import");
+    expect(interestProvenance(f)).toContain("no balance imported");
+  });
+
+  test("an import that omitted the accrued line says so, not \"never imported\"", () => {
+    // Two different facts. Claiming no balance was ever imported, when one was
+    // and simply did not carry the line, is itself an assertion the data does
+    // not support — the same defect class as the figures it guards.
+    const f = marginInterestFigure({
+      accruedMtd: null,
+      hasImport: true,
+      marginUsed: 6_664.33,
+      policy: MARGIN_POLICY_UNSET,
+    });
+    expect(f.kind === "unavailable" && f.reason).toBe("import-omitted-accrued");
+    expect(interestProvenance(f)).toContain("did not include accrued interest");
+    expect(interestProvenance(f)).not.toContain("no balance imported");
+  });
+
+  test("the short form exists for every case and never loses the qualifier", () => {
+    // The strip has no room for the long sentence, so it gets a short one from
+    // the same module. A call site writing its own is how "(estimate)" quietly
+    // stops appearing on one screen.
+    const estimate = marginInterestFigure({ accruedMtd: null, marginUsed: 1, policy });
+    expect(interestProvenanceShort(estimate)).toBe("estimate");
+    const actual = marginInterestFigure({ accruedMtd: 91.22, marginUsed: 1, policy });
+    expect(interestProvenanceShort(actual)).toBe("per Fidelity");
+    for (const hasImport of [false, true]) {
+      const none = marginInterestFigure({
+        accruedMtd: null,
+        hasImport,
+        marginUsed: 1,
+        policy: MARGIN_POLICY_UNSET,
+      });
+      expect(interestProvenanceShort(none).length).toBeGreaterThan(0);
+    }
   });
 
   test("an unset rate does not suppress an imported actual", () => {
