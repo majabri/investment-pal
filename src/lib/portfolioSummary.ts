@@ -383,3 +383,4 @@ export function dayChange(
   }
   return covered > 0 ? { amount, covered, total: positions.length } : null;
 }
+

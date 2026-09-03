@@ -6,6 +6,7 @@ import { MARGIN_POLICY_UNSET, type MarginPolicy } from "@/lib/marginCost";
 import { scopedRows, type AccountScope } from "@/lib/accountTotals";
 import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 import { localIsoDate } from "@/lib/localDate";
+import { isUniqueViolation } from "@/lib/postgresError";
 
 export type Goal = {
   id: string;
@@ -497,7 +498,14 @@ export function useRecordSnapshot() {
         net: p.net,
         margin_used: p.marginUsed,
       } as never);
-      if (error) throw error;
+      // A unique violation here means the day is already recorded — which is
+      // the outcome the index exists to produce, not a failure. Both surfaces
+      // render `SnapshotRecorder`, so walking from the dashboard to the summary
+      // races two inserts through a cached "not recorded yet" check; reporting
+      // that as an error would show the user a failure for working correctly.
+      // Every other error still throws: a permissions failure or a missing
+      // table must not be swallowed into a silently non-recording series.
+      if (error && !isUniqueViolation(error)) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["portfolio_snapshots"] }),
   });

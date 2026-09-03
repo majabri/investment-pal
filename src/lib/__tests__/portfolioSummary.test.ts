@@ -391,3 +391,4 @@ describe("day change", () => {
     expect(dayChange(positions, { AAA: { price: 110, prevClose: 0 } })).toBeNull();
   });
 });
+
