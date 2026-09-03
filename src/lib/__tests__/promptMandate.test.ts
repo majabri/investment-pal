@@ -2,6 +2,8 @@
 // baked into the prompt templates (PR-UI-2). Before this, editing your goal
 // changed every screen except the prompt the model actually reads.
 import { describe, expect, test } from "bun:test";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   buildV6Prompt,
@@ -97,4 +99,83 @@ describe("committee prompts are data-driven", () => {
       expect(after).toContain("January 15, 2031");
     });
   }
+});
+
+// ── Stage 4: one objective, one row ──────────────────────────────────────────
+//
+// The objective was editable in two places that were not the same place. The
+// goal screen wrote `goals`, which the dashboard, the goal screen and the
+// committee prompt all read. The per-account form in Settings wrote
+// `accounts.target_value` / `target_date` / `starting_value`, which NOTHING
+// read — so setting a target there looked like setting a target and set
+// nothing, and the two could disagree indefinitely without any screen noticing.
+
+function productionSources(dir = "src"): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      if (entry === "__tests__" || entry === "test") continue;
+      out.push(...productionSources(full));
+    } else if (/\.tsx?$/.test(entry)) out.push(full);
+  }
+  return out;
+}
+
+const stripComments = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+
+describe("the objective has exactly one home", () => {
+  // Generated Supabase types and the Account row type must still describe the
+  // deprecated columns — the data is still there. What must not exist is code
+  // that WRITES them, which is what re-creates the second objective.
+  const EXEMPT = ["src/integrations/supabase/types.ts", "src/hooks/useAppData.ts"];
+
+  test("nothing writes an objective onto an account any more", () => {
+    const offenders: string[] = [];
+    for (const file of productionSources()) {
+      if (EXEMPT.some((e) => file.replace(/\\/g, "/").endsWith(e))) continue;
+      const code = stripComments(readFileSync(file, "utf8"));
+      // A write looks like `target_value:` in an object literal. A read looks
+      // like `account.target_value`. Only the write re-opens the divergence.
+      for (const field of ["target_value", "target_date", "starting_value"]) {
+        const write = new RegExp(`(^|[^.\\w])${field}\\s*:`, "m");
+        if (write.test(code)) offenders.push(`${file} writes ${field}`);
+      }
+    }
+    // goals.tsx and settings.tsx both write these — to the GOAL row, through
+    // `useGoal().update`. That is the single home, so they are named here
+    // rather than exempted silently: if a third file appears, this fails.
+    const allowed = new Set([
+      "src/routes/_authenticated/goals.tsx writes target_value",
+      "src/routes/_authenticated/goals.tsx writes target_date",
+      "src/routes/_authenticated/goals.tsx writes starting_value",
+      "src/routes/_authenticated/settings.tsx writes target_value",
+      "src/routes/_authenticated/settings.tsx writes target_date",
+      "src/routes/_authenticated/settings.tsx writes starting_value",
+    ]);
+    expect(offenders.filter((o) => !allowed.has(o.replace(/\\/g, "/")))).toEqual([]);
+  });
+
+  test("both objective editors go through the goal row, not the accounts table", () => {
+    // The distinguishing evidence: the two files that write these fields also
+    // call `useGoal`, and neither reaches `from("accounts")` to do it.
+    for (const file of [
+      "src/routes/_authenticated/goals.tsx",
+      "src/routes/_authenticated/settings.tsx",
+    ]) {
+      const code = readFileSync(file, "utf8");
+      expect(code).toContain("useGoal");
+    }
+  });
+
+  test("the mandate the committee reads comes from the goal, not an account", () => {
+    // Restated as behaviour rather than as source-shape: change the objective
+    // and the prompt changes with it.
+    const before = mandateOf(ctx());
+    const after = mandateOf(ctx({ goalTarget: 400_000, goalDate: "2032-01-31" }));
+    expect(before.target).not.toBe(after.target);
+    expect(after.target).toBe("$400,000");
+    expect(after.date).toBe("January 31, 2032");
+  });
 });

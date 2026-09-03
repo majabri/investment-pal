@@ -26,6 +26,7 @@ import {
   useSyncLog,
   useLogSync,
   useAccounts,
+  useGoal,
   useIpsLite,
   type Account,
 } from "@/hooks/useAppData";
@@ -115,6 +116,111 @@ function IpsLiteCard() {
         <div className="flex items-end">
           <Button onClick={onSave} disabled={save.isPending}>
             Save policy
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The objective — one row, edited here and on the goal screen, read everywhere.
+ *
+ * Stage 4 of the 2026-09-03 brief. The objective was editable in two places
+ * that were not the same place: the goal screen wrote `goals`, which the
+ * dashboard, the goal screen and the committee prompt all read; the per-account
+ * form below wrote `accounts.target_value` / `target_date` / `starting_value`,
+ * which NOTHING read. Setting a target there looked like setting a target and
+ * set nothing.
+ *
+ * The account-level fields are no longer written (see AccountCard). This card
+ * edits the row the app actually uses, so Settings and the goal screen are two
+ * views of one objective rather than two objectives.
+ */
+function ObjectiveCard() {
+  const { data: goal, update } = useGoal();
+  const [target, setTarget] = useState("");
+  const [date, setDate] = useState("");
+  const [starting, setStarting] = useState("");
+  const [monthly, setMonthly] = useState("");
+
+  useEffect(() => {
+    if (!goal) return;
+    setTarget(String(goal.target_value ?? ""));
+    setDate(goal.target_date ?? "");
+    setStarting(String(goal.starting_value ?? ""));
+    setMonthly(String(goal.monthly_contribution ?? ""));
+  }, [goal]);
+
+  if (!goal) {
+    // No goal row: say so rather than rendering a form whose save has nowhere
+    // to go. Creating one from here would invent a target.
+    return (
+      <section className="mb-4 rounded-2xl border bg-card p-5">
+        <div className="mb-1 text-sm font-medium">Objective</div>
+        <p className="text-xs text-muted-foreground">
+          No objective set yet. Create one on the Goal screen — the dashboard, the goal screen
+          and the committee prompt all read that single row.
+        </p>
+      </section>
+    );
+  }
+
+  const onSave = () => {
+    const t = Number(target);
+    const s = Number(starting);
+    const m = Number(monthly);
+    if (!Number.isFinite(t) || t <= 0) return toast.error("Target value must be a positive number");
+    if (!Number.isFinite(s) || s < 0) return toast.error("Starting value cannot be negative");
+    if (!Number.isFinite(m) || m < 0) return toast.error("Monthly contribution cannot be negative");
+    if (!date) return toast.error("Set a target date");
+    // A target date in the past makes every CAGR and probability figure
+    // divide by a negative horizon. Reject it here rather than rendering one.
+    if (!isFutureLocalDate(date)) {
+      return toast.error("The target date must be in the future");
+    }
+    update.mutate(
+      {
+        id: goal.id,
+        target_value: t,
+        target_date: date,
+        starting_value: s,
+        monthly_contribution: m,
+      },
+      {
+        onSuccess: () => toast.success("Objective saved"),
+        onError: (e) => toast.error((e as Error).message),
+      },
+    );
+  };
+
+  return (
+    <section className="mb-4 rounded-2xl border bg-card p-5">
+      <div className="mb-1 text-sm font-medium">Objective</div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        One objective, read by the dashboard, the goal screen and the committee prompt. Editing it
+        here and editing it on the Goal screen change the same row — there is no second copy.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-[180px_180px_180px_180px_auto]">
+        <div>
+          <Label className="text-xs">Target value ($)</Label>
+          <Input type="number" min={0} value={target} onChange={(e) => setTarget(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-xs">Target date</Label>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-xs">Starting value ($)</Label>
+          <Input type="number" min={0} value={starting} onChange={(e) => setStarting(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-xs">Monthly contribution ($)</Label>
+          <Input type="number" min={0} value={monthly} onChange={(e) => setMonthly(e.target.value)} />
+        </div>
+        <div className="flex items-end">
+          <Button size="sm" onClick={onSave} disabled={update.isPending}>
+            {update.isPending ? "Saving…" : "Save objective"}
           </Button>
         </div>
       </div>
@@ -282,6 +388,7 @@ function SettingsPage() {
       <div className="mb-4">
         <BalanceImport />
       </div>
+      <ObjectiveCard />
       <IpsLiteCard />
       <MarginRateCard />
       {/* ACCOUNTS */}
@@ -469,9 +576,6 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
     name: account.name,
     account_type: account.account_type,
     broker: account.broker ?? "",
-    starting_value: account.starting_value ?? 0,
-    target_value: account.target_value ?? 0,
-    target_date: account.target_date ?? "",
     cash: account.cash ?? 0,
     margin_used: account.margin_used ?? 0,
     margin_limit: account.margin_limit ?? 0,
@@ -486,9 +590,11 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
         name: form.name,
         account_type: form.account_type,
         broker: form.broker || null,
-        starting_value: Number(form.starting_value) || 0,
-        target_value: form.target_value ? Number(form.target_value) : null,
-        target_date: form.target_date || null,
+        // starting_value / target_value / target_date are deliberately NOT
+        // written. They are a second objective that nothing in the app reads —
+        // the dashboard, the goal screen and the committee prompt all read the
+        // `goals` row. Editing them here looked like setting a target and set
+        // nothing. See the Objective card above.
         cash: Number(form.cash) || 0,
         margin_used: Number(form.margin_used) || 0,
         margin_limit: Number(form.margin_limit) || 0,
@@ -521,15 +627,17 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             Cash {fmtUSD(account.cash)} · BP {fmtUSD(account.buying_power)}
+            {/* A target recorded on the account itself is shown as what it is:
+                a leftover that nothing reads. Hiding it would make the value
+                vanish silently; presenting it as "Target" implied it drove
+                something. The objective the app actually uses is the goal. */}
             {account.target_value ? (
               <>
-                {" · Target "}
+                {" · unused account target "}
                 {fmtUSD(account.target_value)}
                 {account.target_date ? ` by ${account.target_date}` : ""}
               </>
-            ) : (
-              " · No target set"
-            )}
+            ) : null}
             {account.last_synced_at && (
               <> · Last sync {formatDistanceToNow(new Date(account.last_synced_at), { addSuffix: true })}</>
             )}
@@ -583,15 +691,6 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
           </Field>
           <Field label="Broker">
             <Input value={form.broker} onChange={(e) => setForm({ ...form, broker: e.target.value })} placeholder="Fidelity" />
-          </Field>
-          <Field label="Starting value ($)">
-            <Input type="number" value={form.starting_value} onChange={(e) => setForm({ ...form, starting_value: +e.target.value })} />
-          </Field>
-          <Field label="Target value ($)">
-            <Input type="number" value={form.target_value} onChange={(e) => setForm({ ...form, target_value: +e.target.value })} />
-          </Field>
-          <Field label="Target date">
-            <Input type="date" value={form.target_date ?? ""} onChange={(e) => setForm({ ...form, target_date: e.target.value })} />
           </Field>
           <Field label="Cash ($)">
             <Input type="number" value={form.cash} onChange={(e) => setForm({ ...form, cash: +e.target.value })} />
