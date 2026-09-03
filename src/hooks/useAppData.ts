@@ -1,7 +1,9 @@
 // Central data hooks for the Investment Companion (all RLS-scoped to auth.uid()).
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
 import { MARGIN_POLICY_UNSET, type MarginPolicy } from "@/lib/marginCost";
+import { scopedRows, type AccountScope } from "@/lib/accountTotals";
 
 export type Goal = {
   id: string;
@@ -144,7 +146,18 @@ export function useGoal() {
   return { ...query, update };
 }
 
-export function useHoldings() {
+/**
+ * Every holding row the user owns, across every account.
+ *
+ * Renamed from `useHoldings` deliberately. It used to be the default, which
+ * meant a screen got the whole household unless it remembered to filter — and
+ * the dashboard, portfolio and goal figures all blended TOD with the IRA, the
+ * kids' accounts, the 529s and crypto. Callers that genuinely want the whole
+ * household now have to say so at the call site.
+ *
+ * For a single account use `useScopedHoldings`.
+ */
+export function useAllHoldings() {
   return useQuery({
     queryKey: ["holdings"],
     queryFn: async (): Promise<Holding[]> => {
@@ -156,6 +169,27 @@ export function useHoldings() {
       return (data ?? []) as Holding[];
     },
   });
+}
+
+/**
+ * Holdings for one scope. There is no unscoped variant on purpose.
+ *
+ * `{ kind: "none" }` yields an empty list, never a fallback to everything —
+ * a silent all-accounts fallback is exactly what produced the wrong totals.
+ */
+export function useScopedHoldings(
+  scope: AccountScope,
+  { includeUnassigned = false }: { includeUnassigned?: boolean } = {},
+) {
+  const query = useAllHoldings();
+  const all = query.data;
+  // The filter itself is `scopedRows`, pure and tested there — this hook is
+  // only the React wiring around it.
+  const data = useMemo(
+    () => scopedRows(all ?? [], scope, { includeUnassigned }),
+    [all, scope, includeUnassigned],
+  );
+  return { ...query, data };
 }
 
 export function useAccounts() {
@@ -204,40 +238,81 @@ export function useAccounts() {
   return { ...query, create, update, remove };
 }
 
-// Aggregated view across all accounts — used by Dashboard/Portfolio/Prompt center.
-export function useAccount() {
+/**
+ * Cash / margin figures for one scope, and the write path back to them.
+ *
+ * This replaces `useAccount()`, which summed cash, margin_used, margin_limit and
+ * buying_power across every account and returned that blend to the dashboard,
+ * the portfolio, the goal screen and the prompt builder. There was no scope
+ * argument, so no caller could opt out of the blend, and every screen that also
+ * read `selectedAccount` used the aggregate as a `??` fallback — so a missing
+ * figure on the selected account silently became the household's.
+ *
+ * The `upsert` was worse: it wrote to `accounts[0]` no matter which account was
+ * selected. Editing "Cash & margin" while looking at the IRA wrote the IRA's
+ * numbers onto the first account. That is a data-corruption path, and it is why
+ * the mutation now refuses anything but a single named account.
+ */
+export type ScopedBalance = {
+  cash: number;
+  margin_used: number;
+  margin_limit: number;
+  buying_power: number;
+  last_synced_at: string | null;
+};
+
+/** Sum a field across accounts, tolerating nulls from the database. */
+const sumField = (accounts: Account[], key: keyof ScopedBalance): number =>
+  accounts.reduce((s, a) => s + Number((a[key as keyof Account] as number | null) || 0), 0);
+
+/** Latest non-null sync timestamp, or null when nothing has ever synced. */
+const latestSync = (accounts: Account[]): string | null =>
+  accounts
+    .map((a) => a.last_synced_at)
+    .filter((t): t is string => Boolean(t))
+    .sort()
+    .pop() ?? null;
+
+export function useScopedAccount(scope: AccountScope) {
   const qc = useQueryClient();
   const { data: accounts = [], isLoading } = useAccounts();
-  const aggregate = accounts.length
-    ? {
-        cash: accounts.reduce((s, a) => s + Number(a.cash || 0), 0),
-        margin_used: accounts.reduce((s, a) => s + Number(a.margin_used || 0), 0),
-        margin_limit: accounts.reduce((s, a) => s + Number(a.margin_limit || 0), 0),
-        buying_power: accounts.reduce((s, a) => s + Number(a.buying_power || 0), 0),
-        last_synced_at: accounts
-          .map((a) => a.last_synced_at)
-          .filter(Boolean)
-          .sort()
-          .pop() as string | null | undefined,
-      }
-    : null;
+
+  const data = useMemo<ScopedBalance | null>(() => {
+    if (scope.kind === "none") return null;
+    // An "all accounts" scope still blends — but now only because a caller
+    // asked for it by name, and `scopeLabel` puts that on screen.
+    const rows =
+      scope.kind === "all" ? accounts : accounts.filter((a) => a.id === scope.accountId);
+    // A scope that resolves to no rows is unknown, not zero. Returning zeroes
+    // here would render "$0.00 cash" for an account that was simply not found.
+    if (rows.length === 0) return null;
+    return {
+      cash: sumField(rows, "cash"),
+      margin_used: sumField(rows, "margin_used"),
+      margin_limit: sumField(rows, "margin_limit"),
+      buying_power: sumField(rows, "buying_power"),
+      last_synced_at: latestSync(rows),
+    };
+  }, [accounts, scope]);
+
   const upsert = useMutation({
     mutationFn: async (patch: Partial<Account>) => {
-      const primary = accounts[0];
-      const { data: userData } = await supabase.auth.getUser();
-      if (primary?.id) {
-        const { error } = await supabase.from("accounts").update(patch).eq("id", primary.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("accounts")
-          .insert({ ...patch, name: patch.name ?? "Main", user_id: userData.user!.id });
-        if (error) throw error;
+      // Deliberately no "write to the first account" fallback and no insert.
+      // Both were silent: the first wrote one account's figures onto another,
+      // the second invented an account named "Main". Accounts are created on
+      // the Accounts screen and by import, where the user can see what happens.
+      if (scope.kind !== "account") {
+        throw new Error(
+          "Select a single account before saving cash and margin — these figures belong to one account, not to a blend.",
+        );
       }
+      const { error } = await supabase.from("accounts").update(patch).eq("id", scope.accountId);
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
   });
-  return { data: aggregate, isLoading, upsert };
+
+  return { data, isLoading, upsert };
 }
 
 

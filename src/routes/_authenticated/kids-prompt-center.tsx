@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 import { FAMILY_POLICY, ageOf, nextContributionDate } from "@/lib/data/familyPolicy";
 import { KIDS_SEED, type KidAccount } from "@/lib/data/kidsSeed";
-import { useAccounts, useHoldings } from "@/hooks/useAppData";
+import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD } from "@/lib/finance";
 
@@ -18,7 +18,7 @@ const KID_NAMES = ["Karim", "Zain", "Jude"];
 
 function Page() {
   const { data: accounts = [] } = useAccounts();
-  const { data: allHoldings = [] } = useHoldings();
+  const { data: allHoldings = [] } = useAllHoldings();
   const dbKids = accounts.filter((a) => KID_NAMES.includes(a.name));
   const kidsData: KidAccount[] = dbKids.length
     ? dbKids.map((a) => ({

@@ -4,13 +4,13 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getEarningsCalendarFn } from "@/lib/calendarServer";
-import { useHoldings, useUniverse } from "@/hooks/useAppData";
+import { useAllHoldings, useUniverse } from "@/hooks/useAppData";
 import { resolveUniverse, universeEmptyReason, heldSymbolSet, normaliseSymbol } from "@/lib/universe";
 
 export const Route = createFileRoute("/_authenticated/earnings")({ component: Page });
 
 function Page() {
-  const { data: holdings = [] } = useHoldings();
+  const { data: holdings = [] } = useAllHoldings();
   const { data: universe = [], isLoading: universeLoading } = useUniverse();
   const universeSymbols = universe.map((u) => u.symbol);
   const heldSymbols = holdings.map((h) => h.symbol);

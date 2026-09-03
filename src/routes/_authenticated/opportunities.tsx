@@ -4,7 +4,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getQuotesFn } from "@/lib/marketServer";
-import { useHoldings, useUniverse } from "@/hooks/useAppData";
+import { useAllHoldings, useUniverse } from "@/hooks/useAppData";
 import { resolveUniverse, universeEmptyReason, heldSymbolSet, normaliseSymbol } from "@/lib/universe";
 import { fmtUSD } from "@/lib/finance";
 import { cn } from "@/lib/utils";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/opportunities")({ component: Page });
 
 function Page() {
-  const { data: holdings = [] } = useHoldings();
+  const { data: holdings = [] } = useAllHoldings();
   const { data: universe = [], isLoading: universeLoading } = useUniverse();
   // Same normalisation as the scan list, or the "Held" badge silently
   // disappears for a symbol stored as "msft" (Copilot, post-merge review).

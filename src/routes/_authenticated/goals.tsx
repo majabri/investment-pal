@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
 import { AccountNotice } from "@/components/app/AccountNotice";
-import { useAccountContext, selectAccountHoldings } from "@/contexts/AccountContext";
+import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
 import { StatCard } from "@/components/app/StatCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useGoal, useHoldings, useAccount } from "@/hooks/useAppData";
+import { useGoal, useScopedHoldings, useScopedAccount } from "@/hooks/useAppData";
+import { accountTotals, scopeLabel } from "@/lib/accountTotals";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import {
@@ -45,8 +46,7 @@ export const Route = createFileRoute("/_authenticated/goals")({
 
 function GoalsPage() {
   const { data: goal, update } = useGoal();
-  const { data: holdings = [] } = useHoldings();
-  const { data: account } = useAccount();
+
 
   const [name, setName] = useState("");
   const [starting, setStarting] = useState(0);
@@ -68,7 +68,14 @@ function GoalsPage() {
     }
   }, [goal]);
 
-  const { selectedAccount, status: accountStatus } = useAccountContext();
+  const { status: accountStatus } = useAccountContext();
+  // The goal is measured against ONE account's value. It used to read every
+  // holding the user owned and fall back to the household's summed cash, so
+  // progress towards a single-account target counted the kids' 529s.
+  const scope = useAccountScope();
+  const { data: holdings } = useScopedHoldings(scope, { includeUnassigned: true });
+  const { data: balance } = useScopedAccount(scope);
+  const scopeName = scopeLabel(scope);
   const goalSymbols = useMemo(() => [...new Set(holdings.map((h) => h.symbol))], [holdings]);
   const { data: liveQuotes } = useQuery({
     queryKey: ["goal-quotes", goalSymbols.join(",")],
@@ -76,15 +83,15 @@ function GoalsPage() {
     enabled: goalSymbols.length > 0,
     refetchInterval: 60 * 1000,
   });
-  const portfolioValue = useMemo(() => {
-    const scoped = selectAccountHoldings(holdings, selectedAccount?.id ?? null, {
-      includeUnassigned: true,
-    });
-    const positions = scoped.reduce((s, h) => s + h.quantity * (liveQuotes?.[h.symbol]?.price ?? h.current_price), 0);
-    const cash = Number(selectedAccount?.cash ?? account?.cash ?? 0);
-    const marginUsed = Number(selectedAccount?.margin_used ?? 0);
-    return positions + cash - marginUsed; // net equity — same base as the Office
-  }, [holdings, account, selectedAccount, liveQuotes]);
+  const portfolioValue = useMemo(
+    () =>
+      accountTotals(
+        holdings,
+        balance,
+        (h) => liveQuotes?.[h.symbol]?.price ?? h.current_price,
+      ).totalAccountValue, // net equity — same arithmetic as the Office
+    [holdings, balance, liveQuotes],
+  );
 
   const metrics = useMemo(() => {
     if (!date) return null;
@@ -180,10 +187,16 @@ function GoalsPage() {
         </div>
 
         <div className="space-y-4">
+          {/* Named, because progress towards a target is meaningless without
+              knowing which account it is progress in. */}
           <StatCard
             label="Current value"
-            value={fmtUSD(portfolioValue)}
-            hint={`Progress ${metrics ? fmtPct(metrics.progress) : "—"}`}
+            value={balance === null ? "—" : fmtUSD(portfolioValue)}
+            hint={
+              balance === null
+                ? scopeName
+                : `${scopeName} · progress ${metrics ? fmtPct(metrics.progress) : "—"}`
+            }
           />
           <StatCard
             label="Required CAGR"
