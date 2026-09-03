@@ -27,6 +27,7 @@ import { useAccountContext, selectAccountHoldings } from "@/contexts/AccountCont
 import { AccountNotice } from "@/components/app/AccountNotice";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { dailyMarginInterest, rateStatus } from "@/lib/marginCost";
 import {
   useGoal,
   useProfile,
@@ -266,7 +267,11 @@ function Dashboard() {
         const gross = amirHs.reduce((x, h) => x + h.quantity * px(h), 0) + Number(selectedAccount?.cash ?? 0);
         const net = gross - marginUsed;
         const equityPct = gross > 0 ? net / gross : 1;
-        const dailyInterest = (marginUsed * 0.11825) / 365;
+        // From IPS policy (ADR-APP-007), never a constant. null when the rate
+        // is unset, and the strip then suppresses the figure rather than
+        // showing a cost computed from a fallback.
+        const dailyInterest = dailyMarginInterest(marginUsed, ipsLite);
+        const rateState = rateStatus(ipsLite);
         const lastUpdate = amirHs.reduce<string | null>((m, h) => {
           const u = (h as { updated_at?: string }).updated_at ?? null;
           return u && (!m || u > m) ? u : m;
@@ -293,9 +298,35 @@ function Dashboard() {
             </span>
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground">
-              Margin {marginUsed > 0 ? `${fmtUSD(marginUsed)} · ~${fmtUSD(dailyInterest, 2)}/day interest · equity ${fmtPct(equityPct)}` : "not set"}
+              Margin{" "}
+              {marginUsed > 0
+                ? `${fmtUSD(marginUsed)} · ${
+                    dailyInterest == null
+                      ? "margin rate not set"
+                      : `~${fmtUSD(dailyInterest, 2)}/day interest`
+                  } · equity ${fmtPct(equityPct)}`
+                : "not set"}
             </span>
             <span className="text-muted-foreground">·</span>
+            {/* Rate staleness, flagged only when there is a margin balance for
+                it to matter to. Amber, not red: an ageing rate is a prompt to
+                re-check, not a policy breach — those keep red to themselves. */}
+            {marginUsed > 0 && rateState.kind === "stale" ? (
+              <>
+                <span className="font-medium text-amber-500">
+                  Margin rate {rateState.ageDays}d old
+                </span>
+                <span className="text-muted-foreground">·</span>
+              </>
+            ) : null}
+            {marginUsed > 0 && rateState.kind === "unset" ? (
+              <>
+                <Link to="/settings" className="font-medium text-amber-500 hover:underline">
+                  Set margin rate →
+                </Link>
+                <span className="text-muted-foreground">·</span>
+              </>
+            ) : null}
             {breaches.length === 0 ? (
               <span className="text-emerald-500">Constitution: clean</span>
             ) : (

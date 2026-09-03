@@ -197,6 +197,7 @@ function PromptCenter() {
       ipsPositionCapPct: ipsLite.position_cap_pct,
       ipsPositionCapHard: ipsLite.position_cap_hard,
       ipsMarginCapPct: ipsLite.margin_cap_pct,
+      marginPolicy: ipsLite,
       holdings: holdings.map((h) => ({
         symbol: h.symbol,
         quantity: h.quantity,

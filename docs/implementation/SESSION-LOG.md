@@ -183,3 +183,86 @@ Reverted.
 - **Item 3 — ADR-APP-007 (margin rate):** ⛔ blocked pending Amir's four
   sign-off values. The rate disagreement above strengthens the case.
 - **Item 4 — PR-UI-3:** decision card against `recommendation.schema.json`.
+
+---
+
+## 2026-09-03 — Master instruction, four stages, run continuously
+
+Executed `CLAUDE-CODE-MASTER-INSTRUCTION-2026-09-02.md`, which supersedes the
+UI-redesign and 4-item handoffs. Per-stage review gates removed; self-merge on
+a green gate.
+
+### What merged
+
+| Stage | PR | What |
+|---|---|---|
+| 1 | #103 | Decisions surface on the canonical 14-field contract |
+| 2 | #104 | `investment_universe` replaces the frozen ticker lists |
+| 3 | #105 | IA collapse, 18 flat entries → 7 sections with tabs |
+| 4 | #106 | Margin rate becomes IPS policy; no rate in code |
+
+### ADRs written
+
+- **ADR-APP-007** — the margin rate is IPS policy; unset suppresses the cost
+  figure and never zeroes.
+- **ADR-APP-008** — canonical recommendation contract (14-field, plus
+  `objective_id`), and the two deliberate column divergences.
+
+### OD-008 resolved
+
+The 14-field `recommendation.schema.json` in `08 APIs/contracts/` is canonical;
+the 10-field copy in `24 Schemas/` is superseded. Recorded in
+`docs/open-decisions/OD-008-...` and ADR-APP-008.
+
+### Contradictions found against the master instruction
+
+The instruction asked for these to be reported rather than silently absorbed.
+
+1. **Both schema files are still discoverable in Drive.** Claude Code has no
+   write access to the certified repository, so marking the 10-field copy
+   superseded remains Amir's action. Until then a future session can still pick
+   the wrong one — the defect OD-008 identified is only half closed.
+2. **`ADR-APP-006` was already taken** (server-function access controls), as the
+   instruction warned. 007 went to margin per the instruction's reservation, so
+   the divergence ADR is **008**.
+3. **The two 12.075% prompt literals** were not mentioned in the master
+   instruction's Stage 4, which named only the two 11.825% sites. There were
+   **ten** rate constants in total, not two: the two named, plus eight in the
+   committee prompt templates, two of which disagreed at 12.075%. All ten are
+   now gone.
+4. **The extractor does not write the four new provenance columns.**
+   `ips_version`, `model_version`, `prompt_version` and `objective_id` will read
+   "Not captured" on new rows as well as old until it does. Visible by design
+   rather than hidden; the obvious next piece of work.
+
+### Ticker lists still hardcoded, outside Stage 2
+
+Stage 2 named `earnings.tsx:11` and `opportunities.tsx:13`. Three others exist
+and were left alone deliberately:
+
+- `src/lib/data/familyPolicy.ts` — family policy core/preferred names
+- `src/routes/_authenticated/watchlist.tsx` — themed watchlist groups
+- `src/routes/_authenticated/prompt-center.tsx:209` — a watchlist fed into the
+  committee prompt. **This one is worth a decision**: it changes what the
+  committee sees, which is closer to money than a screening page.
+
+(`committeeScorecard.ts` matches a ticker-array search but holds action words,
+not symbols — a false positive.)
+
+### Still outstanding for Amir
+
+- Enter the current margin rate in Settings. The app ships with it unset: no
+  interest cost on the dashboard, and the committee told the rate is unknown.
+- Mark the 10-field schema superseded in Drive.
+- Delete the stale `ui/pr-0-test-harness` branch — the git proxy in this
+  sandbox refuses ref deletions, so it needs the GitHub UI.
+- Superseded PRs #99, #100, #101, #102 — see the report.
+
+### Gate
+
+Every stage passed `bun install --frozen-lockfile` → `bun run typecheck` →
+`bun run test:typecheck` → `bun test` → dev-server boot. Test count went from
+55 to 114. Negative controls were run rather than assumed on each new guard:
+an unset rate falling back to zero, a `DEFAULT` in the margin migration, a
+reintroduced rate constant, and a nav tab removed from the model all fail their
+respective tests.
