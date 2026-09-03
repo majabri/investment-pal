@@ -202,7 +202,15 @@ function PortfolioPage() {
           value={noScope ? "—" : fmtUSD(totalAccountValue)}
           hint={noScope ? scopeName : `${scopeName} · gross − margin loan · matches Fidelity's Total account value`}
         />
-        <StatCard label="Total Gain/Loss" value={`${fmtUSD(pl)} (${fmtPct(plPct)})`} tone={pl >= 0 ? "positive" : "negative"} />
+        {/* Same rule as the cards above: no scope, no figure. "$0.00 (0.00%)"
+            reads as "this account is flat", which is a different claim from
+            "no account is selected". */}
+        <StatCard
+          label="Total Gain/Loss"
+          value={noScope ? "—" : `${fmtUSD(pl)} (${unrealizedPLPct == null ? "—" : fmtPct(plPct)})`}
+          hint={scopeName}
+          tone={noScope ? "default" : pl >= 0 ? "positive" : "negative"}
+        />
         <StatCard
           label="Buying power"
           value={noScope ? "—" : fmtUSD(balance!.buying_power)}

@@ -321,7 +321,12 @@ function Dashboard() {
                 <span className="text-muted-foreground">·</span>
               </>
             ) : null}
-            {breaches.length === 0 ? (
+            {/* "Constitution: clean" over an unresolved scope asserts that
+                nothing breached, having checked nothing. Say which scope
+                instead. */}
+            {noScope ? (
+              <span className="text-muted-foreground">Constitution: {scopeName.toLowerCase()}</span>
+            ) : breaches.length === 0 ? (
               <span className="text-emerald-500">Constitution: clean</span>
             ) : (
               <span className="font-medium text-red-500">⚠ {breaches.join(" · ")}</span>
@@ -454,13 +459,15 @@ function Dashboard() {
           }
           icon={<Wallet className="h-4 w-4 text-muted-foreground" />}
         />
+        {/* "$0.00" with a green up-arrow is a claim that the account is flat.
+            An unresolved scope has no P/L to report, so it reports none. */}
         <StatCard
           label="Unrealized P/L"
-          value={fmtUSD(totalPL)}
-          hint={unrealizedPLPct == null ? "—" : fmtPct(unrealizedPLPct)}
-          tone={totalPL >= 0 ? "positive" : "negative"}
+          value={noScope ? "—" : fmtUSD(totalPL)}
+          hint={noScope ? scopeName : `${scopeName} · ${unrealizedPLPct == null ? "no cost basis recorded" : fmtPct(unrealizedPLPct)}`}
+          tone={noScope ? "default" : totalPL >= 0 ? "positive" : "negative"}
           icon={
-            totalPL >= 0 ? (
+            noScope ? undefined : totalPL >= 0 ? (
               <TrendingUp className="h-4 w-4 text-success" />
             ) : (
               <TrendingDown className="h-4 w-4 text-destructive" />
@@ -477,9 +484,11 @@ function Dashboard() {
           label="Goal progress"
           value={goalMetrics ? fmtPct(goalMetrics.progress) : "—"}
           hint={
-            goal
-              ? `${fmtUSD(portfolioValue)} → ${fmtUSD(goal.target_value)} by ${goal.target_date}`
-              : "Set a goal"
+            !goal
+              ? "Set a goal"
+              : noScope
+                ? `${scopeName} · target ${fmtUSD(goal.target_value)} by ${goal.target_date}`
+                : `${scopeName} · ${fmtUSD(portfolioValue)} → ${fmtUSD(goal.target_value)} by ${goal.target_date}`
           }
           icon={<TargetIcon className="h-4 w-4 text-primary" />}
         />
