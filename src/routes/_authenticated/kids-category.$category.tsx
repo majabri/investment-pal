@@ -48,8 +48,14 @@ const CATEGORIES: Record<string, CategoryConfig> = Object.assign(Object.create(n
   },
 });
 
-/** Known category names, for the unknown-category message. */
-export const KIDS_CATEGORIES = ["529", "crypto"] as const;
+/**
+ * Known category names, for the unknown-category message.
+ *
+ * Derived, not retyped: a hand-written copy drifts the moment a category is
+ * added or removed, and the drift shows up as an error message that lies about
+ * what is available. Safe on a null-prototype object.
+ */
+export const KIDS_CATEGORIES = Object.keys(CATEGORIES);
 
 /** Own-property lookup only. Belt and braces alongside the null prototype. */
 export function categoryConfig(category: string): CategoryConfig | null {
