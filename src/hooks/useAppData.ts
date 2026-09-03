@@ -6,7 +6,7 @@ import { MARGIN_POLICY_UNSET, type MarginPolicy } from "@/lib/marginCost";
 import { scopedRows, type AccountScope } from "@/lib/accountTotals";
 import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 import { localIsoDate } from "@/lib/localDate";
-import { isDuplicateRowError } from "@/lib/portfolioSummary";
+import { isUniqueViolation } from "@/lib/postgresError";
 
 export type Goal = {
   id: string;
@@ -505,7 +505,7 @@ export function useRecordSnapshot() {
       // that as an error would show the user a failure for working correctly.
       // Every other error still throws: a permissions failure or a missing
       // table must not be swallowed into a silently non-recording series.
-      if (error && !isDuplicateRowError(error)) throw error;
+      if (error && !isUniqueViolation(error)) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["portfolio_snapshots"] }),
   });

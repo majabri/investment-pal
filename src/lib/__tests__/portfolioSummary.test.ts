@@ -8,7 +8,6 @@ import {
   balanceSeries,
   dayChange,
   goalProgress,
-  isDuplicateRowError,
   performance,
   seriesInRange,
   CHART_RANGES,
@@ -393,36 +392,3 @@ describe("day change", () => {
   });
 });
 
-describe("a duplicate day is the index working, not a failure", () => {
-  test("a Postgres unique violation is recognised", () => {
-    // What Supabase returns when the partial unique index on
-    // (user_id, account_id, snapshot_date) rejects the second insert.
-    expect(
-      isDuplicateRowError({
-        code: "23505",
-        message: 'duplicate key value violates unique constraint "portfolio_snapshots_one_per_account_day"',
-      }),
-    ).toBe(true);
-  });
-
-  test("every other error is still an error", () => {
-    // Narrow on purpose. Swallowing a permissions failure or a missing table
-    // would hide the series quietly failing to record at all — which is worse
-    // than the duplicate this exists to tolerate, because nothing would show.
-    expect(isDuplicateRowError({ code: "42501", message: "permission denied" })).toBe(false);
-    expect(isDuplicateRowError({ code: "42P01", message: "relation does not exist" })).toBe(false);
-    expect(isDuplicateRowError({ message: "network error" })).toBe(false);
-  });
-
-  test("non-objects are not duplicates", () => {
-    for (const v of [null, undefined, "23505", 23505, new Error("boom")]) {
-      expect(isDuplicateRowError(v)).toBe(false);
-    }
-  });
-
-  test("a numeric 23505 is not a match", () => {
-    // Postgres error codes are strings. A loose `==` here would make a numeric
-    // code from some other client pass, which is a different error entirely.
-    expect(isDuplicateRowError({ code: 23505 })).toBe(false);
-  });
-});
