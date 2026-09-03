@@ -25,6 +25,7 @@ import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
 import { accountCategory, CATEGORY_ORDER } from "@/lib/data/accountGroups";
 import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
 import { AccountNotice } from "@/components/app/AccountNotice";
+import { ReconciliationBanner } from "@/components/app/ReconciliationBanner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { dailyMarginInterest, rateStatus } from "@/lib/marginCost";
@@ -250,6 +251,7 @@ function Dashboard() {
       }
     >
       <AccountNotice status={accountStatus} />
+      <ReconciliationBanner computedTotal={portfolioValue} />
       <div className="mb-4">
         <WorkflowButtons symbols={holdings.map((h) => h.symbol)} />
       </div>
