@@ -200,6 +200,44 @@ a green gate.
 | 2 | #104 | `investment_universe` replaces the frozen ticker lists |
 | 3 | #105 | IA collapse, 18 flat entries → 7 sections with tabs |
 | 4 | #106 | Margin rate becomes IPS policy; no rate in code |
+| — | #107 | Nine post-merge review defects, all of which reached live `main` |
+
+### Nine defects shipped to `main` before being caught
+
+Recorded because the process failure matters more than the bugs.
+
+Each stage was merged as soon as `boot-gate` went green. The Copilot review on
+each PR landed **two to four minutes later**, after the merge — so #104, #105
+and #106 each deployed to a live money app carrying real defects, and all nine
+findings across those three reviews turned out to be genuine. Every one was
+reproduced locally before being fixed in #107.
+
+The three that mattered:
+
+- **The "Held" badge silently disappeared.** The scan list was normalised to
+  uppercase while the `held` set was built from raw `holdings.symbol`. A
+  position stored as `msft` stopped showing as held — still owned, the screen
+  just stopped saying so. Reproduced: `scan ["MSFT"]`, `held ["msft"]`,
+  `held.has("MSFT") === false`.
+- **`/kids-category/constructor` would have thrown.** `CATEGORIES[category]`
+  returned an inherited property, making `config` truthy before dying on
+  `config.title`. Now a null-prototype map with an `Object.hasOwn` lookup.
+- **The committee could be told `verified not-a-date`.** A malformed date was
+  echoed into the prompt as a provenance claim — the exact §27 failure
+  `marginCost.ts` exists to prevent. `rateStatus` already knew the date was
+  unverified; the prompt line ignored it.
+
+Plus: the Earnings subtitle and row badge still said "watchlist" after the page
+moved off it (Opportunities was fixed in #104 and these were missed), the nav
+lost its section and tab strip on unknown-category pages, Settings accepted
+future verified-on dates, and `KIDS_CATEGORIES` duplicated the map's keys.
+
+**The lesson, stated plainly:** `boot-gate` green is not the same as reviewed.
+Waiting the extra two to four minutes per stage for the Copilot review would
+have caught all nine before deploy, at a cost of roughly ten minutes total.
+Autonomy removed the *approval* gate; it did not remove the *review* gate, and
+treating the two as one put defects on a live money screen. #107 was held until
+its review came back.
 
 ### ADRs written
 
@@ -262,7 +300,9 @@ not symbols — a false positive.)
 
 Every stage passed `bun install --frozen-lockfile` → `bun run typecheck` →
 `bun run test:typecheck` → `bun test` → dev-server boot. Test count went from
-55 to 114. Negative controls were run rather than assumed on each new guard:
+55 to 131 (114 after stage 4, plus 17 regression tests in #107).
+
+Negative controls were run rather than assumed on each new guard:
 an unset rate falling back to zero, a `DEFAULT` in the margin migration, a
 reintroduced rate constant, and a nav tab removed from the model all fail their
 respective tests.
