@@ -4,26 +4,41 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getEarningsCalendarFn } from "@/lib/calendarServer";
-import { useHoldings } from "@/hooks/useAppData";
+import { useHoldings, useUniverse } from "@/hooks/useAppData";
+import { resolveUniverse, universeEmptyReason } from "@/lib/universe";
 
 export const Route = createFileRoute("/_authenticated/earnings")({ component: Page });
 
-const WATCH = ["NVDA","AVGO","TSM","AMD","META","COST","NFLX","NOW","PANW","MA","LLY","BRK.B","V","MSFT","AMZN","GOOGL","CRWD","LRCX","TSLA","INTU","ABT","BLK","RY","AAPL"];
-
 function Page() {
   const { data: holdings = [] } = useHoldings();
-  const symbols = [...new Set([...holdings.map((h) => h.symbol), ...WATCH])];
+  const { data: universe = [], isLoading: universeLoading } = useUniverse();
+  const universeSymbols = universe.map((u) => u.symbol);
+  const heldSymbols = holdings.map((h) => h.symbol);
+  const symbols = resolveUniverse(universeSymbols, heldSymbols);
+  const emptyReason = universeEmptyReason(universeSymbols, heldSymbols);
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["earnings-cal", symbols.join(",")],
     queryFn: () => getEarningsCalendarFn({ data: { symbols, days: 14 } }),
+    enabled: symbols.length > 0,
     refetchInterval: 60 * 60 * 1000,
   });
   const held = new Set(holdings.map((h) => h.symbol));
   return (
     <AppShell title="Earnings" subtitle="Next 14 days — held and watchlist names, live from Nasdaq's calendar">
       <Card><CardContent className="pt-6">
-        {isLoading && <p className="text-sm text-muted-foreground">Loading live earnings calendar…</p>}
-        {!isLoading && events.length === 0 && <p className="text-sm text-muted-foreground">No held/watchlist earnings in the next 14 days.</p>}
+        {(universeLoading || isLoading) && <p className="text-sm text-muted-foreground">Loading live earnings calendar…</p>}
+        {/* Distinguish "nothing to scan" from "nothing reports soon" — the old
+            copy could only ever mean the latter, because the list was baked in. */}
+        {!universeLoading && emptyReason ? (
+          <p className="text-sm text-muted-foreground">
+            {emptyReason === "none-configured"
+              ? "No investment universe configured and no holdings. Add names to investment_universe, or import a portfolio, to see their earnings dates."
+              : "No investment universe configured — showing earnings for your holdings only."}
+          </p>
+        ) : null}
+        {!universeLoading && !isLoading && !emptyReason && events.length === 0 && (
+          <p className="text-sm text-muted-foreground">No earnings for these names in the next 14 days.</p>
+        )}
         <table className="w-full text-sm">
           <tbody>
             {events.map((e) => (

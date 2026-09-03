@@ -399,6 +399,27 @@ export type IpsLite = {
   margin_cap_pct: number;
 };
 
+/**
+ * The stored investment universe.
+ *
+ * Unlike `useIpsLite`, this has NO fallback list. An empty universe means the
+ * universe is empty, and the pages say so — falling back to a baked-in set of
+ * symbols is exactly the defect this replaces.
+ */
+export function useUniverse() {
+  return useQuery({
+    queryKey: ["investment_universe"],
+    queryFn: async (): Promise<{ symbol: string }[]> => {
+      const { data, error } = await supabase
+        .from("investment_universe" as never)
+        .select("symbol")
+        .order("symbol");
+      if (error) throw error;
+      return (data ?? []) as unknown as { symbol: string }[];
+    },
+  });
+}
+
 // Signed-off defaults (ADR-APP-004): 30% soft position cap, 25% margin cap.
 export const IPS_LITE_DEFAULTS: IpsLite = {
   position_cap_pct: 30,
