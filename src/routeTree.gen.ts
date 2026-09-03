@@ -20,8 +20,6 @@ import { Route as AuthenticatedGoalsRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedIraRouteImport } from './routes/_authenticated/ira'
 import { Route as AuthenticatedJournalRouteImport } from './routes/_authenticated/journal'
 import { Route as AuthenticatedKidsRouteImport } from './routes/_authenticated/kids'
-import { Route as AuthenticatedKids529RouteImport } from './routes/_authenticated/kids-529'
-import { Route as AuthenticatedKidsCryptoRouteImport } from './routes/_authenticated/kids-crypto'
 import { Route as AuthenticatedKidsPromptCenterRouteImport } from './routes/_authenticated/kids-prompt-center'
 import { Route as AuthenticatedKidsWatchlistRouteImport } from './routes/_authenticated/kids-watchlist'
 import { Route as AuthenticatedNewsRouteImport } from './routes/_authenticated/news'
@@ -30,6 +28,7 @@ import { Route as AuthenticatedPortfolioRouteImport } from './routes/_authentica
 import { Route as AuthenticatedPromptCenterRouteImport } from './routes/_authenticated/prompt-center'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedWatchlistRouteImport } from './routes/_authenticated/watchlist'
+import { Route as AuthenticatedKidsCategoryCategoryRouteImport } from './routes/_authenticated/kids-category.$category'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
@@ -87,16 +86,6 @@ const AuthenticatedKidsRoute = AuthenticatedKidsRouteImport.update({
   path: '/kids',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedKids529Route = AuthenticatedKids529RouteImport.update({
-  id: '/kids-529',
-  path: '/kids-529',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedKidsCryptoRoute = AuthenticatedKidsCryptoRouteImport.update({
-  id: '/kids-crypto',
-  path: '/kids-crypto',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedKidsPromptCenterRoute =
   AuthenticatedKidsPromptCenterRouteImport.update({
     id: '/kids-prompt-center',
@@ -141,6 +130,12 @@ const AuthenticatedWatchlistRoute = AuthenticatedWatchlistRouteImport.update({
   path: '/watchlist',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedKidsCategoryCategoryRoute =
+  AuthenticatedKidsCategoryCategoryRouteImport.update({
+    id: '/kids-category/$category',
+    path: '/kids-category/$category',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -153,8 +148,6 @@ export interface FileRoutesByFullPath {
   '/ira': typeof AuthenticatedIraRoute
   '/journal': typeof AuthenticatedJournalRoute
   '/kids': typeof AuthenticatedKidsRoute
-  '/kids-529': typeof AuthenticatedKids529Route
-  '/kids-crypto': typeof AuthenticatedKidsCryptoRoute
   '/kids-prompt-center': typeof AuthenticatedKidsPromptCenterRoute
   '/kids-watchlist': typeof AuthenticatedKidsWatchlistRoute
   '/news': typeof AuthenticatedNewsRoute
@@ -163,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/prompt-center': typeof AuthenticatedPromptCenterRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/watchlist': typeof AuthenticatedWatchlistRoute
+  '/kids-category/$category': typeof AuthenticatedKidsCategoryCategoryRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -174,8 +168,6 @@ export interface FileRoutesByTo {
   '/ira': typeof AuthenticatedIraRoute
   '/journal': typeof AuthenticatedJournalRoute
   '/kids': typeof AuthenticatedKidsRoute
-  '/kids-529': typeof AuthenticatedKids529Route
-  '/kids-crypto': typeof AuthenticatedKidsCryptoRoute
   '/kids-prompt-center': typeof AuthenticatedKidsPromptCenterRoute
   '/kids-watchlist': typeof AuthenticatedKidsWatchlistRoute
   '/news': typeof AuthenticatedNewsRoute
@@ -185,6 +177,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/watchlist': typeof AuthenticatedWatchlistRoute
   '/': typeof AuthenticatedIndexRoute
+  '/kids-category/$category': typeof AuthenticatedKidsCategoryCategoryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -198,8 +191,6 @@ export interface FileRoutesById {
   '/_authenticated/ira': typeof AuthenticatedIraRoute
   '/_authenticated/journal': typeof AuthenticatedJournalRoute
   '/_authenticated/kids': typeof AuthenticatedKidsRoute
-  '/_authenticated/kids-529': typeof AuthenticatedKids529Route
-  '/_authenticated/kids-crypto': typeof AuthenticatedKidsCryptoRoute
   '/_authenticated/kids-prompt-center': typeof AuthenticatedKidsPromptCenterRoute
   '/_authenticated/kids-watchlist': typeof AuthenticatedKidsWatchlistRoute
   '/_authenticated/news': typeof AuthenticatedNewsRoute
@@ -209,6 +200,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/watchlist': typeof AuthenticatedWatchlistRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/kids-category/$category': typeof AuthenticatedKidsCategoryCategoryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -223,8 +215,6 @@ export interface FileRouteTypes {
     | '/ira'
     | '/journal'
     | '/kids'
-    | '/kids-529'
-    | '/kids-crypto'
     | '/kids-prompt-center'
     | '/kids-watchlist'
     | '/news'
@@ -233,6 +223,7 @@ export interface FileRouteTypes {
     | '/prompt-center'
     | '/settings'
     | '/watchlist'
+    | '/kids-category/$category'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -244,8 +235,6 @@ export interface FileRouteTypes {
     | '/ira'
     | '/journal'
     | '/kids'
-    | '/kids-529'
-    | '/kids-crypto'
     | '/kids-prompt-center'
     | '/kids-watchlist'
     | '/news'
@@ -255,6 +244,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/watchlist'
     | '/'
+    | '/kids-category/$category'
   id:
     | '__root__'
     | '/_authenticated'
@@ -267,8 +257,6 @@ export interface FileRouteTypes {
     | '/_authenticated/ira'
     | '/_authenticated/journal'
     | '/_authenticated/kids'
-    | '/_authenticated/kids-529'
-    | '/_authenticated/kids-crypto'
     | '/_authenticated/kids-prompt-center'
     | '/_authenticated/kids-watchlist'
     | '/_authenticated/news'
@@ -278,6 +266,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/watchlist'
     | '/_authenticated/'
+    | '/_authenticated/kids-category/$category'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -364,20 +353,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedKidsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/kids-529': {
-      id: '/_authenticated/kids-529'
-      path: '/kids-529'
-      fullPath: '/kids-529'
-      preLoaderRoute: typeof AuthenticatedKids529RouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/kids-crypto': {
-      id: '/_authenticated/kids-crypto'
-      path: '/kids-crypto'
-      fullPath: '/kids-crypto'
-      preLoaderRoute: typeof AuthenticatedKidsCryptoRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/kids-prompt-center': {
       id: '/_authenticated/kids-prompt-center'
       path: '/kids-prompt-center'
@@ -434,6 +409,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWatchlistRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/kids-category/$category': {
+      id: '/_authenticated/kids-category/$category'
+      path: '/kids-category/$category'
+      fullPath: '/kids-category/$category'
+      preLoaderRoute: typeof AuthenticatedKidsCategoryCategoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -446,8 +428,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIraRoute: typeof AuthenticatedIraRoute
   AuthenticatedJournalRoute: typeof AuthenticatedJournalRoute
   AuthenticatedKidsRoute: typeof AuthenticatedKidsRoute
-  AuthenticatedKids529Route: typeof AuthenticatedKids529Route
-  AuthenticatedKidsCryptoRoute: typeof AuthenticatedKidsCryptoRoute
   AuthenticatedKidsPromptCenterRoute: typeof AuthenticatedKidsPromptCenterRoute
   AuthenticatedKidsWatchlistRoute: typeof AuthenticatedKidsWatchlistRoute
   AuthenticatedNewsRoute: typeof AuthenticatedNewsRoute
@@ -457,6 +437,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedWatchlistRoute: typeof AuthenticatedWatchlistRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedKidsCategoryCategoryRoute: typeof AuthenticatedKidsCategoryCategoryRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -468,8 +449,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIraRoute: AuthenticatedIraRoute,
   AuthenticatedJournalRoute: AuthenticatedJournalRoute,
   AuthenticatedKidsRoute: AuthenticatedKidsRoute,
-  AuthenticatedKids529Route: AuthenticatedKids529Route,
-  AuthenticatedKidsCryptoRoute: AuthenticatedKidsCryptoRoute,
   AuthenticatedKidsPromptCenterRoute: AuthenticatedKidsPromptCenterRoute,
   AuthenticatedKidsWatchlistRoute: AuthenticatedKidsWatchlistRoute,
   AuthenticatedNewsRoute: AuthenticatedNewsRoute,
@@ -479,6 +458,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedWatchlistRoute: AuthenticatedWatchlistRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedKidsCategoryCategoryRoute:
+    AuthenticatedKidsCategoryCategoryRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
