@@ -1,4 +1,4 @@
-# OD-009 — The margin rate has no single source of truth (and two literals disagree)
+# OD-009 — The margin rate has no single source of truth (ten sites, two values, one of them arithmetic)
 
 - **Status:** Open
 - **Raised:** 2026-09-02
@@ -12,8 +12,9 @@ explicit line-item sign-off). This OD does not attempt to answer it. It records 
 the code actually does today**, so the decision can be made against evidence rather than
 recollection.
 
-The rate is not stored anywhere. It is a **string literal repeated in nine places across
-two files**, and the literals are not all the same number.
+The rate is not stored anywhere. It is a **constant repeated in ten places across three
+files**, and the values are not all the same number. Nine are text; the tenth is
+arithmetic on a live screen.
 
 | # | Site | Value | Hedge | On a live screen? |
 |---|---|---|---|---|
@@ -26,8 +27,25 @@ two files**, and the literals are not all the same number.
 | 7 | `src/lib/prompts.ts:1044` — `buildV5Prompt` rate note | 11.825% | "(updated)" | no |
 | 8 | `src/lib/prompts.ts:433` — **Weekly template** | **12.075%** | — | no |
 | 9 | `src/lib/prompts.ts:701` — **Universal template** | **12.075%** | "unless updated" | no |
+| 10 | `src/routes/_authenticated/index.tsx:269` — `dailyInterest` | **`0.11825`** | — | **yes — and it is arithmetic** |
 
-## What is and isn't broken right now
+### Site 10 is the one that matters most, and I missed it first time
+
+```ts
+const dailyInterest = (marginUsed * 0.11825) / 365;
+```
+
+The first nine sites are **text** — a label, or a sentence handed to the model.
+Site 10 is **arithmetic**: it multiplies a real margin balance and puts the
+result on the dashboard as a dollar figure. A wrong rate here is a wrong number
+on screen, not a wrong sentence.
+
+I did not find it in the first pass because I grepped for `11.825` and this site
+writes the rate in decimal form as `0.11825`. Worth recording as a search
+lesson: **a rate constant can be spelled at least two ways, and the arithmetic
+one is the dangerous one.** Any future sweep must cover both forms.
+
+## Which prompt builders emit which number
 
 I did not infer this from reading the templates — I ran every builder and searched its
 output for both numbers:
@@ -42,11 +60,13 @@ output for both numbers:
 | `buildUniversalPrompt` | **yes** | **yes** | no |
 | `buildWeeklyPrompt` | no | **yes** | no |
 
-**The live path is clean.** `prompt-center.tsx` is the only route that imports from
+**No live prompt carries the 12.075% figure.** `prompt-center.tsx` is the only route that imports from
 `@/lib/prompts`, and it imports exactly one builder — `buildV6Prompt`. `OS_V6_TEMPLATE`
 contains no rate of its own; the only rate in the generated prompt is the appended note at
 11.825%, matching what `MarginCard` shows. **No screen today shows or sends 12.075%.**
-This is not a live defect, and I am not reporting it as one.
+The 12.075%/11.825% *disagreement* is therefore not a live defect, and I am not reporting
+it as one. That is a narrower claim than "the live path is clean": site 10 is live, is
+arithmetic, and uses a figure Amir has now said is out of date.
 
 **Two builders are one import away from being live, and they fail differently.**
 Both are exported and covered by `promptMandate.test.ts`, so they read as supported API
@@ -68,6 +88,25 @@ prevent.
 
 **Which number is right is not mine to determine.** Both appear in prompts Amir supplied
 verbatim, on different dates. 12.075% may be a superseded quote rather than an error.
+Amir's answer on 2026-09-03 was **"neither — it has changed since"**, without supplying
+the replacement, so all ten sites are now known to be stale and the correct figure and
+its as-of date are still outstanding.
+
+### A constant is the wrong shape here, not just the wrong number
+
+Fidelity margin rates are **tiered by debit balance and float with the base rate**. A
+hardcoded constant is therefore wrong in two independent ways over time: it drifts as
+rates move, and it is wrong the moment the debit balance crosses a tier — even if
+nobody changed anything. Site 10 sits beside the C3 25% margin cap, so an understated
+rate biases the screen toward making leverage look cheaper than it is, right next to
+the control meant to limit leverage.
+
+This also settles *where* the value belongs, with evidence rather than preference.
+`ips.schema.json` in the certified repository defines **`margin_policy` as a
+first-class IPS property** — so the rate is IPS policy, not app config. Here the IPS is
+`public.ips_lite`, which today holds `position_cap_pct` and `margin_cap_pct` and **no
+rate at all**. That is the gap, and it is why `ips_lite` is the recommended home rather
+than a new table.
 
 ## Options
 
@@ -75,9 +114,10 @@ verbatim, on different dates. 12.075% may be a superseded quote rather than an e
    its as-of date, whether it is fixed or floating, and what the app does when the value
    goes stale. It is stored in `ips_lite` (recommended over a new table — the mandate
    already lives in a row, and PR #97 established reading it from data), read by both
-   `MarginCard` and the prompt builders, and all nine literals are deleted.
+   `MarginCard`, the prompt builders and the `dailyInterest` computation, and all ten
+   constants are deleted.
 2. **Delete the two 12.075% literals now; defer storage.** A minimum-scope PR that makes
-   the nine sites agree and removes the latent trap, leaving centralisation for later.
+   the ten sites agree and removes the latent trap, leaving centralisation for later.
    Still money-adjacent: it changes what a committee prompt would assert.
 3. **Do nothing until a Weekly tab is actually built.** Cheapest, and wrong — the trap is
    armed now and the next session has no reason to look.
@@ -89,7 +129,8 @@ verbatim, on different dates. 12.075% may be a superseded quote rather than an e
 Option 2 looks tempting as a quick win, but "make them agree" requires knowing which
 number is correct, which is the same sign-off option 1 needs. There is no cheaper path
 that is still safe; the only thing option 2 saves is the storage work, and that work is
-what stops the ninth literal from becoming a tenth.
+what stops the tenth constant from becoming an eleventh — and the tenth was already
+there, unnoticed, when this OD was first written.
 
 Ordering caveat: if the Weekly tab gets built before this is resolved, **option 2 becomes
 urgent on its own**, because at that moment 12.075% stops being latent.
