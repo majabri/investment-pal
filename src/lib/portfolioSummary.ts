@@ -383,3 +383,31 @@ export function dayChange(
   }
   return covered > 0 ? { amount, covered, total: positions.length } : null;
 }
+
+/**
+ * Postgres unique-violation. The one insert failure that is not a failure.
+ *
+ * `portfolio_snapshots` carries a partial unique index on
+ * `(user_id, account_id, snapshot_date)` — that index IS the one-per-day
+ * guarantee, because the client-side "have we recorded today?" check is a
+ * cached read that two surfaces can both pass before either has written.
+ * `SnapshotRecorder` renders on the dashboard and on the summary page, so the
+ * race is reachable by walking between them, not just by opening two tabs.
+ *
+ * When the index does its job the second insert returns 23505, and the correct
+ * reading of that is "today is already recorded" — the desired end state. The
+ * caller treats it as success rather than surfacing an error for an outcome it
+ * deliberately engineered.
+ *
+ * Narrow on purpose: only 23505. Every other error is still an error, because
+ * swallowing a permissions failure or a missing table would hide the snapshot
+ * series quietly failing to record at all.
+ */
+export function isDuplicateRowError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "23505"
+  );
+}
