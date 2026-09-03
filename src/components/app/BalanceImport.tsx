@@ -22,7 +22,8 @@ import {
   type BalanceFieldKey,
 } from "@/lib/balanceImport";
 import { fmtUSD } from "@/lib/finance";
-import { useRecordBalanceImport } from "@/hooks/useAppData";
+import { useIpsLite, useRecordBalanceImport } from "@/hooks/useAppData";
+import { marginRateLabel } from "@/lib/marginCost";
 
 /** Percentages print as percentages; everything else is money. */
 function displayValue(key: BalanceFieldKey, value: number): string {
@@ -36,13 +37,28 @@ export function BalanceImport() {
   const scope = useAccountScope();
   const scopeName = scopeLabel(scope);
   const record = useRecordBalanceImport();
+  const { data: ips, save: saveIps } = useIpsLite();
   const [raw, setRaw] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  // Setting the IPS margin rate is a separate, separately-ticked decision. The
+  // rate is policy (ADR-APP-007) and money-adjacent (OD-001), so it does not
+  // ride along inside "import my balances" — it is its own line item, showing
+  // the exact value and the date it would be recorded as verified.
+  const [adoptRate, setAdoptRate] = useState(true);
 
   // Parsing is pure and instant, so the preview is live — there is no "parse"
   // button whose result could go stale against an edited textarea.
   const parse = useMemo(() => parseBalanceBlock(raw), [raw]);
   const patch = useMemo(() => accountPatch(parse.fields), [parse]);
+
+  // The rate the paste carries, offered only when it is actually different
+  // from what IPS already holds. Re-confirming an identical rate would just
+  // move its as-of date forward, which claims a verification that adds nothing.
+  const pastedRate = parse.fields.marginInterestRatePct;
+  const rateDiffers = pastedRate !== null && pastedRate !== ips.margin_rate_annual_pct;
+  // The date the rate was observed at the broker, which is today — this paste
+  // came off the balances page now. Stored as ADR-APP-007's verification date.
+  const rateAsOf = new Date().toISOString().slice(0, 10);
 
   const found = BALANCE_FIELD_ORDER.filter((k) => parse.fields[k] !== null);
   const partial = !parse.empty && parse.missing.length > 0;
@@ -55,8 +71,22 @@ export function BalanceImport() {
       {
         onSuccess: () => {
           toast.success(`Balances recorded for ${scope.accountName}`);
+          // Only after the balances are safely recorded, and only when the
+          // rate line was ticked. A failure here leaves the import intact and
+          // the old rate in place, which are both correct states.
+          if (rateDiffers && adoptRate) {
+            saveIps.mutate(
+              { margin_rate_annual_pct: pastedRate, margin_rate_as_of: rateAsOf },
+              {
+                onSuccess: () => toast.success(`IPS margin rate set to ${pastedRate}%`),
+                onError: (e) =>
+                  toast.error(`Balances saved, but the margin rate was not: ${(e as Error).message}`),
+              },
+            );
+          }
           setRaw("");
           setConfirmed(false);
+          setAdoptRate(true);
         },
         onError: (e) => toast.error((e as Error).message),
       },
@@ -169,6 +199,26 @@ export function BalanceImport() {
                 These figures match my Fidelity balances page for {scope.accountName}.
               </span>
             </label>
+            {/* The margin rate is IPS policy, not an account figure, so it is
+                its own line item rather than part of the balances above. */}
+            {rateDiffers ? (
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={adoptRate}
+                  onChange={(e) => setAdoptRate(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  Also set the IPS margin rate to{" "}
+                  <span className="font-medium">{pastedRate}%</span>, verified {rateAsOf}{" "}
+                  <span className="text-muted-foreground">
+                    (currently {marginRateLabel(ips)})
+                  </span>
+                  . This changes policy for the whole app, not just this account.
+                </span>
+              </label>
+            ) : null}
           </div>
         ) : null}
 

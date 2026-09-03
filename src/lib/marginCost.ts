@@ -121,3 +121,63 @@ export function marginRatePromptLine(policy: MarginPolicy): string {
   const stale = status.kind === "stale" ? ` This value is ${status.ageDays} days old and may be out of date.` : "";
   return `Margin interest rate: ${policy.margin_rate_annual_pct}% APR (${kind}${asOf}).${stale}`;
 }
+
+/**
+ * What to show for margin interest, and where the figure came from.
+ *
+ * Stage 3 delta of the 2026-09-03 brief. The app computed a daily estimate from
+ * the IPS rate; the broker's balance import carries the interest it has
+ * ACTUALLY accrued this month. When both exist the observed figure wins — an
+ * estimate shown next to an available actual is a worse number presented with
+ * equal authority.
+ *
+ * The two are never blended, never reconciled into one figure, and never shown
+ * without saying which is which. An estimate labelled as an actual is the
+ * failure this type exists to make unrepresentable.
+ */
+export type InterestFigure =
+  /** The broker's own accrued-this-month figure. */
+  | { kind: "actual"; accruedMtd: number; importedAt: string | null }
+  /** Computed from the IPS rate. Always presented as an estimate. */
+  | { kind: "estimate"; daily: number; annual: number }
+  /** No rate set and no import — nothing honest to show. */
+  | { kind: "unavailable" };
+
+export function marginInterestFigure(args: {
+  /** From the latest balance import. `null` = no import, or the paste omitted it. */
+  accruedMtd: number | null;
+  /** When that import was taken, for the provenance label. */
+  importedAt?: string | null;
+  marginUsed: number;
+  policy: MarginPolicy;
+}): InterestFigure {
+  // Observed beats computed, unconditionally — including when the observation
+  // is zero. "Fidelity has charged nothing this month" is a fact; replacing it
+  // with an estimate of what it might charge would be inventing a broker state.
+  if (args.accruedMtd != null && Number.isFinite(args.accruedMtd)) {
+    return { kind: "actual", accruedMtd: args.accruedMtd, importedAt: args.importedAt ?? null };
+  }
+  const daily = dailyMarginInterest(args.marginUsed, args.policy);
+  if (daily == null) return { kind: "unavailable" };
+  return { kind: "estimate", daily, annual: daily * 365 };
+}
+
+/**
+ * Whether a figure is the broker's or the app's own arithmetic.
+ *
+ * Callers render this beside the number. Nothing else in the app is allowed to
+ * decide how to describe the provenance, because two screens describing it
+ * differently is how an estimate starts reading as a fact.
+ */
+export function interestProvenance(figure: InterestFigure): string {
+  switch (figure.kind) {
+    case "actual":
+      return figure.importedAt
+        ? `accrued this month, per Fidelity (imported ${figure.importedAt.slice(0, 10)})`
+        : "accrued this month, per Fidelity";
+    case "estimate":
+      return "estimated from your IPS margin rate — not the broker's figure";
+    case "unavailable":
+      return "margin rate not set and no balance imported";
+  }
+}
