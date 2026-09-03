@@ -137,19 +137,30 @@ describe("the objective has exactly one home", () => {
    * specifically these fields being SENT TO THE ACCOUNTS TABLE, so the guard
    * looks only at the text following an accounts write.
    */
+  // Two signals, unioned, because neither alone covers every write.
+  //
   // Both editors call something named `update.mutate(`, one from `useGoal` and
   // one from `useAccounts`, so the call site alone cannot tell them apart. What
   // can: the SHAPE of the payload. `account_type` and `broker` are unmistakably
   // account columns and appear in no goal write, so an objective field sharing
-  // an object with either of them is an objective being written onto an account
-  // — which is exactly the defect, and exactly what the old Settings form did.
+  // an object with either of them is an objective being written onto an
+  // account — exactly what the old Settings form did.
   const ACCOUNT_SHAPE = /(^|[^.\w])(account_type|broker)\s*:/g;
+  // But a direct `supabase.from("accounts").update({ ... })` need carry
+  // neither key, so those call sites are scanned too. Named tables only: the
+  // point is to catch a write to THIS table, not to flag every mutation.
+  const ACCOUNTS_TABLE_WRITE = /\.from\(\s*["']accounts["']\s*\)[\s\S]{0,80}?\.(update|insert|upsert)\(/g;
   const WINDOW = 700;
 
   function accountPayloads(code: string): string[] {
     const out: string[] = [];
     for (const m of code.matchAll(ACCOUNT_SHAPE)) {
       out.push(code.slice(Math.max(0, m.index - WINDOW), m.index + WINDOW));
+    }
+    for (const m of code.matchAll(ACCOUNTS_TABLE_WRITE)) {
+      // Forward only: the payload follows the call, and looking backwards here
+      // would sweep in unrelated code above it.
+      out.push(code.slice(m.index, m.index + m[0].length + WINDOW));
     }
     return out;
   }

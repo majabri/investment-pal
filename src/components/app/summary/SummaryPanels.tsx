@@ -202,10 +202,16 @@ export function BalanceOverTime({
       </CardHeader>
       <CardContent>
         {isError ? (
+          // Deliberately does not assert WHY. `isError` covers a missing table,
+          // a network failure and an RLS refusal alike, and naming one of them
+          // sends the reader to fix something that may not be broken. Say what
+          // is true — the history could not be read — and offer the likeliest
+          // cause as a possibility rather than a diagnosis.
           <p className="text-sm text-muted-foreground">
-            Snapshot storage isn&apos;t provisioned yet — the portfolio_snapshots migrations need
-            to run. Ask Lovable to apply pending migrations, then this chart starts recording
-            automatically.
+            Could not read the balance history for this account. If the
+            portfolio_snapshots migrations have not been applied yet, that is the likeliest
+            cause — ask Lovable to apply pending migrations. Otherwise this is a connection or
+            permissions problem, and the figures above are unaffected.
           </p>
         ) : scope.kind !== "account" ? (
           <p className="text-sm text-muted-foreground">
