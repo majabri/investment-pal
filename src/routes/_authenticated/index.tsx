@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { activeBuybackBySymbol, type TrimDecision } from "@/lib/buybackZones";
 import { StatCard } from "@/components/app/StatCard";
 import { ProgressChart } from "@/components/app/ProgressChart";
+import { SnapshotRecorder } from "@/components/app/SnapshotRecorder";
 import { WorkflowButtons } from "@/components/app/WorkflowButtons";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
@@ -224,7 +225,7 @@ function Dashboard() {
   return (
     <AppShell
       title={displayName ? `${greeting}, ${displayName}` : greeting}
-      subtitle="Investment Office · What changed. What matters. What to do."
+      subtitle="What changed. What matters. What to do."
       actions={
         <>
           <Button
@@ -255,6 +256,8 @@ function Dashboard() {
       }
     >
       <AccountNotice status={accountStatus} />
+      {/* Invisible: records at most one balance snapshot per account per day. */}
+      <SnapshotRecorder gross={grossValue} net={portfolioValue} marginUsed={marginUsed} />
       <ReconciliationBanner computedTotal={portfolioValue} />
       <div className="mb-4">
         <WorkflowButtons symbols={holdings.map((h) => h.symbol)} />
@@ -523,7 +526,7 @@ function Dashboard() {
       </div>
 
       <div className="mt-4">
-        <ProgressChart gross={grossValue} net={portfolioValue} marginUsed={marginUsed} />
+        <ProgressChart />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">

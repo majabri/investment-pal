@@ -1,68 +1,63 @@
-// Portfolio progress over time: records one snapshot per day automatically
-// (whenever the dashboard is opened) and charts gross vs net.
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+// Portfolio progress over time, for the selected account.
+//
+// Stage 5 rescoped this. It used to read and write `portfolio_snapshots` with
+// `scope = 'amir'` — one hardcoded series for the whole household — so the
+// chart kept blending TOD with the IRA, the kids' accounts, the 529s and crypto
+// long after Stage 1 stopped every live figure from doing it. Recording now
+// lives in `SnapshotRecorder`, so this component only draws.
+import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/lib/supabaseClient";
+import { useAccountScope } from "@/contexts/AccountContext";
+import { useSnapshots, useUnscopedSnapshotCount } from "@/hooks/useAppData";
+import { scopeLabel } from "@/lib/accountTotals";
+import { balanceSeries, summaryReadiness } from "@/lib/portfolioSummary";
 import { fmtUSD } from "@/lib/finance";
 
-interface Snap { gross: number; net: number; margin_used: number; created_at: string; }
+export function ProgressChart() {
+  const scope = useAccountScope();
+  const scopeName = scopeLabel(scope);
+  const { data: snapshots = [], isError } = useSnapshots(scope);
+  const { data: unscopedCount = 0 } = useUnscopedSnapshotCount();
 
-export function ProgressChart({ gross, net, marginUsed }: { gross: number; net: number; marginUsed: number }) {
-  const qc = useQueryClient();
-  const [unavailable, setUnavailable] = useState(false);
-
-  const { data: snaps = [] } = useQuery({
-    queryKey: ["snapshots", "amir"],
-    queryFn: async (): Promise<Snap[]> => {
-      const { data, error } = await supabase
-        .from("portfolio_snapshots" as never)
-        .select("gross,net,margin_used,created_at")
-        .eq("scope", "amir")
-        .order("created_at", { ascending: true })
-        .limit(400);
-      if (error) { setUnavailable(true); return []; }
-      return (data ?? []) as unknown as Snap[];
-    },
-  });
-
-  // Record at most one snapshot per calendar day, once real values exist.
-  useEffect(() => {
-    if (unavailable || gross <= 0) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const last = snaps.at(-1)?.created_at?.slice(0, 10);
-    if (last === today) return;
-    void (async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) return;
-      const { error } = await supabase.from("portfolio_snapshots" as never).insert({
-        user_id: auth.user.id, scope: "amir", gross, net, margin_used: marginUsed,
-      } as never);
-      if (!error) void qc.invalidateQueries({ queryKey: ["snapshots", "amir"] });
-    })();
-  }, [unavailable, gross, net, marginUsed, snaps, qc]);
-
-  const data = useMemo(() =>
-    snaps.map((s) => ({
-      date: new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      "Investments": Math.round(s.gross * 100) / 100,
-      "Account value": Math.round(s.net * 100) / 100,
-    })), [snaps]);
+  const series = useMemo(() => balanceSeries(snapshots), [snapshots]);
+  const readiness = summaryReadiness(series);
+  const data = useMemo(
+    () =>
+      series.map((p) => ({
+        date: p.date.slice(5),
+        Investments: Math.round(p.gross * 100) / 100,
+        "Account value": Math.round(p.net * 100) / 100,
+      })),
+    [series],
+  );
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Progress over time</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">Progress over time — {scopeName}</CardTitle>
+      </CardHeader>
       <CardContent>
-        {unavailable ? (
+        {isError ? (
           <p className="text-sm text-muted-foreground">
-            Snapshot storage isn&apos;t provisioned yet — the portfolio_snapshots migration needs to run.
-            Ask Lovable to apply pending migrations, then this chart starts recording automatically.
+            Snapshot storage isn&apos;t provisioned yet — the portfolio_snapshots migrations need to
+            run. Ask Lovable to apply pending migrations, then this chart starts recording
+            automatically.
           </p>
-        ) : data.length < 2 ? (
+        ) : scope.kind !== "account" ? (
           <p className="text-sm text-muted-foreground">
-            Recording daily snapshots — the chart draws itself once there are at least two days of history.
-            {data.length === 1 && " First snapshot captured today."}
+            Select a single account to see its recorded history. A blended series across accounts
+            is what this chart used to draw, and it was not a portfolio anyone holds.
+          </p>
+        ) : !readiness.chartReady ? (
+          <p className="text-sm text-muted-foreground">
+            {readiness.points === 0
+              ? "Recording daily snapshots for this account — the chart draws itself once there are two days of history."
+              : "First snapshot captured today. The chart draws once there are two — a single point is a dot, not a trend."}
+            {unscopedCount > 0
+              ? ` ${unscopedCount} older snapshot${unscopedCount === 1 ? "" : "s"} predate account scoping; they blend every account and cannot be attributed to this one, so they are not charted.`
+              : ""}
           </p>
         ) : (
           <div className="h-56">
@@ -76,11 +71,29 @@ export function ProgressChart({ gross, net, marginUsed }: { gross: number; net: 
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false}
-                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}K`} domain={["auto", "auto"]} />
+                <YAxis
+                  tick={{ fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}K`}
+                  domain={["auto", "auto"]}
+                />
                 <Tooltip formatter={(v: number) => fmtUSD(v)} />
-                <Area type="monotone" dataKey="Investments" stroke="hsl(var(--muted-foreground))" fill="none" strokeWidth={1.5} strokeDasharray="4 3" />
-                <Area type="monotone" dataKey="Account value" stroke="hsl(var(--primary))" fill="url(#g1)" strokeWidth={2} />
+                <Area
+                  type="monotone"
+                  dataKey="Investments"
+                  stroke="hsl(var(--muted-foreground))"
+                  fill="none"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="Account value"
+                  stroke="hsl(var(--primary))"
+                  fill="url(#g1)"
+                  strokeWidth={2}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>

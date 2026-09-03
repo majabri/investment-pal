@@ -27,6 +27,7 @@ import { Route as AuthenticatedOpportunitiesRouteImport } from './routes/_authen
 import { Route as AuthenticatedPortfolioRouteImport } from './routes/_authenticated/portfolio'
 import { Route as AuthenticatedPromptCenterRouteImport } from './routes/_authenticated/prompt-center'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSummaryRouteImport } from './routes/_authenticated/summary'
 import { Route as AuthenticatedWatchlistRouteImport } from './routes/_authenticated/watchlist'
 import { Route as AuthenticatedKidsCategoryCategoryRouteImport } from './routes/_authenticated/kids-category.$category'
 
@@ -125,6 +126,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSummaryRoute = AuthenticatedSummaryRouteImport.update({
+  id: '/summary',
+  path: '/summary',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedWatchlistRoute = AuthenticatedWatchlistRouteImport.update({
   id: '/watchlist',
   path: '/watchlist',
@@ -155,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/portfolio': typeof AuthenticatedPortfolioRoute
   '/prompt-center': typeof AuthenticatedPromptCenterRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/summary': typeof AuthenticatedSummaryRoute
   '/watchlist': typeof AuthenticatedWatchlistRoute
   '/kids-category/$category': typeof AuthenticatedKidsCategoryCategoryRoute
 }
@@ -175,6 +182,7 @@ export interface FileRoutesByTo {
   '/portfolio': typeof AuthenticatedPortfolioRoute
   '/prompt-center': typeof AuthenticatedPromptCenterRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/summary': typeof AuthenticatedSummaryRoute
   '/watchlist': typeof AuthenticatedWatchlistRoute
   '/': typeof AuthenticatedIndexRoute
   '/kids-category/$category': typeof AuthenticatedKidsCategoryCategoryRoute
@@ -198,6 +206,7 @@ export interface FileRoutesById {
   '/_authenticated/portfolio': typeof AuthenticatedPortfolioRoute
   '/_authenticated/prompt-center': typeof AuthenticatedPromptCenterRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/summary': typeof AuthenticatedSummaryRoute
   '/_authenticated/watchlist': typeof AuthenticatedWatchlistRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/kids-category/$category': typeof AuthenticatedKidsCategoryCategoryRoute
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/portfolio'
     | '/prompt-center'
     | '/settings'
+    | '/summary'
     | '/watchlist'
     | '/kids-category/$category'
   fileRoutesByTo: FileRoutesByTo
@@ -242,6 +252,7 @@ export interface FileRouteTypes {
     | '/portfolio'
     | '/prompt-center'
     | '/settings'
+    | '/summary'
     | '/watchlist'
     | '/'
     | '/kids-category/$category'
@@ -264,6 +275,7 @@ export interface FileRouteTypes {
     | '/_authenticated/portfolio'
     | '/_authenticated/prompt-center'
     | '/_authenticated/settings'
+    | '/_authenticated/summary'
     | '/_authenticated/watchlist'
     | '/_authenticated/'
     | '/_authenticated/kids-category/$category'
@@ -402,6 +414,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/summary': {
+      id: '/_authenticated/summary'
+      path: '/summary'
+      fullPath: '/summary'
+      preLoaderRoute: typeof AuthenticatedSummaryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/watchlist': {
       id: '/_authenticated/watchlist'
       path: '/watchlist'
@@ -435,6 +454,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPortfolioRoute: typeof AuthenticatedPortfolioRoute
   AuthenticatedPromptCenterRoute: typeof AuthenticatedPromptCenterRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedSummaryRoute: typeof AuthenticatedSummaryRoute
   AuthenticatedWatchlistRoute: typeof AuthenticatedWatchlistRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedKidsCategoryCategoryRoute: typeof AuthenticatedKidsCategoryCategoryRoute
@@ -456,6 +476,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPortfolioRoute: AuthenticatedPortfolioRoute,
   AuthenticatedPromptCenterRoute: AuthenticatedPromptCenterRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedSummaryRoute: AuthenticatedSummaryRoute,
   AuthenticatedWatchlistRoute: AuthenticatedWatchlistRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedKidsCategoryCategoryRoute:
