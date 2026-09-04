@@ -29,10 +29,11 @@ const stripComments = (src: string) =>
   src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 
 describe("theme colour tokens are used as whole colours", () => {
-  test("no production source wraps a theme token in hsl()", () => {
-    // `var(--token)`, never `hsl(var(--token))`. The doughnut always used the
-    // bare form and always rendered; the balance chart used the wrapped form
-    // and drew nothing.
+  test("no production source wraps a theme token in a colour function", () => {
+    // `var(--token)`, never `hsl(var(--token))` — nor rgb/hsla/rgba/oklch, all
+    // of which fail the same way for the same reason. The doughnut always used
+    // the bare form and always rendered; the balance chart used the wrapped
+    // form and drew nothing.
     const offenders: string[] = [];
     for (const file of productionSources()) {
       const code = stripComments(readFileSync(file, "utf8"));
@@ -51,7 +52,9 @@ describe("theme colour tokens are used as whole colours", () => {
     const css = readFileSync("src/styles.css", "utf8");
     const primary = /--primary:\s*([^;]+);/.exec(css)?.[1]?.trim();
     expect(primary).toBeDefined();
-    // A channel triplet looks like "195 78% 14%". A whole colour names a space.
+    // A bare channel triplet looks like `195 78% 14%` — it starts with a digit
+    // and only becomes a colour once a function wraps it. A whole colour starts
+    // with its own syntax: a colour-space function, or a hex literal.
     expect(primary).toMatch(/^(oklch|hsl|rgb|#)/);
   });
 });
