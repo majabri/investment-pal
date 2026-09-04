@@ -41,6 +41,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import { getEarningsCalendarFn } from "@/lib/calendarServer";
 import { computeSwing, tradingDaysUntil, type SwingResult } from "@/lib/swingScore";
+import { fmtChartUSD } from "@/lib/chartFormat";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -410,7 +411,7 @@ function PortfolioPage() {
                       borderRadius: 8,
                       color: "var(--color-popover-foreground)",
                     }}
-                    formatter={(v: number) => fmtUSD(v)}
+                    formatter={fmtChartUSD}
                   />
                   <Legend wrapperStyle={{ fontSize: 11, color: "var(--color-muted-foreground)" }} />
                 </PieChart>

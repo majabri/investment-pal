@@ -30,6 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { AccountTotals, AccountScope } from "@/lib/accountTotals";
 import { scopeLabel } from "@/lib/accountTotals";
+import { fmtChartUSD } from "@/lib/chartFormat";
 import { fmtPct, fmtUSD } from "@/lib/finance";
 import { interestProvenanceShort, marginRateLabel, type InterestFigure } from "@/lib/marginCost";
 import {
@@ -248,7 +249,7 @@ export function BalanceOverTime({
                   tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}K`}
                   domain={["auto", "auto"]}
                 />
-                <Tooltip formatter={(v: number) => fmtUSD(v)} />
+                <Tooltip formatter={fmtChartUSD} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Area
                   type="monotone"
@@ -416,7 +417,7 @@ export function AllocationPanel<T extends AllocatablePosition>({
                       <Cell key={s.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => fmtUSD(v)} />
+                  <Tooltip formatter={fmtChartUSD} />
                   <Legend wrapperStyle={{ fontSize: 11, color: "var(--color-muted-foreground)" }} />
                 </PieChart>
               </ResponsiveContainer>
