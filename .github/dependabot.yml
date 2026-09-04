@@ -18,9 +18,11 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
-    groups:
-      # Batch minor/patch bumps into one PR to reduce noise.
-      minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
+    # No `groups:` block, deliberately. ADR-APP-005 §3 requires dependency bumps
+    # to arrive as individual PRs: a grouped bump hides which package changed
+    # what, and the #70 group silently moved a build-toolchain package, passed
+    # `tsc`, and broke `main`'s boot. One PR per package is what makes the boot
+    # gate meaningful — you cannot boot-gate a bundle and learn anything about
+    # the member that broke it. Grouping was reintroduced here after that ADR
+    # and kept regenerating banned PRs (#108 most recently), which is why this
+    # comment exists rather than an empty section someone can helpfully fill in.
