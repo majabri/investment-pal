@@ -405,3 +405,113 @@ fails it too.
 - **~10 remaining `toISOString().slice(0, 10)` UTC-date uses** (calendar
   windows, price-history "today", the `decisions.decided_on` filter). Same
   class as the bug fixed in #116; the decisions one is money-adjacent.
+
+---
+
+## 2026-09-04 — Master Brief rev. 2, Stage 0 (PR triage) + chart fixes
+
+Brief re-read from Drive: `CLAUDE-CODE-MASTER-BRIEF-2026-09-03.md` **rev. 2**
+(new file id `1MTOkA0g…`; the rev. 1 id no longer resolves). Rev. 2 is
+byte-identical to rev. 1 apart from the header, the operating-mode line, a new
+**Stage 0**, and one addition to the session-close instruction. Stages 1–8 are
+unchanged and were all merged on 2026-09-03 (#114–#119).
+
+### Stage 0 — the brief's PR list was stale
+
+Every PR the brief names had already been dealt with **before the brief was
+written**:
+
+| PR | Brief says | Actual |
+|---|---|---|
+| #99 | close it | already closed 2026-09-03 |
+| #100 | **keep open**, Stage 6 re-points it | already closed 2026-09-03 |
+| #101 | close it | already closed 2026-09-03 |
+| #85 | "appears never to have been closed" — close it | closed 2026-08-27 |
+
+Stage 6 shipped anyway as #105 / ADR-APP-008, built to the 14-field schema the
+brief specifies, so #100's closure cost nothing.
+
+### What Stage 0 actually found: six open PRs
+
+| PR | Action | Why |
+|---|---|---|
+| #108 | **closed** | Grouped Dependabot PR (18 updates) — banned under ADR-APP-005 |
+| #111 | **closed** | Superseded by #121, which makes the same bump and fixes it |
+| #112 | **closed** | TypeScript 7 breaks ESLint outright — see below |
+| #110 | **closed** | Superseded by #124, re-gated on current `main` |
+| #109 | **closed** | Superseded by #125, re-gated on current `main` |
+| #121 | **merged** | recharts 2 → 3, done properly |
+
+### TypeScript 7 is blocked by the ecosystem, not by us
+
+#123 rebased #112 onto current `main` and passed the entire repo gate — `tsc`
+clean under 7.0.2, both tsconfigs, 279 tests, production build, boot on five
+routes. **It still cannot be merged.** `typescript-eslint@8.67.0` declares
+`typescript: >=4.8.4 <6.1.0` and hard-throws:
+
+```
+typescript-eslint does not support TS 7.0.
+```
+
+CI has no lint step, so nothing in the pipeline would have caught it. Copilot
+flagged the peer range; running the linter confirmed it. Tracked upstream at
+typescript-eslint#10940 for TS ≥ 7.1.
+
+**The general lesson, worth more than the bump:** ADR-APP-005 says a green
+`tsc` is not sufficient evidence and the boot check is the real gate. That is
+still true and still not enough. The boot check catches runtime breakage that
+`tsc` misses; *nothing* catches toolchain breakage that both miss. A dependency
+bump's blast radius includes every tool that consumes that dependency's API.
+
+### A live rendering bug, found by looking
+
+The balance-over-time chart on the Morning Brief and the Portfolio Summary was
+drawing **axes, grid labels and legend text, and no series at all** — no line,
+no fill. Live on `main` since Stage 5b, and inherited from the original
+`ProgressChart` before that.
+
+Cause: this theme defines its tokens as complete colours
+(`--primary: oklch(0.78 0.14 195)`), not the bare HSL channel triplets shadcn's
+default theme uses. `hsl(var(--primary))` expands to `hsl(oklch(…))`, which is
+not a valid colour, and the browser drops it silently. The doughnut in the same
+card never had the bug because it uses bare `var(--chart-N)`.
+
+Fixed in #122, with before/after browser screenshots and a source guard
+(`themeColors.test.ts`) that fails on any theme token wrapped in a colour
+function. Negative control run.
+
+**Why it survived so long:** a chart with axes and no line reads as "this
+account has no history yet", not as "this style is broken" — and this app has
+many legitimate empty states. Nothing in the type system or the test suite can
+catch an invalid CSS colour string, and the boot check only proves the route
+returns 200.
+
+**Correction:** I first reported this as a recharts 3 regression. It is not —
+recharts 2 on `main` produced identical broken output. Verified by rendering the
+same fixtures under both.
+
+### Verification method worth reusing
+
+Playwright and Chromium are available in this environment
+(`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`). Rendering the panels in a real
+browser via a temporary unauthenticated route — then deleting it — caught a bug
+that 279 unit tests, a clean typecheck and seven 200 responses all missed. The
+component harness cannot substitute: `ResponsiveContainer` measures its parent
+and happy-dom reports every element as zero-sized, so no chart body ever lays
+out under test.
+
+### Still outstanding for Amir
+
+Unchanged from 2026-09-03, plus two new items:
+
+- **Apply the three migrations** (`account_balances`,
+  `deprecate_account_objective`, `portfolio_snapshots_account_scope`).
+- **Paste a Fidelity balance block** to seed reconciliation and set the rate.
+- **Decide on dropping** the deprecated `accounts` objective columns.
+- **NEW — `.github/dependabot.yml` still configures a `minor-and-patch` group.**
+  #108 will keep coming back until that group is removed. The ban currently
+  lives in an ADR and in triage; it should live in the config.
+- **NEW — CI does not run lint, and `eslint src` reports 1402 problems**
+  (1354 errors, 48 warnings, 1340 auto-fixable — almost entirely prettier).
+  Identical under eslint 9 and 10. Either add lint to CI and pay the backlog
+  down, or accept the config is advisory; right now it is neither.
