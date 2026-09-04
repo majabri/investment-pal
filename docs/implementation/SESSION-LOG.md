@@ -455,7 +455,8 @@ typescript-eslint does not support TS 7.0.
 
 CI has no lint step, so nothing in the pipeline would have caught it. Copilot
 flagged the peer range; running the linter confirmed it. Tracked upstream at
-typescript-eslint#10940 for TS ≥ 7.1.
+[typescript-eslint/typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)
+for TS ≥ 7.1.
 
 **The general lesson, worth more than the bump:** ADR-APP-005 says a green
 `tsc` is not sufficient evidence and the boot check is the real gate. That is
