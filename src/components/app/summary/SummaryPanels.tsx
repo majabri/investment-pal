@@ -235,12 +235,20 @@ export function BalanceOverTime({
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 8 }}>
                 <defs>
+                  {/* Bare `var(--primary)`, NOT `hsl(var(--primary))`.
+                      This theme defines --primary as a complete oklch() colour,
+                      so wrapping it produced `hsl(oklch(...))` — an invalid
+                      colour the browser silently drops. The result was a chart
+                      with axes and no visible line: it looked like an empty
+                      series rather than a broken style, which is why it went
+                      unnoticed. The doughnut never had the bug because it uses
+                      bare var(--chart-N). */}
                   <linearGradient id="summaryFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
-                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.25} />
+                    <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                 <YAxis
                   tick={{ fontSize: 11 }}
@@ -254,7 +262,7 @@ export function BalanceOverTime({
                 <Area
                   type="monotone"
                   dataKey="Gross value"
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   fill="none"
                   strokeWidth={1.5}
                   strokeDasharray="4 3"
@@ -262,7 +270,7 @@ export function BalanceOverTime({
                 <Area
                   type="monotone"
                   dataKey="Account value"
-                  stroke="hsl(var(--primary))"
+                  stroke="var(--primary)"
                   fill="url(#summaryFill)"
                   strokeWidth={2}
                 />
