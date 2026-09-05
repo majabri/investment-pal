@@ -1014,3 +1014,227 @@ holding was narrower: in those files an objective field only ever appears as a
   difference is not that the code got better.
 - **Git history** still contains everything the P0 remediation removed (§5).
 - **CI still does not run lint**, unchanged since 2026-09-04.
+
+---
+
+## 2026-09-05 — Master Brief (user-agnostic rebuild), Phase 5: truth gates
+
+Four PRs.
+
+| PR | rules | what |
+|---|---|---|
+| #162 | 17, 30 | the readiness gate |
+| #163 | 17 | multi-account readiness — closes the gap #162 named |
+| #164 | 18 | AI is downstream, by construction |
+| #165 | 30 | coverage unavailable is not the same as none |
+
+### Rule 17 is a dependency table, not a switch
+
+Two failure modes, pulling in opposite directions. The one the app had:
+recommendations produced from whatever data happened to be present, because
+nothing checked and so nothing could refuse. The one an over-eager gate would
+introduce: the news page unusable because a quote is stale — and **a gate
+people route around is not a gate.**
+
+So the unit is a CAPABILITY, not a screen. `research` and `reporting` depend on
+nothing and can never be blocked; `position_sizing` depends on all seven
+checks; `goal_projection` on positions and quotes only. Two screens, two
+capabilities, two different sets of blocking inputs, from one table.
+
+**Three check states, not two.** `fail` means the check ran and the data is
+wrong — investigate. `unknown` means it could not run — import. They block
+equally and report separately, because the fix differs. Collapsing them is the
+same conflation rule 13 forbids everywhere else.
+
+Two calibrations that took thought:
+
+- **`UNSUPPORTED` reconciliation is `unknown`, not `fail`.** An account with no
+  broker figure can never reconcile; treating "no such comparison exists" as a
+  fault would block every manually-tracked account forever.
+- **A `WARNING` reconciliation passes.** Rule 11 made WARNING the band worth
+  seeing and not worth alarming; blocking on it would block on rounding drift
+  at scale.
+
+### A banner is not a gate
+
+A panel above a prompt that still asks for position sizes against unverified
+data does nothing. `PromptContext` gained a REQUIRED `readiness` field, and the
+brief opens with a block naming each unverified input and instructing the model
+not to substitute a figure, not to infer one from the others, and not to assume
+a missing figure is zero — while saying explicitly that research remains in
+scope, or the model refuses everything and the brief is worthless.
+
+Required rather than optional because rule 18 is why it is an INPUT: the gate
+is deterministic and the model cannot argue with it.
+
+### Rule 18: I found no violation, and that was the finding
+
+The one place a model's response becomes a row happens to write only
+recommendation columns. **"Happens to" is the problem.** Nothing prevented the
+next person adding `cash: parsedFromResponse`, and nothing would have noticed.
+A model told the cash balance is NOT KNOWN will helpfully estimate one, and an
+estimate written into `accounts.cash` is indistinguishable from an imported
+figure the moment it lands.
+
+The boundary throws rather than filtering — dropping the field silently would
+leave the caller believing it was saved — and matches by column NAME across all
+tables, because the point is not that `accounts.cash` is protected but that a
+column called `cash` anywhere is a claim about money.
+
+`decisions.price_at_rec` is the interesting case: it IS a price and it IS
+allowed, because the extractor reads it from the live quote map rather than
+from the response text. The boundary can see what a value is called, not where
+it came from, so the column sits in `PROVENANCE_EXEMPT` with the argument
+attached and a test asserting the argument is still true of the source.
+
+### Rule 30 found four live bugs, all the same line
+
+```ts
+const { data: events = [], isLoading } = useQuery(...)
+{!isLoading && events.length === 0 && <p>No earnings…</p>}
+```
+
+React Query settles `isLoading` to false when a query FAILS, and the `= []`
+default fills in. So on a fetch error `/geopolitics` said "Nothing
+market-relevant right now.", `/earnings` said "No earnings for these names in
+the next 14 days.", `/economic-calendar` and `/news` rendered empty with no
+message, and the committee prompt told a model `- (none)`.
+
+**"No earnings this week" is a reason to hold through the week. "We could not
+reach the source" is a reason to check first.**
+
+`coverageOf` takes the QUERY, not its defaulted data, because `isError` alone
+is not enough: a query can settle with `data` undefined and the caller's `= []`
+then makes that indistinguishable from an empty result. And an empty array that
+WAS fetched stays AVAILABLE — that is a real answer and must not be swept up.
+
+The wording is the fix, not the state: the notice says what it is NOT ("this is
+not the same as there being none"), because without that clause a user reads
+"unavailable" as "none" anyway.
+
+### A Phase 4 miss, found by sweeping
+
+Six tickers hardcoded into the earnings-calendar lookup in `prompt-center`,
+appended to every user's holdings. The Phase 4 guard scans for
+`core: ["MSFT", …]`-shaped DECLARATIONS; these were an ARGUMENT TO A FETCH.
+Worth carrying forward: a guard written against the shape a defect took last
+time will not find the same defect in a different position.
+
+---
+
+## 2026-09-05 — Master Brief (user-agnostic rebuild), Phase 6: orders, tranches, import safety
+
+Three PRs, and the last one fixes data loss that was shipping.
+
+| PR | rules | what |
+|---|---|---|
+| #166 | 19 | broker-neutral order model; `openOrdersKnown` stops being a literal |
+| #167 | 19 | lots and tranches |
+| #168 | 29 | import safety — atomic, account-scoped, theses survive |
+
+### The order model was a truth-gate fix, not a feature
+
+`readiness.ts` hardcoded `openOrdersKnown: false` for every caller because
+there was no data that could make it true. That was the honest value AND a
+permanent block on the position-sizing capability.
+
+**The distinction is not "are there orders" but "has anybody told us."**
+`accounts.orders_as_of` records when the app was last told; an account whose
+orders were read and reported nothing working IS known to have none, and an
+account nobody has read is not. A count of rows cannot tell those apart, which
+is why an empty table never becomes "no open orders".
+
+Three calibrations:
+
+- **`unknown` is a real status and counts as COMMITTED.** An order whose state
+  the adapter could not map might be working, and treating it as closed frees
+  capital the app cannot prove is free.
+- **`committedCash` is null for a working MARKET order, not zero.** A screen
+  reporting $0 committed against three working market orders tells the user
+  capital is free that is not.
+- **An over-fill is deliberately not rejected by a CHECK.** It is a data
+  problem to surface, and a constraint would discard the evidence.
+
+### The tranche rule loses money in both directions
+
+A stop entered against one lot but read as covering the whole holding leaves
+far too much size APPARENTLY protected. A position-wide stop taken for a
+tranche stop leaves the rest APPARENTLY unprotected. `holdings` — one row per
+symbol, one blended cost basis — cannot express the difference.
+
+`lotCoverage` has four answers because two of them are what a boolean loses:
+`not_recorded` (composition unknown — a tranche-scoped stop cannot be placed
+safely), `incomplete`, `mismatched` (a finding to surface, never a number to
+adjust), `complete`. **A position with no lots is not a position of one lot.**
+
+`holdingPeriod` returns null for a missing acquisition date rather than
+"short_term". Defaulting to short-term LOOKS conservative and is not: it
+understates the after-tax value of a sale the user may be told to make, and it
+is a claim about their tax position nobody supplied. Exactly one year is
+short-term — the US rule is strictly more than a year, and inverting it
+misstates a tax bill.
+
+### The import audit found four violations, three of them live
+
+Rule 29 asks for atomic, account-scoped, previewed, auditable. The Portfolio
+CSV import was none of those:
+
+1. **Not atomic.** DELETE-then-INSERT per account in the client, no
+   transaction. A failure between them left that account with NO POSITIONS and
+   every later account untouched — a portfolio in two states, one of them
+   empty, under a toast saying the save failed.
+2. **Theses did not survive.** The delete dropped `original_thesis`,
+   `current_thesis`, `why_own`, `notes`, `sector`, `last_ai_review` and
+   `last_reviewed_at` for every symbol on every import. Rule 29 names this
+   exactly, and a reason for owning a position is not recoverable from a broker
+   export.
+3. **An import touched other accounts.** "Overwrite entire portfolio"
+   defaulted to ON and deleted every holding the user had, including accounts
+   the import was not mapping and could not restore.
+4. **Unknown cash was written as zero** — the Phase 1a defect, still live in
+   the path that writes money most often.
+
+The fix is one Postgres function that is the only way positions are written.
+UPDATE-then-INSERT rather than DELETE-then-INSERT is the whole mechanism: the
+narrative columns are simply not in the SET list, so they survive untouched.
+
+`NARRATIVE_COLUMNS` is listed in TypeScript so a test can assert the SQL
+function's SET list excludes every one. **Two places that must agree, in two
+languages, is exactly how a rule like this rots.**
+
+### The recurring own-goal, instance seven, caught by its own run
+
+A test asserting the open-orders detail never claims "no open orders" fired on
+the detail's own EXPLANATION — "it cannot tell an account with no open orders
+from one whose orders it cannot see". Narrowed to the claim (the phrase at the
+start of a sentence), with a control proving it catches the claim and spares
+the explanation.
+
+Instance eight was worse and is worth recording separately: a control I wrote
+for the shape-only exemption list — "these files contain no mutation" — was
+simply the WRONG CLAIM, and failed on its first run because `useAppData` is the
+hooks module and obviously mutates. The claim that needed holding was narrower:
+in those files an objective field only ever appears as a TYPE DECLARATION,
+never as a key assigned a value. Writing the control first is what surfaced it.
+
+### Still outstanding for Amir
+
+- **Fifteen migrations pending.** Phases 5–6 add four (`orders`,
+  `position_lots`, `import_safety`, plus the Phase 4 four) on top of the eleven
+  already waiting. Nothing backfills a value; every new column is NULL for
+  every existing row by design.
+- **The import fixes are only live once the migration is applied.** Until
+  `import_account_positions` exists in the database, the CSV import will fail
+  rather than silently doing the old thing — the client no longer contains the
+  old path.
+- **Populate the configuration.** `/kids`, `/kids-watchlist` and
+  `/kids-prompt-center` stay empty until household members, per-account targets
+  and a strategy are entered.
+- **Confirm the IPS-lite caps and the account types.** Both are still
+  `legacy_unknown` / `inferred_from_name`.
+- **Copilot review has been unavailable since #157** ("quota limit"). Eleven
+  PRs have now merged on the gate and my own reading alone.
+- **CI still does not run lint.** `eslint src` reports pre-existing problems
+  across the tree; every file touched in this session is clean, and the rest
+  are not.
+- **Git history** still contains everything the P0 remediation removed (§5).
