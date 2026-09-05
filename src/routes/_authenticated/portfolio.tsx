@@ -6,7 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recha
 
 import { AppShell } from "@/components/app/AppShell";
 import { AccountNotice } from "@/components/app/AccountNotice";
-import { ReconciliationBanner } from "@/components/app/ReconciliationBanner";
+import { ReconciliationPanel } from "@/components/app/ReconciliationPanel";
 import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
 import { StatCard } from "@/components/app/StatCard";
 import { Button } from "@/components/ui/button";
@@ -213,7 +213,7 @@ function PortfolioPage() {
       <AccountNotice status={accountStatus} />
       {/* Computed vs the broker's own total. The figures below are the app's
           arithmetic; this says whether the broker agrees with it. */}
-      <ReconciliationBanner computedTotal={totalAccountValue} />
+      <ReconciliationPanel totals={totals} />
       {/* Invisible: records one daily close per held symbol into price_history. */}
       <PriceHistoryRecorder quotes={liveQuotes} />
       <div className="grid gap-4 md:grid-cols-4">
