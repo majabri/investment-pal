@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus, Upload, LogOut, Trash2, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { IpsLiteCard, MarginRateCard, ObjectiveCard } from "@/components/app/settings/PolicyCards";
 import { supabase } from "@/lib/supabaseClient";
 import {
   usePriorities,
@@ -32,8 +33,6 @@ import {
 } from "@/hooks/useAppData";
 import { useQueryClient } from "@tanstack/react-query";
 import { fmtUSD } from "@/lib/finance";
-import { rateStatus } from "@/lib/marginCost";
-import { isFutureLocalDate } from "@/lib/localDate";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -57,344 +56,6 @@ const ACCOUNT_TYPES = [
   "other",
 ] as const;
 
-// IPS-lite policy editor (ADR-APP-004). Position cap + margin cap govern the
-// committee prompt and the Constitution Check strip. Money-adjacent numbers were
-// signed off in ADR-APP-004; edits here re-set the policy going forward.
-function IpsLiteCard() {
-  const { data: ips, save } = useIpsLite();
-  const [posCap, setPosCap] = useState("");
-  const [marginCap, setMarginCap] = useState("");
-  const [mode, setMode] = useState("soft");
-  useEffect(() => {
-    setPosCap(String(ips.position_cap_pct));
-    setMarginCap(String(ips.margin_cap_pct));
-    setMode(ips.position_cap_hard ? "hard" : "soft");
-  }, [ips.position_cap_pct, ips.margin_cap_pct, ips.position_cap_hard]);
-
-  const onSave = () => {
-    const p = Number(posCap);
-    const m = Number(marginCap);
-    if (!Number.isFinite(p) || p < 0 || p > 100) return toast.error("Position cap must be 0–100%");
-    if (!Number.isFinite(m) || m < 0 || m > 100) return toast.error("Margin cap must be 0–100%");
-    save.mutate(
-      { position_cap_pct: p, position_cap_hard: mode === "hard", margin_cap_pct: m },
-      {
-        onSuccess: () => toast.success("Policy saved"),
-        onError: (e) => toast.error((e as Error).message),
-      },
-    );
-  };
-
-  return (
-    <section className="mb-4 rounded-2xl border bg-card p-5">
-      <div className="mb-1 text-sm font-medium">Investment policy (IPS-lite)</div>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Governs the committee prompt and the Constitution Check strip. The objective never justifies
-        overriding these limits or the evidence contract.
-      </p>
-      <div className="grid gap-3 sm:grid-cols-[200px_200px_160px_auto]">
-        <div>
-          <Label className="text-xs">Max single position (% of gross)</Label>
-          <Input
-            type="number"
-            min={0}
-            max={100}
-            value={posCap}
-            onChange={(e) => setPosCap(e.target.value)}
-          />
-        </div>
-        <div>
-          <Label className="text-xs">Max margin utilization (% of acct)</Label>
-          <Input
-            type="number"
-            min={0}
-            max={100}
-            value={marginCap}
-            onChange={(e) => setMarginCap(e.target.value)}
-          />
-        </div>
-        <div>
-          <Label className="text-xs">Position cap enforcement</Label>
-          <Select value={mode} onValueChange={setMode}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="soft">Soft (flag)</SelectItem>
-              <SelectItem value="hard">Hard (block)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-end">
-          <Button onClick={onSave} disabled={save.isPending}>
-            Save policy
-          </Button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/**
- * The objective — one row, edited here and on the goal screen, read everywhere.
- *
- * Stage 4 of the 2026-09-03 brief. The objective was editable in two places
- * that were not the same place: the goal screen wrote `goals`, which the
- * dashboard, the goal screen and the committee prompt all read; the per-account
- * form below wrote `accounts.target_value` / `target_date` / `starting_value`,
- * which NOTHING read. Setting a target there looked like setting a target and
- * set nothing.
- *
- * The account-level fields are no longer written (see AccountCard). This card
- * edits the row the app actually uses, so Settings and the goal screen are two
- * views of one objective rather than two objectives.
- */
-function ObjectiveCard() {
-  const { data: goal, update } = useGoal();
-  const [target, setTarget] = useState("");
-  const [date, setDate] = useState("");
-  const [starting, setStarting] = useState("");
-  const [monthly, setMonthly] = useState("");
-
-  useEffect(() => {
-    if (!goal) return;
-    setTarget(String(goal.target_value ?? ""));
-    setDate(goal.target_date ?? "");
-    setStarting(String(goal.starting_value ?? ""));
-    setMonthly(String(goal.monthly_contribution ?? ""));
-  }, [goal]);
-
-  if (!goal) {
-    // No goal row: say so rather than rendering a form whose save has nowhere
-    // to go. Creating one from here would invent a target.
-    return (
-      <section className="mb-4 rounded-2xl border bg-card p-5">
-        <div className="mb-1 text-sm font-medium">Objective</div>
-        <p className="text-xs text-muted-foreground">
-          No objective set yet. Create one on the Goal screen — the dashboard, the goal screen and
-          the committee prompt all read that single row.
-        </p>
-      </section>
-    );
-  }
-
-  const onSave = () => {
-    const t = Number(target);
-    const s = Number(starting);
-    const m = Number(monthly);
-    if (!Number.isFinite(t) || t <= 0) return toast.error("Target value must be a positive number");
-    if (!Number.isFinite(s) || s < 0) return toast.error("Starting value cannot be negative");
-    if (!Number.isFinite(m) || m < 0) return toast.error("Monthly contribution cannot be negative");
-    if (!date) return toast.error("Set a target date");
-    // Today is rejected along with the past, deliberately. A zero horizon is
-    // as unusable as a negative one: `yearsBetween` clamps it to 0.01 years,
-    // and every CAGR and probability figure downstream is then computed over
-    // roughly three days — an absurd number rendered with full confidence.
-    if (!isFutureLocalDate(date)) {
-      return toast.error("The target date must be later than today");
-    }
-    update.mutate(
-      {
-        id: goal.id,
-        target_value: t,
-        target_date: date,
-        starting_value: s,
-        monthly_contribution: m,
-      },
-      {
-        onSuccess: () => toast.success("Objective saved"),
-        onError: (e) => toast.error((e as Error).message),
-      },
-    );
-  };
-
-  return (
-    <section className="mb-4 rounded-2xl border bg-card p-5">
-      <div className="mb-1 text-sm font-medium">Objective</div>
-      <p className="mb-3 text-xs text-muted-foreground">
-        One objective, read by the dashboard, the goal screen and the committee prompt. Editing it
-        here and editing it on the Goal screen change the same row — there is no second copy.
-      </p>
-      <div className="grid gap-3 sm:grid-cols-[180px_180px_180px_180px_auto]">
-        <div>
-          <Label className="text-xs">Target value ($)</Label>
-          {/* `min` matches the check in onSave. A browser constraint that
-              disagrees with the validation produces an error message the form
-              itself said was fine. */}
-          <Input
-            type="number"
-            min={0.01}
-            step="0.01"
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-          />
-        </div>
-        <div>
-          <Label className="text-xs">Target date</Label>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </div>
-        <div>
-          <Label className="text-xs">Starting value ($)</Label>
-          <Input
-            type="number"
-            min={0}
-            value={starting}
-            onChange={(e) => setStarting(e.target.value)}
-          />
-        </div>
-        <div>
-          <Label className="text-xs">Monthly contribution ($)</Label>
-          <Input
-            type="number"
-            min={0}
-            value={monthly}
-            onChange={(e) => setMonthly(e.target.value)}
-          />
-        </div>
-        <div className="flex items-end">
-          <Button size="sm" onClick={onSave} disabled={update.isPending}>
-            {update.isPending ? "Saving…" : "Save objective"}
-          </Button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// Margin rate (ADR-APP-007). The rate is IPS policy, not app config, and it is
-// entered here rather than committed to source: Fidelity's rate is tiered by
-// debit balance and floats with the base rate, so any value baked into code is
-// wrong over time. Unset is a valid, shipped state — the app suppresses the
-// cost figure rather than computing with a fallback.
-function MarginRateCard() {
-  const { data: ips, save } = useIpsLite();
-  const [rate, setRate] = useState("");
-  const [asOf, setAsOf] = useState("");
-  const [floating, setFloating] = useState("floating");
-  const [staleDays, setStaleDays] = useState("");
-
-  useEffect(() => {
-    setRate(ips.margin_rate_annual_pct == null ? "" : String(ips.margin_rate_annual_pct));
-    setAsOf(ips.margin_rate_as_of ?? "");
-    setFloating(ips.margin_rate_is_floating ? "floating" : "fixed");
-    setStaleDays(String(ips.margin_rate_stale_days));
-  }, [
-    ips.margin_rate_annual_pct,
-    ips.margin_rate_as_of,
-    ips.margin_rate_is_floating,
-    ips.margin_rate_stale_days,
-  ]);
-
-  const status = rateStatus(ips);
-
-  const onSave = () => {
-    const trimmed = rate.trim();
-    // Clearing the field un-sets the rate. That has to stay possible: if the
-    // stored value is known to be wrong, "no rate" is the honest state and is
-    // safer than leaving a stale number driving a cost figure.
-    const r = trimmed === "" ? null : Number(trimmed);
-    if (r != null && (!Number.isFinite(r) || r < 0 || r > 100)) {
-      return toast.error("Margin rate must be 0–100%, or blank to clear it");
-    }
-    if (r != null && !asOf) {
-      return toast.error("Enter the date you verified this rate");
-    }
-    // A malformed or future date produces a negative age in rateStatus and a
-    // provenance claim the data does not support. Reject it here rather than
-    // letting it reach the committee prompt.
-    if (r != null) {
-      const parsed = new Date(`${asOf}T00:00:00Z`);
-      if (Number.isNaN(parsed.getTime())) {
-        return toast.error("Verified-on must be a real date (YYYY-MM-DD)");
-      }
-      // Compared as a LOCAL calendar date. `parsed > Date.now()` rejects
-      // today's date for anyone east of Greenwich after their local midnight,
-      // because midnight-UTC of that day has not arrived yet.
-      if (isFutureLocalDate(asOf)) {
-        return toast.error("Verified-on cannot be in the future");
-      }
-    }
-    const days = Number(staleDays);
-    if (!Number.isFinite(days) || days < 1) {
-      return toast.error("Staleness threshold must be at least 1 day");
-    }
-    save.mutate(
-      {
-        margin_rate_annual_pct: r,
-        margin_rate_as_of: r == null ? null : asOf,
-        margin_rate_is_floating: floating === "floating",
-        margin_rate_stale_days: Math.round(days),
-      },
-      {
-        onSuccess: () => toast.success(r == null ? "Margin rate cleared" : "Margin rate saved"),
-        onError: (e) => toast.error((e as Error).message),
-      },
-    );
-  };
-
-  return (
-    <section className="mb-4 rounded-2xl border bg-card p-5">
-      <div className="mb-1 text-sm font-medium">Margin rate</div>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Your current Fidelity margin rate. Nothing in the app supplies a default: while this is
-        blank, the dashboard shows no interest cost and the committee is told the rate is not set.
-        Fidelity tiers by debit balance and floats with the base rate, so enter the tier that
-        applies to your balance and re-check it periodically.
-      </p>
-      {status.kind === "stale" ? (
-        <p className="mb-3 text-xs font-medium text-amber-500">
-          Verified {status.ageDays} days ago — older than your {ips.margin_rate_stale_days}-day
-          threshold.
-        </p>
-      ) : null}
-      <div className="grid gap-3 sm:grid-cols-[160px_180px_160px_160px_auto]">
-        <div>
-          <Label className="text-xs">Annual rate (%)</Label>
-          <Input
-            type="number"
-            min={0}
-            max={100}
-            step="0.001"
-            placeholder="not set"
-            value={rate}
-            onChange={(e) => setRate(e.target.value)}
-          />
-        </div>
-        <div>
-          <Label className="text-xs">Verified on</Label>
-          <Input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
-        </div>
-        <div>
-          <Label className="text-xs">Rate type</Label>
-          <Select value={floating} onValueChange={setFloating}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="floating">Floating</SelectItem>
-              <SelectItem value="fixed">Fixed</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-xs">Flag as stale after (days)</Label>
-          <Input
-            type="number"
-            min={1}
-            value={staleDays}
-            onChange={(e) => setStaleDays(e.target.value)}
-          />
-        </div>
-        <div className="flex items-end">
-          <Button onClick={onSave} disabled={save.isPending}>
-            Save rate
-          </Button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function SettingsPage() {
   const qc = useQueryClient();
   const { data: priorities = [], add: addPriority, dismiss: dismissP } = usePriorities();
@@ -402,6 +63,11 @@ function SettingsPage() {
   const { data: syncs = [] } = useSyncLog();
 
   const { data: accounts = [], create: createAccount } = useAccounts();
+  // The policy editors take their record and loading flag as props: the load
+  // window is a money-adjacent hazard (see PolicyCards) and the guard is
+  // easier to test when the components do not fetch for themselves.
+  const { data: ips, isLoading: ipsLoading, save: saveIps } = useIpsLite();
+  const { data: goal, isLoading: goalLoading, update: updateGoal } = useGoal();
 
   const [pLabel, setPLabel] = useState("");
   const [pSev, setPSev] = useState<"info" | "warning" | "critical">("info");
@@ -421,9 +87,9 @@ function SettingsPage() {
       <div className="mb-4">
         <BalanceImport />
       </div>
-      <ObjectiveCard />
-      <IpsLiteCard />
-      <MarginRateCard />
+      <ObjectiveCard goal={goal} isLoading={goalLoading} update={updateGoal} />
+      <IpsLiteCard ips={ips} isLoading={ipsLoading} save={saveIps} />
+      <MarginRateCard ips={ips} isLoading={ipsLoading} save={saveIps} />
       {/* ACCOUNTS */}
       <section className="rounded-2xl border bg-card p-5">
         <div className="mb-3 flex items-center justify-between">

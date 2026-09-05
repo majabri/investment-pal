@@ -2,11 +2,17 @@
 import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
-import { MARGIN_POLICY_UNSET, type MarginPolicy } from "@/lib/marginCost";
 import { scopedRows, type AccountScope } from "@/lib/accountTotals";
 import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 import { localIsoDate } from "@/lib/localDate";
 import { isUniqueViolation } from "@/lib/postgresError";
+
+// The IPS-lite record and its signed-off defaults live in lib/ipsPolicy so
+// they can be read without importing the Supabase client. Re-exported here
+// because this module is where the rest of the app already imports them.
+import { IPS_LITE_DEFAULTS, type IpsLite } from "@/lib/ipsPolicy";
+
+export { IPS_LITE_DEFAULTS, type IpsLite };
 
 export type Goal = {
   id: string;
@@ -658,12 +664,6 @@ export function useLogSync() {
   });
 }
 
-export type IpsLite = {
-  position_cap_pct: number;
-  position_cap_hard: boolean;
-  margin_cap_pct: number;
-} & MarginPolicy;
-
 /**
  * The stored investment universe.
  *
@@ -684,17 +684,6 @@ export function useUniverse() {
     },
   });
 }
-
-// Signed-off defaults (ADR-APP-004): 30% soft position cap, 25% margin cap.
-export const IPS_LITE_DEFAULTS: IpsLite = {
-  position_cap_pct: 30,
-  position_cap_hard: false,
-  margin_cap_pct: 25,
-  // The caps have signed-off defaults (ADR-APP-004). The margin RATE does not
-  // and must not (ADR-APP-007): unset means unset, and the UI suppresses the
-  // cost figure rather than computing with a fallback.
-  ...MARGIN_POLICY_UNSET,
-};
 
 // IPS-lite policy record (one row per user). Falls back to the signed-off
 // defaults when unset, so the policy always has values.
