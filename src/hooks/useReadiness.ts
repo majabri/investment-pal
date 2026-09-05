@@ -1,17 +1,16 @@
 // Assembling the readiness gate's inputs from live data (Phase 5, rule 17).
 //
-// The rules live in `src/lib/readiness.ts` and are pure; this is the wiring.
-// Kept separate on purpose — a gate whose logic can only be exercised through
-// React is a gate nobody tests, and rule 17 asks for DETERMINISTIC checks.
+// The rules live in `src/lib/readiness.ts` and the per-account mapping in
+// `src/lib/readinessInput.ts`; both are pure. This file is only the React
+// wiring — a gate whose logic can only be exercised through React is a gate
+// nobody tests, and rule 17 asks for DETERMINISTIC checks.
 import { useMemo } from "react";
 
 import { useAccountScope } from "@/contexts/AccountContext";
-import { useAccounts, useIpsLite, useLatestBalance } from "@/hooks/useAppData";
+import { useAccounts, useIpsLite, useLatestBalance, useLatestBalances } from "@/hooks/useAppData";
 import type { AccountTotals } from "@/lib/accountTotals";
-import { freshnessOf, type Freshness, type SourceType } from "@/lib/freshness";
-import { DEFAULT_TOLERANCE, reconcileAccount } from "@/lib/reconciliation";
-import { reconciliationInputFor } from "@/lib/reconciliationInput";
-import { runChecks, type ReadinessCheck } from "@/lib/readiness";
+import { combineChecks, type ReadinessCheck } from "@/lib/readiness";
+import { readinessChecksFor } from "@/lib/readinessInput";
 
 /**
  * The checks, for the currently selected scope.
@@ -30,55 +29,61 @@ export function useReadiness(totals: AccountTotals | null): ReadinessCheck[] {
   const accountId = scope.kind === "account" ? scope.accountId : null;
   const account = accountId === null ? null : (accounts.find((a) => a.id === accountId) ?? null);
 
-  return useMemo(() => {
-    // The value comes first because `freshnessOf` short-circuits on it: there
-    // is nothing to be fresh or stale ABOUT a figure that does not exist, and
-    // the account's total is the figure the positions check is about.
-    const positions: Freshness =
-      account === null
-        ? "UNAVAILABLE"
-        : freshnessOf(totals?.totalAccountValue ?? null, {
-            sourceType: (account.balances_source_type ?? null) as SourceType | null,
-            asOf: account.balances_as_of ?? null,
-          });
+  return useMemo(
+    () =>
+      readinessChecksFor({
+        account,
+        totalAccountValue: totals?.totalAccountValue ?? null,
+        positionsValue: totals?.positionsValue ?? null,
+        latestValue: latest?.total_account_value ?? null,
+        latestAsOf: latest?.imported_at ?? null,
+        policySource: ips?.caps_source ?? "default",
+      }),
+    [account, latest, totals, ips],
+  );
+}
 
-    // Quotes are re-fetched on a 60s cadence wherever a screen asks for them.
-    // `live_quote` with the current moment is the honest description of that
-    // for a screen that has just rendered; there is no per-symbol quote
-    // timestamp in the schema yet, and inventing one would be worse.
-    const quotes: Freshness =
-      account === null
-        ? "UNAVAILABLE"
-        : freshnessOf(totals?.positionsValue ?? null, {
-            sourceType: "live_quote",
-            asOf: new Date().toISOString(),
-          });
+/**
+ * The checks across several accounts, combined worst-first
+ * (Phase 5b, rule 17).
+ *
+ * For briefs that cover more than one account — the kids committee review.
+ * A single-account gate applied to a multi-account brief would report the
+ * wrong account's readiness, which is worse than no gate at all, so this
+ * exists rather than reusing `useReadiness` with the selected scope.
+ */
+export function useMultiReadiness(
+  accounts: { id: string; name: string; totals: AccountTotals | null }[],
+): ReadinessCheck[] {
+  const { data: allAccounts = [] } = useAccounts();
+  const { data: ips } = useIpsLite();
+  const ids = accounts.map((a) => a.id);
+  const { data: balances = {} } = useLatestBalances(ids);
 
-    const reconciliation =
-      account === null
-        ? null
-        : reconcileAccount(
-            reconciliationInputFor({
+  // `ids.join` rather than the array: a new array of the same ids on every
+  // render would recompute this on every render.
+  const key = ids.join(",");
+
+  return useMemo(
+    () =>
+      combineChecks(
+        accounts.map((a) => {
+          const row = allAccounts.find((x) => x.id === a.id) ?? null;
+          const latest = balances[a.id];
+          return {
+            label: a.name,
+            checks: readinessChecksFor({
+              account: row,
+              totalAccountValue: a.totals?.totalAccountValue ?? null,
+              positionsValue: a.totals?.positionsValue ?? null,
               latestValue: latest?.total_account_value ?? null,
               latestAsOf: latest?.imported_at ?? null,
-              account,
-              calculatedValue: totals?.totalAccountValue ?? null,
+              policySource: ips?.caps_source ?? "default",
             }),
-            DEFAULT_TOLERANCE,
-          ).status;
-
-    return runChecks({
-      reconciliation,
-      positions,
-      quotes,
-      cash: account?.cash ?? null,
-      marginEnabled: account?.margin_enabled ?? null,
-      marginUsed: account?.margin_used ?? null,
-      // There is no order model yet — Phase 6. `false` is the honest value,
-      // and rule 30 requires the app to say "unavailable" rather than let a
-      // recommendation assume nothing is committed to an open order.
-      openOrdersKnown: false,
-      policySource: ips?.caps_source ?? "default",
-    });
-  }, [account, latest, totals, ips]);
+          };
+        }),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key, accounts, allAccounts, balances, ips],
+  );
 }

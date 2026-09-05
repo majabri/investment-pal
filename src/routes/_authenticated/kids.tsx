@@ -11,6 +11,9 @@ import {
 import { approvedShare, approvedSymbols } from "@/lib/strategy";
 import { combinedTarget, nextContributionDate } from "@/lib/accountObjective";
 import { kidAccounts } from "@/lib/kidAccounts";
+import { accountTotals } from "@/lib/accountTotals";
+import { useMultiReadiness } from "@/hooks/useReadiness";
+import { ReadinessPanel } from "@/components/app/ReadinessPanel";
 import {
   useAccounts,
   useAllHoldings,
@@ -44,6 +47,28 @@ function KidsPage() {
     () => kidAccounts(accounts, allHoldings, members),
     [accounts, allHoldings, members],
   );
+
+  // The readiness gate for the projections below (Phase 5b, rule 17). This
+  // screen produces "Required CAGR", "Projected @10%" and a
+  // "Behind / On Track / Ahead" verdict — a goal projection, which depends on
+  // the positions and the quotes and on nothing else. Cash and margin are NOT
+  // in that capability's dependencies, so a missing cash balance does not take
+  // this screen down: it already shows Unavailable for the figures cash feeds.
+  const readinessAccounts = useMemo(
+    () =>
+      kidsData.map((k) => ({
+        id: k.id,
+        name: k.name,
+        totals: accountTotals(
+          allHoldings.filter((h) => h.account_id === k.id),
+          // No margin on a custodial account, and no buying-power figure has
+          // ever been supplied for one. `null` is honest for both.
+          { cash: k.cash, margin_used: null, buying_power: null },
+        ),
+      })),
+    [kidsData, allHoldings],
+  );
+  const readiness = useMultiReadiness(readinessAccounts);
 
   // Live prices: one source of truth, 60s cadence, merged upstream of all math
   const allSymbols = useMemo(
@@ -184,6 +209,11 @@ function KidsPage() {
         next === null ? "No contribution plan set" : `Next contribution ${next}`
       }
     >
+      <ReadinessPanel
+        checks={readiness}
+        capability="goal_projection"
+        what="the projections on this page"
+      />
       <Card className="mb-6">
         <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 pt-6 text-sm">
           <span>
