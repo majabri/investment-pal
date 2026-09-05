@@ -22,12 +22,24 @@ function Page() {
   const dbKids = accounts.filter((a) => KID_NAMES.includes(a.name));
   const kidsData: KidAccount[] = dbKids.length
     ? dbKids.map((a) => ({
-        key: a.name.toLowerCase(), name: a.name, accountNumber: "", cash: Number(a.cash ?? 0),
-        holdings: allHoldings.filter((h) => h.account_id === a.id)
-          .map((h) => ({ symbol: h.symbol, shares: Number(h.quantity), price: Number(h.current_price), avgCost: Number(h.cost_basis) })),
+        key: a.name.toLowerCase(),
+        name: a.name,
+        accountNumber: "",
+        cash: Number(a.cash ?? 0),
+        holdings: allHoldings
+          .filter((h) => h.account_id === a.id)
+          .map((h) => ({
+            symbol: h.symbol,
+            shares: Number(h.quantity),
+            price: Number(h.current_price),
+            avgCost: Number(h.cost_basis),
+          })),
       }))
     : KIDS_SEED;
-  const symbols = useMemo(() => [...new Set(kidsData.flatMap((k) => k.holdings.map((h) => h.symbol)))], [kidsData]);
+  const symbols = useMemo(
+    () => [...new Set(kidsData.flatMap((k) => k.holdings.map((h) => h.symbol)))],
+    [kidsData],
+  );
   const { data: quotes } = useQuery({
     queryKey: ["kids-pc-quotes", symbols.join(",")],
     queryFn: () => getQuotesFn({ data: { symbols } }),
@@ -38,13 +50,25 @@ function Page() {
   const prompt = useMemo(() => {
     const next = nextContributionDate().toISOString().slice(0, 10);
     const kidsLine = FAMILY_POLICY.children
-      .map((c) => `${c.name} ${ageOf(c.birthDate)}`).join(", ");
-    const data = kidsData.map((k) => {
-      const live = k.holdings.map((h) => quotes?.[h.symbol] ? { ...h, price: quotes[h.symbol].price } : h);
-      const mv = live.reduce((s, h) => s + h.shares * h.price, 0);
-      return `${k.name}: ${fmtUSD(mv + k.cash)} (cash ${fmtUSD(k.cash, 2)}) — ` +
-        live.map((h) => `${h.symbol} ${h.shares}sh @ ${fmtUSD(h.price, 2)} = ${fmtUSD(h.shares * h.price)}${h.avgCost > 0 ? ` (avg ${fmtUSD(h.avgCost, 2)})` : ""}`).join(", ");
-    }).join("\n");
+      .map((c) => `${c.name} ${ageOf(c.birthDate)}`)
+      .join(", ");
+    const data = kidsData
+      .map((k) => {
+        const live = k.holdings.map((h) =>
+          quotes?.[h.symbol] ? { ...h, price: quotes[h.symbol].price } : h,
+        );
+        const mv = live.reduce((s, h) => s + h.shares * h.price, 0);
+        return (
+          `${k.name}: ${fmtUSD(mv + k.cash)} (cash ${fmtUSD(k.cash, 2)}) — ` +
+          live
+            .map(
+              (h) =>
+                `${h.symbol} ${h.shares}sh @ ${fmtUSD(h.price, 2)} = ${fmtUSD(h.shares * h.price)}${h.avgCost > 0 ? ` (avg ${fmtUSD(h.avgCost, 2)})` : ""}`,
+            )
+            .join(", ")
+        );
+      })
+      .join("\n");
     return `Family Investment Committee – Biweekly Capital Allocation Review
 
 Today is my biweekly investment review for my children's accounts (${kidsLine}).
@@ -151,15 +175,34 @@ ${data}`;
   }, [kidsData, quotes]);
 
   return (
-    <AppShell title="Kids Prompt Center" subtitle="Biweekly Family Investment Committee — live-priced data, chat in-app or copy to ChatGPT">
+    <AppShell
+      title="Kids Prompt Center"
+      subtitle="Biweekly Family Investment Committee — live-priced data, chat in-app or copy to ChatGPT"
+    >
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base">Family Committee Prompt</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Family Committee Prompt</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
-            <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">{prompt}</pre>
+            <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">
+              {prompt}
+            </pre>
             <div className="flex gap-2">
-              <Button onClick={() => { void navigator.clipboard.writeText(prompt); toast.success("Copied"); }}>Copy Prompt</Button>
-              <Button variant="secondary" onClick={() => window.open("https://chatgpt.com", "_blank")}>Open ChatGPT</Button>
+              <Button
+                onClick={() => {
+                  void navigator.clipboard.writeText(prompt);
+                  toast.success("Copied");
+                }}
+              >
+                Copy Prompt
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => window.open("https://chatgpt.com", "_blank")}
+              >
+                Open ChatGPT
+              </Button>
             </div>
           </CardContent>
         </Card>

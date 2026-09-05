@@ -9,8 +9,11 @@ import { useQueryClient } from "@tanstack/react-query";
 function activeWorkflow(): "morning" | "refresh" | "evening" | "weekly" {
   const now = new Date();
   const et = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York", hour: "numeric", minute: "numeric",
-    hour12: false, weekday: "short",
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+    weekday: "short",
   }).formatToParts(now);
   const get = (t: string) => et.find((p) => p.type === t)?.value ?? "";
   const day = get("weekday");
@@ -34,8 +37,16 @@ export function WorkflowButtons({ symbols }: { symbols: string[] }) {
           <Sunrise className="mr-2 h-4 w-4" /> Morning Review
         </Link>
       </Button>
-      <Button size="lg" variant={v("refresh")} className="h-12" disabled={busy}
-        onClick={() => { void refresh(); void qc.invalidateQueries({ queryKey: ["market-tape"] }); }}>
+      <Button
+        size="lg"
+        variant={v("refresh")}
+        className="h-12"
+        disabled={busy}
+        onClick={() => {
+          void refresh();
+          void qc.invalidateQueries({ queryKey: ["market-tape"] });
+        }}
+      >
         <RefreshCw className={`mr-2 h-4 w-4 ${busy ? "animate-spin" : ""}`} />
         {busy ? "Refreshing…" : "Mid-Day Meeting"}
       </Button>

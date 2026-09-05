@@ -29,16 +29,29 @@ export function useRefreshPrices(symbols: string[]) {
       for (const sym of unique) {
         const px = prices[toYahoo(sym)];
         if (!px || !isFinite(px)) continue;
-        const { error } = await supabase.from("holdings")
+        const { error } = await supabase
+          .from("holdings")
           .update({ current_price: px, last_price_at: now })
-          .eq("user_id", userId).eq("symbol", sym);
+          .eq("user_id", userId)
+          .eq("symbol", sym);
         if (!error) updated++;
       }
-      toast.success(`Prices refreshed: ${updated}/${unique.length} symbols${updated < unique.length ? " (unlisted/legacy symbols keep their last price)" : ""}`);
+      toast.success(
+        `Prices refreshed: ${updated}/${unique.length} symbols${updated < unique.length ? " (unlisted/legacy symbols keep their last price)" : ""}`,
+      );
       // On-demand: refresh every live consumer immediately
       void qc.invalidateQueries({ queryKey: ["holdings"] });
-      void qc.invalidateQueries({ predicate: (q) =>
-        ["pf-quotes", "daily-quotes", "pc-quotes", "kids-quotes", "market-tape", "snapshots"].includes(String(q.queryKey[0])) });
+      void qc.invalidateQueries({
+        predicate: (q) =>
+          [
+            "pf-quotes",
+            "daily-quotes",
+            "pc-quotes",
+            "kids-quotes",
+            "market-tape",
+            "snapshots",
+          ].includes(String(q.queryKey[0])),
+      });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Refresh failed");
     } finally {
@@ -52,7 +65,12 @@ export function useRefreshPrices(symbols: string[]) {
 export function RefreshPricesButton({ symbols }: { symbols: string[] }) {
   const { refresh, busy } = useRefreshPrices(symbols);
   return (
-    <Button size="sm" variant="secondary" onClick={() => void refresh()} disabled={busy || !symbols.length}>
+    <Button
+      size="sm"
+      variant="secondary"
+      onClick={() => void refresh()}
+      disabled={busy || !symbols.length}
+    >
       <RefreshCw className={`mr-2 h-4 w-4 ${busy ? "animate-spin" : ""}`} />
       {busy ? "Checking prices…" : "Refresh prices"}
     </Button>

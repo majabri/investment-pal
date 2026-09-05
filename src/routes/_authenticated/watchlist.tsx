@@ -28,21 +28,34 @@ function Page() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {Object.entries(LISTS).map(([theme, syms]) => (
           <Card key={theme}>
-            <CardHeader><CardTitle className="text-base">{theme}</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">{theme}</CardTitle>
+            </CardHeader>
             <CardContent>
               {syms.map((s) => {
                 const q = quotes?.[s];
                 return (
-                  <div key={s} className="flex items-center justify-between border-b py-1.5 text-sm last:border-0">
+                  <div
+                    key={s}
+                    className="flex items-center justify-between border-b py-1.5 text-sm last:border-0"
+                  >
                     <span className="font-medium">{s}</span>
                     {q ? (
                       <span className="flex gap-3 tabular-nums">
                         <span>{fmtUSD(q.price, 2)}</span>
-                        <span className={cn("w-16 text-right", q.changePct >= 0 ? "text-emerald-500" : "text-red-500")}>
-                          {q.changePct >= 0 ? "+" : ""}{q.changePct.toFixed(2)}%
+                        <span
+                          className={cn(
+                            "w-16 text-right",
+                            q.changePct >= 0 ? "text-emerald-500" : "text-red-500",
+                          )}
+                        >
+                          {q.changePct >= 0 ? "+" : ""}
+                          {q.changePct.toFixed(2)}%
                         </span>
                       </span>
-                    ) : <span className="text-xs text-muted-foreground">…</span>}
+                    ) : (
+                      <span className="text-xs text-muted-foreground">…</span>
+                    )}
                   </div>
                 );
               })}

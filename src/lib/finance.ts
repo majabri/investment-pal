@@ -51,9 +51,7 @@ const erf = (x: number) => {
   const t = 1 / (1 + 0.3275911 * ax);
   const y =
     1 -
-    (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) *
-      t +
-      0.254829592) *
+    ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) *
       t *
       Math.exp(-ax * ax);
   return sign * y;
@@ -119,7 +117,12 @@ export const marginStatus = (used: number, limit: number): MarginStatus => {
 };
 
 /** Future value with monthly contributions at an annual rate. */
-export const fvWithMonthlyContrib = (present: number, annualRate: number, years: number, monthly: number) => {
+export const fvWithMonthlyContrib = (
+  present: number,
+  annualRate: number,
+  years: number,
+  monthly: number,
+) => {
   const n = Math.max(0, Math.round(years * 12));
   const i = Math.pow(1 + annualRate, 1 / 12) - 1;
   if (i === 0) return present + monthly * n;
@@ -127,20 +130,32 @@ export const fvWithMonthlyContrib = (present: number, annualRate: number, years:
 };
 
 /** Required CAGR to hit target, accounting for monthly contributions (bisection). */
-export const requiredCAGRWithContrib = (present: number, target: number, years: number, monthly: number) => {
+export const requiredCAGRWithContrib = (
+  present: number,
+  target: number,
+  years: number,
+  monthly: number,
+) => {
   if (years <= 0 || present >= target) return 0;
   if (monthly <= 0) return requiredCAGR(present, target, years);
-  let lo = -0.5, hi = 3.0;
+  let lo = -0.5,
+    hi = 3.0;
   if (fvWithMonthlyContrib(present, hi, years, monthly) < target) return hi;
   for (let k = 0; k < 60; k++) {
     const mid = (lo + hi) / 2;
-    if (fvWithMonthlyContrib(present, mid, years, monthly) >= target) hi = mid; else lo = mid;
+    if (fvWithMonthlyContrib(present, mid, years, monthly) >= target) hi = mid;
+    else lo = mid;
   }
   return hi;
 };
 
 /** When would the target actually be reached at a given annual return? Null if >40yrs. */
-export const estimatedCompletionDate = (present: number, target: number, annualRate: number, monthly: number): Date | null => {
+export const estimatedCompletionDate = (
+  present: number,
+  target: number,
+  annualRate: number,
+  monthly: number,
+): Date | null => {
   if (present >= target) return new Date();
   const i = Math.pow(1 + annualRate, 1 / 12) - 1;
   let v = present;

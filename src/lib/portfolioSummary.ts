@@ -303,10 +303,7 @@ export const CHART_RANGES: ChartRange[] = [
  * last two points would otherwise clip the chart to nothing and read as "no
  * history", which is a different fact from "no history in the last month".
  */
-export function seriesInRange(
-  series: readonly BalancePoint[],
-  range: ChartRange,
-): BalancePoint[] {
+export function seriesInRange(series: readonly BalancePoint[], range: ChartRange): BalancePoint[] {
   if (range.months === null || series.length === 0) return [...series];
   const latest = series[series.length - 1];
   const cutoffDate = new Date(`${latest.date}T00:00:00Z`);
@@ -383,4 +380,3 @@ export function dayChange(
   }
   return covered > 0 ? { amount, covered, total: positions.length } : null;
 }
-

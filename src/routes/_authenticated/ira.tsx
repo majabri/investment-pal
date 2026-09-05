@@ -16,22 +16,32 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/ira")({ component: Page });
 
 /** Monthly review is due during the first 5 calendar days of each month. */
-function reviewDue(): boolean { return new Date().getDate() <= 5; }
+function reviewDue(): boolean {
+  return new Date().getDate() <= 5;
+}
 
 function Page() {
   const { data: accounts = [] } = useAccounts();
   const { data: allHoldings = [] } = useAllHoldings();
   const iraAccounts = accounts.filter((a) => accountCategory(a.name) === "IRA");
-  const symbols = useMemo(() => [...new Set(allHoldings
-    .filter((h) => iraAccounts.some((a) => a.id === h.account_id))
-    .map((h) => h.symbol))], [allHoldings, iraAccounts]);
+  const symbols = useMemo(
+    () => [
+      ...new Set(
+        allHoldings
+          .filter((h) => iraAccounts.some((a) => a.id === h.account_id))
+          .map((h) => h.symbol),
+      ),
+    ],
+    [allHoldings, iraAccounts],
+  );
   const { data: quotes } = useQuery({
     queryKey: ["ira-quotes", symbols.join(",")],
     queryFn: () => getQuotesFn({ data: { symbols } }),
     enabled: symbols.length > 0,
     refetchInterval: 60 * 1000,
   });
-  const px = (h: { symbol: string; current_price: number }) => quotes?.[h.symbol]?.price ?? h.current_price;
+  const px = (h: { symbol: string; current_price: number }) =>
+    quotes?.[h.symbol]?.price ?? h.current_price;
 
   const rows = iraAccounts.map((a) => {
     const hs = allHoldings.filter((h) => h.account_id === a.id);
@@ -47,10 +57,21 @@ function Page() {
   const totalDay = rows.reduce((s, r) => s + r.day, 0);
 
   const prompt = useMemo(() => {
-    const data = rows.map((r) =>
-      `${r.a.name}: ${fmtUSD(r.value)} (cash ${fmtUSD(Number(r.a.cash ?? 0), 2)})` +
-      (r.hs.length ? " — " + r.hs.map((h) => `${h.symbol} ${h.quantity}sh @ ${fmtUSD(px(h), 2)} (avg ${fmtUSD(h.cost_basis, 2)})`).join(", ") : " — no positions"),
-    ).join("\n");
+    const data = rows
+      .map(
+        (r) =>
+          `${r.a.name}: ${fmtUSD(r.value)} (cash ${fmtUSD(Number(r.a.cash ?? 0), 2)})` +
+          (r.hs.length
+            ? " — " +
+              r.hs
+                .map(
+                  (h) =>
+                    `${h.symbol} ${h.quantity}sh @ ${fmtUSD(px(h), 2)} (avg ${fmtUSD(h.cost_basis, 2)})`,
+                )
+                .join(", ")
+            : " — no positions"),
+      )
+      .join("\n");
     return `Monthly Retirement Committee Review — IRA Accounts
 
 You are my Retirement Investment Committee. Today is my monthly review of my IRA accounts (Roth IRA and Rollover IRA). These are tax-advantaged retirement accounts with a multi-decade horizon.
@@ -79,12 +100,18 @@ IRA total: ${fmtUSD(total)}`;
   }, [rows, total]);
 
   return (
-    <AppShell title="IRA — Retirement" subtitle="Tax-advantaged accounts · live-priced · monthly committee review">
+    <AppShell
+      title="IRA — Retirement"
+      subtitle="Tax-advantaged accounts · live-priced · monthly committee review"
+    >
       <div className="mb-4 flex items-center gap-3">
         <div className="text-sm">
           <span className="font-semibold">{fmtUSD(total)}</span>
-          <span className={cn("ml-2 tabular-nums", totalDay >= 0 ? "text-emerald-500" : "text-red-500")}>
-            {totalDay >= 0 ? "+" : ""}{fmtUSD(totalDay)} today
+          <span
+            className={cn("ml-2 tabular-nums", totalDay >= 0 ? "text-emerald-500" : "text-red-500")}
+          >
+            {totalDay >= 0 ? "+" : ""}
+            {fmtUSD(totalDay)} today
           </span>
         </div>
         {reviewDue() && <Badge variant="destructive">Monthly review due</Badge>}
@@ -93,11 +120,13 @@ IRA total: ${fmtUSD(total)}`;
         <Card className="mb-4">
           <CardContent className="pt-6 text-sm text-muted-foreground">
             <p className="mb-1 font-medium text-foreground">No IRA accounts yet.</p>
-            <p>They appear here automatically after your next Fidelity import with
-            <span className="font-medium"> "Create accounts for everything in the file" </span>
-            switched on (Settings → Portfolio CSV Import) — your ROTH IRA and ROLLOVER IRA
-            will be created and grouped here with live prices. You can also add one manually
-            in Settings → Add account.</p>
+            <p>
+              They appear here automatically after your next Fidelity import with
+              <span className="font-medium"> "Create accounts for everything in the file" </span>
+              switched on (Settings → Portfolio CSV Import) — your ROTH IRA and ROLLOVER IRA will be
+              created and grouped here with live prices. You can also add one manually in Settings →
+              Add account.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -106,26 +135,45 @@ IRA total: ${fmtUSD(total)}`;
           <Card key={a.id}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-base">{a.name}</CardTitle>
-              <span className={cn("text-xs tabular-nums", day >= 0 ? "text-emerald-500" : "text-red-500")}>
-                {day >= 0 ? "+" : ""}{fmtUSD(day)} today
+              <span
+                className={cn(
+                  "text-xs tabular-nums",
+                  day >= 0 ? "text-emerald-500" : "text-red-500",
+                )}
+              >
+                {day >= 0 ? "+" : ""}
+                {fmtUSD(day)} today
               </span>
             </CardHeader>
             <CardContent>
               <div className="mb-2 text-lg font-semibold tabular-nums">{fmtUSD(value)}</div>
-              {hs.length === 0 && <p className="text-sm text-muted-foreground">No positions — cash {fmtUSD(Number(a.cash ?? 0), 2)}</p>}
+              {hs.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No positions — cash {fmtUSD(Number(a.cash ?? 0), 2)}
+                </p>
+              )}
               {hs.map((h) => {
                 const q = quotes?.[h.symbol];
                 const p = px(h);
                 const gl = h.cost_basis > 0 ? (p - h.cost_basis) / h.cost_basis : null;
                 return (
-                  <div key={h.id} className="flex items-center justify-between border-b py-1.5 text-sm last:border-0">
+                  <div
+                    key={h.id}
+                    className="flex items-center justify-between border-b py-1.5 text-sm last:border-0"
+                  >
                     <span className="font-medium">{h.symbol}</span>
                     <span className="flex gap-3 tabular-nums">
                       <span>{h.quantity} sh</span>
                       <span>{fmtUSD(p, 2)}</span>
                       {gl != null && (
-                        <span className={cn("w-16 text-right", gl >= 0 ? "text-emerald-500" : "text-red-500")}>
-                          {gl >= 0 ? "+" : ""}{fmtPct(gl)}
+                        <span
+                          className={cn(
+                            "w-16 text-right",
+                            gl >= 0 ? "text-emerald-500" : "text-red-500",
+                          )}
+                        >
+                          {gl >= 0 ? "+" : ""}
+                          {fmtPct(gl)}
                         </span>
                       )}
                     </span>
@@ -138,12 +186,28 @@ IRA total: ${fmtUSD(total)}`;
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base">Monthly Retirement Committee Prompt</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Monthly Retirement Committee Prompt</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
-            <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">{prompt}</pre>
+            <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">
+              {prompt}
+            </pre>
             <div className="flex gap-2">
-              <Button onClick={() => { void navigator.clipboard.writeText(prompt); toast.success("Copied"); }}>Copy Prompt</Button>
-              <Button variant="secondary" onClick={() => window.open("https://chatgpt.com", "_blank")}>Open ChatGPT</Button>
+              <Button
+                onClick={() => {
+                  void navigator.clipboard.writeText(prompt);
+                  toast.success("Copied");
+                }}
+              >
+                Copy Prompt
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => window.open("https://chatgpt.com", "_blank")}
+              >
+                Open ChatGPT
+              </Button>
             </div>
           </CardContent>
         </Card>

@@ -19,9 +19,7 @@ function NotFoundComponent() {
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-semibold tracking-tight text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-medium text-foreground">Not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          This page doesn't exist.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">This page doesn't exist.</p>
         <div className="mt-6">
           <Link
             to="/"

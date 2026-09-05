@@ -16,10 +16,7 @@ import {
 
 import { useAccounts, type Account } from "@/hooks/useAppData";
 import type { AccountScope } from "@/lib/accountTotals";
-import {
-  defaultAccountId,
-  selectAccountHoldings,
-} from "@/lib/accountSelection";
+import { defaultAccountId, selectAccountHoldings } from "@/lib/accountSelection";
 
 // Re-exported so screens import selection helpers from one place.
 export { defaultAccountId, selectAccountHoldings };
@@ -126,7 +123,6 @@ export function useAccountContext(): AccountContextValue {
   }
   return ctx;
 }
-
 
 /**
  * The selected account as an `AccountScope`, for the data hooks.

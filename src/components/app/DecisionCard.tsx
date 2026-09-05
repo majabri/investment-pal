@@ -234,10 +234,7 @@ export function DecisionCard({ row }: { row: DecisionRow }) {
               {/* Provenance. Required by the contract; NULL on every row written
                   before ADR-APP-008, and shown as not captured rather than
                   backfilled with a guess about which model or prompt ran. */}
-              <Section
-                title="Provenance"
-                hint="which policy, model and prompt produced this"
-              >
+              <Section title="Provenance" hint="which policy, model and prompt produced this">
                 <dl className="space-y-0.5">
                   {(
                     [

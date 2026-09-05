@@ -22,15 +22,12 @@ export function AccountNotice({ status }: { status: AccountStatus }) {
     >
       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
       <div className="text-sm">
-        <div className="font-medium">
-          {unresolved ? "No account selected" : "No accounts yet"}
-        </div>
+        <div className="font-medium">{unresolved ? "No account selected" : "No accounts yet"}</div>
         <p className="mt-0.5 text-muted-foreground">
           {unresolved ? (
             <>
-              The selected account no longer exists — it may have been renamed or
-              removed. Choose an account from the switcher above. No figures are
-              shown until one is selected.
+              The selected account no longer exists — it may have been renamed or removed. Choose an
+              account from the switcher above. No figures are shown until one is selected.
             </>
           ) : (
             <>

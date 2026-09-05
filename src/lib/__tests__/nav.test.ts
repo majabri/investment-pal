@@ -62,8 +62,9 @@ describe("the collapse kept every page", () => {
   test("every route file has a nav entry", () => {
     // Guards the real failure mode: adding a page and forgetting to navigate to
     // it, which is how routes became unreachable in the first place.
-    const files = readdirSync("src/routes/_authenticated")
-      .filter((f) => f.endsWith(".tsx") && f !== "route.tsx");
+    const files = readdirSync("src/routes/_authenticated").filter(
+      (f) => f.endsWith(".tsx") && f !== "route.tsx",
+    );
     const routes = new Set(allNavRoutes());
     const missing: string[] = [];
     for (const f of files) {

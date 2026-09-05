@@ -1,8 +1,23 @@
 // Reference calendars — seed data ported from the Investment OS demo layer.
 // Edit freely; high-impact items surface as dashboard priorities.
-export interface EconEvent { date: string; name: string; importance: "high" | "medium" | "low"; }
-export interface EarningsEvt { date: string; symbol: string; session: "bmo" | "amc"; inPortfolio?: boolean; onWatchlist?: boolean; }
-export interface GeoEvent { region: string; title: string; impact: "high" | "medium" | "low"; note: string; }
+export interface EconEvent {
+  date: string;
+  name: string;
+  importance: "high" | "medium" | "low";
+}
+export interface EarningsEvt {
+  date: string;
+  symbol: string;
+  session: "bmo" | "amc";
+  inPortfolio?: boolean;
+  onWatchlist?: boolean;
+}
+export interface GeoEvent {
+  region: string;
+  title: string;
+  impact: "high" | "medium" | "low";
+  note: string;
+}
 
 export const ECON_EVENTS: EconEvent[] = [
   { date: "2026-07-24", name: "CPI (June)", importance: "high" },
@@ -27,8 +42,28 @@ export const EARNINGS_EVENTS: EarningsEvt[] = [
 ];
 
 export const GEO_EVENTS: GeoEvent[] = [
-  { region: "China / Taiwan", title: "Export-control review on AI chips", impact: "high", note: "Direct read-through to semis (LRCX, AVGO, TSM watch)" },
-  { region: "Middle East", title: "Shipping-lane tensions", impact: "medium", note: "Oil transit risk; watch WTI" },
-  { region: "Trade / Tariffs", title: "Pharma tariff proposal (2028 start)", impact: "medium", note: "Sector rotation risk; LLY watch" },
-  { region: "Russia / Ukraine", title: "Energy-infrastructure strikes", impact: "low", note: "European gas; limited US equity impact" },
+  {
+    region: "China / Taiwan",
+    title: "Export-control review on AI chips",
+    impact: "high",
+    note: "Direct read-through to semis (LRCX, AVGO, TSM watch)",
+  },
+  {
+    region: "Middle East",
+    title: "Shipping-lane tensions",
+    impact: "medium",
+    note: "Oil transit risk; watch WTI",
+  },
+  {
+    region: "Trade / Tariffs",
+    title: "Pharma tariff proposal (2028 start)",
+    impact: "medium",
+    note: "Sector rotation risk; LLY watch",
+  },
+  {
+    region: "Russia / Ukraine",
+    title: "Energy-infrastructure strikes",
+    impact: "low",
+    note: "European gas; limited US equity impact",
+  },
 ];

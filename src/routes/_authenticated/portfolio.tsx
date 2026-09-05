@@ -110,7 +110,8 @@ function PortfolioPage() {
     const earnDays = new Map<string, number>();
     for (const e of swingEarnings) {
       const d = tradingDaysUntil(e.date);
-      if (d != null && (!earnDays.has(e.symbol) || d < earnDays.get(e.symbol)!)) earnDays.set(e.symbol, d);
+      if (d != null && (!earnDays.has(e.symbol) || d < earnDays.get(e.symbol)!))
+        earnDays.set(e.symbol, d);
     }
     const out = new Map<string, SwingResult>();
     for (const s of swingSymbolKey ? swingSymbolKey.split(",") : []) {
@@ -121,23 +122,39 @@ function PortfolioPage() {
   const swingFor = (sym: string): SwingResult =>
     swing.get(sym) ?? { insufficient: true, band: "none", suggestion: null };
 
-  type PfSortKey = "symbol" | "last" | "dayGL" | "totalGL" | "value" | "pct" | "qty" | "avgCost" | "totalCost";
+  type PfSortKey =
+    "symbol" | "last" | "dayGL" | "totalGL" | "value" | "pct" | "qty" | "avgCost" | "totalCost";
   const [pfSortKey, setPfSortKey] = useState<PfSortKey>("value");
   const [pfSortDir, setPfSortDir] = useState<1 | -1>(-1);
   const togglePfSort = (k: PfSortKey) => {
     if (k === pfSortKey) setPfSortDir((d) => (d === 1 ? -1 : 1));
-    else { setPfSortKey(k); setPfSortDir(k === "symbol" ? 1 : -1); }
+    else {
+      setPfSortKey(k);
+      setPfSortDir(k === "symbol" ? 1 : -1);
+    }
   };
   const pfArrow = (k: PfSortKey) => (pfSortKey === k ? (pfSortDir === 1 ? " ▲" : " ▼") : "");
 
   // One source of truth for prices: live quote when available, else last saved.
-  const liveHoldings = useMemo(() => holdings.map((h) =>
-    liveQuotes?.[h.symbol] ? { ...h, current_price: liveQuotes[h.symbol].price } : h,
-  ), [holdings, liveQuotes]);
+  const liveHoldings = useMemo(
+    () =>
+      holdings.map((h) =>
+        liveQuotes?.[h.symbol] ? { ...h, current_price: liveQuotes[h.symbol].price } : h,
+      ),
+    [holdings, liveQuotes],
+  );
   // One arithmetic for the whole page. The account value was spelled out from
   // `selectedAccount` in five separate places; they agreed only by luck.
   const totals = useMemo(() => accountTotals(liveHoldings, balance), [liveHoldings, balance]);
-  const { positionsValue, cash, marginDebit, grossValue, totalAccountValue, unrealizedPL: pl, unrealizedPLPct } = totals;
+  const {
+    positionsValue,
+    cash,
+    marginDebit,
+    grossValue,
+    totalAccountValue,
+    unrealizedPL: pl,
+    unrealizedPLPct,
+  } = totals;
   const plPct = unrealizedPLPct ?? 0;
 
   const sectorData = useMemo(() => {
@@ -150,7 +167,13 @@ function PortfolioPage() {
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
   }, [holdings]);
 
-  const CHART_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
+  const CHART_COLORS = [
+    "var(--chart-1)",
+    "var(--chart-2)",
+    "var(--chart-3)",
+    "var(--chart-4)",
+    "var(--chart-5)",
+  ];
 
   return (
     <AppShell
@@ -205,7 +228,11 @@ function PortfolioPage() {
         <StatCard
           label="Net — actual account value"
           value={noScope ? "—" : fmtUSD(totalAccountValue)}
-          hint={noScope ? scopeName : `${scopeName} · gross − margin loan · matches Fidelity's Total account value`}
+          hint={
+            noScope
+              ? scopeName
+              : `${scopeName} · gross − margin loan · matches Fidelity's Total account value`
+          }
         />
         {/* Same rule as the cards above: no scope, no figure. "$0.00 (0.00%)"
             reads as "this account is flat", which is a different claim from
@@ -230,7 +257,9 @@ function PortfolioPage() {
             <span className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
                 {selectedAccount ? `${selectedAccount.name} only` : "No account selected"}
-                {dataUpdatedAt ? ` · as of ${new Date(dataUpdatedAt).toLocaleTimeString("en-US")}` : ""}
+                {dataUpdatedAt
+                  ? ` · as of ${new Date(dataUpdatedAt).toLocaleTimeString("en-US")}`
+                  : ""}
               </span>
               <RefreshPricesButton symbols={holdings.map((h) => h.symbol)} />
             </span>
@@ -241,145 +270,254 @@ function PortfolioPage() {
             </p>
           ) : (
             <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="cursor-pointer select-none" onClick={() => togglePfSort("symbol")}>Symbol{pfArrow("symbol")}</TableHead>
-                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("last")}>Last Price{pfArrow("last")}</TableHead>
-                  <TableHead className="text-right" title="Advisory trim signal (ADR-APP-002)">Swing</TableHead>
-                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("dayGL")}>Today's G/L{pfArrow("dayGL")}</TableHead>
-                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("totalGL")}>Total G/L{pfArrow("totalGL")}</TableHead>
-                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("value")}>Current Value{pfArrow("value")}</TableHead>
-                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("pct")}>% of Acct{pfArrow("pct")}</TableHead>
-                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("qty")}>Qty{pfArrow("qty")}</TableHead>
-                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("avgCost")}>Avg Cost{pfArrow("avgCost")}</TableHead>
-                  <TableHead className="cursor-pointer select-none text-right" onClick={() => togglePfSort("totalCost")}>Total Cost{pfArrow("totalCost")}</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...liveHoldings]
-                  .sort((a, b) => {
-                    const metric = (h: typeof a): number | string => {
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead
+                      className="cursor-pointer select-none"
+                      onClick={() => togglePfSort("symbol")}
+                    >
+                      Symbol{pfArrow("symbol")}
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none text-right"
+                      onClick={() => togglePfSort("last")}
+                    >
+                      Last Price{pfArrow("last")}
+                    </TableHead>
+                    <TableHead className="text-right" title="Advisory trim signal (ADR-APP-002)">
+                      Swing
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none text-right"
+                      onClick={() => togglePfSort("dayGL")}
+                    >
+                      Today's G/L{pfArrow("dayGL")}
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none text-right"
+                      onClick={() => togglePfSort("totalGL")}
+                    >
+                      Total G/L{pfArrow("totalGL")}
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none text-right"
+                      onClick={() => togglePfSort("value")}
+                    >
+                      Current Value{pfArrow("value")}
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none text-right"
+                      onClick={() => togglePfSort("pct")}
+                    >
+                      % of Acct{pfArrow("pct")}
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none text-right"
+                      onClick={() => togglePfSort("qty")}
+                    >
+                      Qty{pfArrow("qty")}
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none text-right"
+                      onClick={() => togglePfSort("avgCost")}
+                    >
+                      Avg Cost{pfArrow("avgCost")}
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none text-right"
+                      onClick={() => togglePfSort("totalCost")}
+                    >
+                      Total Cost{pfArrow("totalCost")}
+                    </TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...liveHoldings]
+                    .sort((a, b) => {
+                      const metric = (h: typeof a): number | string => {
+                        const q = liveQuotes?.[h.symbol];
+                        const price = q?.price ?? h.current_price;
+                        const value = h.quantity * price;
+                        const cost = h.quantity * h.cost_basis;
+                        switch (pfSortKey) {
+                          case "symbol":
+                            return h.symbol;
+                          case "last":
+                            return price;
+                          case "dayGL":
+                            return q && q.prevClose > 0
+                              ? h.quantity * (price - q.prevClose)
+                              : -Infinity;
+                          case "totalGL":
+                            return cost > 0 ? value - cost : -Infinity;
+                          case "value":
+                            return value;
+                          case "pct":
+                            return value; // same ordering as value
+                          case "qty":
+                            return h.quantity;
+                          case "avgCost":
+                            return h.cost_basis;
+                          case "totalCost":
+                            return cost;
+                        }
+                      };
+                      const va = metric(a),
+                        vb = metric(b);
+                      return (
+                        (typeof va === "string"
+                          ? va.localeCompare(vb as string)
+                          : (va as number) - (vb as number)) * pfSortDir
+                      );
+                    })
+                    .map((h) => {
                       const q = liveQuotes?.[h.symbol];
                       const price = q?.price ?? h.current_price;
                       const value = h.quantity * price;
                       const cost = h.quantity * h.cost_basis;
-                      switch (pfSortKey) {
-                        case "symbol": return h.symbol;
-                        case "last": return price;
-                        case "dayGL": return q && q.prevClose > 0 ? h.quantity * (price - q.prevClose) : -Infinity;
-                        case "totalGL": return cost > 0 ? value - cost : -Infinity;
-                        case "value": return value;
-                        case "pct": return value; // same ordering as value
-                        case "qty": return h.quantity;
-                        case "avgCost": return h.cost_basis;
-                        case "totalCost": return cost;
-                      }
-                    };
-                    const va = metric(a), vb = metric(b);
-                    return (typeof va === "string" ? va.localeCompare(vb as string) : (va as number) - (vb as number)) * pfSortDir;
-                  })
-                  .map((h) => {
-                  const q = liveQuotes?.[h.symbol];
-                  const price = q?.price ?? h.current_price;
-                  const value = h.quantity * price;
-                  const cost = h.quantity * h.cost_basis;
-                  const totalGL = value - cost;
-                  const dayGL = q && q.prevClose > 0 ? h.quantity * (price - q.prevClose) : null;
-                  const dayPct = q && q.prevClose > 0 ? (price - q.prevClose) / q.prevClose : null;
-                  // Fidelity divides % of Acct by TOTAL ACCOUNT VALUE (net equity) —
-                  // verified against real statements (CRWD 32.24%, LRCX 26.84%, ...).
-                  const pctOfAcct = totalAccountValue > 0 ? value / totalAccountValue : 0;
-                  const unpriced = !q;
-                  return (
-                    <TableRow key={h.id} className="cursor-pointer" onClick={() => setSelected(h)}>
-                      <TableCell className="font-medium">
-                        {h.symbol}
-                        {unpriced && <span className="ml-1 align-super text-[9px] text-muted-foreground">t</span>}
-                      </TableCell>
-                      <TableCell className="text-right tabular">
-                        {unpriced ? (h.current_price > 0 ? fmtUSD(h.current_price, 2) : "--") : (
-                          <>
-                            {fmtUSD(price, 2)}
-                            {dayPct != null && (
-                              <div className={`text-[11px] ${dayPct >= 0 ? "text-success" : "text-destructive"}`}>
-                                {dayPct >= 0 ? "+" : ""}{fmtPct(dayPct)}
-                              </div>
+                      const totalGL = value - cost;
+                      const dayGL =
+                        q && q.prevClose > 0 ? h.quantity * (price - q.prevClose) : null;
+                      const dayPct =
+                        q && q.prevClose > 0 ? (price - q.prevClose) / q.prevClose : null;
+                      // Fidelity divides % of Acct by TOTAL ACCOUNT VALUE (net equity) —
+                      // verified against real statements (CRWD 32.24%, LRCX 26.84%, ...).
+                      const pctOfAcct = totalAccountValue > 0 ? value / totalAccountValue : 0;
+                      const unpriced = !q;
+                      return (
+                        <TableRow
+                          key={h.id}
+                          className="cursor-pointer"
+                          onClick={() => setSelected(h)}
+                        >
+                          <TableCell className="font-medium">
+                            {h.symbol}
+                            {unpriced && (
+                              <span className="ml-1 align-super text-[9px] text-muted-foreground">
+                                t
+                              </span>
                             )}
-                          </>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <SwingScoreBadge r={swingFor(h.symbol)} />
-                      </TableCell>
-                      <TableCell className={`text-right tabular ${dayGL == null ? "text-muted-foreground" : dayGL >= 0 ? "text-success" : "text-destructive"}`}>
-                        {dayGL == null ? "--" : `${dayGL >= 0 ? "+" : ""}${fmtUSD(dayGL)}`}
-                      </TableCell>
-                      <TableCell className={`text-right tabular ${cost <= 0 ? "text-muted-foreground" : totalGL >= 0 ? "text-success" : "text-destructive"}`}>
-                        {cost > 0 ? `${totalGL >= 0 ? "+" : ""}${fmtUSD(totalGL)} (${fmtPct(totalGL / cost)})` : "--"}
-                      </TableCell>
-                      <TableCell className="text-right tabular">{value > 0.005 ? fmtUSD(value) : value > 0 ? fmtUSD(value, 2) : "--"}</TableCell>
-                      <TableCell className="text-right tabular text-muted-foreground">{fmtPct(pctOfAcct)}</TableCell>
-                      <TableCell className="text-right tabular">{h.quantity.toLocaleString("en-US")}</TableCell>
-                      <TableCell className="text-right tabular">{fmtUSD(h.cost_basis, 2)}</TableCell>
-                      <TableCell className="text-right tabular">{fmtUSD(cost)}</TableCell>
-                      <TableCell className="w-8 p-1" onClick={(e) => e.stopPropagation()}>
-                        <ThesisDialog holding={h} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              <span className="font-medium">Swing</span> (advisory · ADR-APP-002): 65–79 → consider trim 10–25% ·
-              80+ → trim 25–50% · <span aria-hidden>⚠</span> = earnings within 5 trading days (hold the trim
-              decision). Score blends RSI(14) + distance above the 20/50-day MAs. The committee decides; you execute.
-            </p>
-            {/* Fidelity-style account summary footer */}
-            <div className="mt-3 divide-y border-t text-sm">
-              <div className="flex items-center justify-between py-2">
-                <span className="font-semibold uppercase tracking-wide text-muted-foreground">Total</span>
-                <span className="flex gap-6 tabular">
-                  <span className={pl >= 0 ? "text-success" : "text-destructive"}>{fmtUSD(pl)}</span>
-                  <span className="font-medium">{fmtUSD(positionsValue)}</span>
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                {/* This row is the margin debit. Labelling it "Pending activity"
+                          </TableCell>
+                          <TableCell className="text-right tabular">
+                            {unpriced ? (
+                              h.current_price > 0 ? (
+                                fmtUSD(h.current_price, 2)
+                              ) : (
+                                "--"
+                              )
+                            ) : (
+                              <>
+                                {fmtUSD(price, 2)}
+                                {dayPct != null && (
+                                  <div
+                                    className={`text-[11px] ${dayPct >= 0 ? "text-success" : "text-destructive"}`}
+                                  >
+                                    {dayPct >= 0 ? "+" : ""}
+                                    {fmtPct(dayPct)}
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                            <SwingScoreBadge r={swingFor(h.symbol)} />
+                          </TableCell>
+                          <TableCell
+                            className={`text-right tabular ${dayGL == null ? "text-muted-foreground" : dayGL >= 0 ? "text-success" : "text-destructive"}`}
+                          >
+                            {dayGL == null ? "--" : `${dayGL >= 0 ? "+" : ""}${fmtUSD(dayGL)}`}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right tabular ${cost <= 0 ? "text-muted-foreground" : totalGL >= 0 ? "text-success" : "text-destructive"}`}
+                          >
+                            {cost > 0
+                              ? `${totalGL >= 0 ? "+" : ""}${fmtUSD(totalGL)} (${fmtPct(totalGL / cost)})`
+                              : "--"}
+                          </TableCell>
+                          <TableCell className="text-right tabular">
+                            {value > 0.005 ? fmtUSD(value) : value > 0 ? fmtUSD(value, 2) : "--"}
+                          </TableCell>
+                          <TableCell className="text-right tabular text-muted-foreground">
+                            {fmtPct(pctOfAcct)}
+                          </TableCell>
+                          <TableCell className="text-right tabular">
+                            {h.quantity.toLocaleString("en-US")}
+                          </TableCell>
+                          <TableCell className="text-right tabular">
+                            {fmtUSD(h.cost_basis, 2)}
+                          </TableCell>
+                          <TableCell className="text-right tabular">{fmtUSD(cost)}</TableCell>
+                          <TableCell className="w-8 p-1" onClick={(e) => e.stopPropagation()}>
+                            <ThesisDialog holding={h} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                </TableBody>
+              </Table>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                <span className="font-medium">Swing</span> (advisory · ADR-APP-002): 65–79 →
+                consider trim 10–25% · 80+ → trim 25–50% · <span aria-hidden>⚠</span> = earnings
+                within 5 trading days (hold the trim decision). Score blends RSI(14) + distance
+                above the 20/50-day MAs. The committee decides; you execute.
+              </p>
+              {/* Fidelity-style account summary footer */}
+              <div className="mt-3 divide-y border-t text-sm">
+                <div className="flex items-center justify-between py-2">
+                  <span className="font-semibold uppercase tracking-wide text-muted-foreground">
+                    Total
+                  </span>
+                  <span className="flex gap-6 tabular">
+                    <span className={pl >= 0 ? "text-success" : "text-destructive"}>
+                      {fmtUSD(pl)}
+                    </span>
+                    <span className="font-medium">{fmtUSD(positionsValue)}</span>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  {/* This row is the margin debit. Labelling it "Pending activity"
                     described the wrong thing entirely — Fidelity's pending
                     activity is settling trades, not the loan. */}
-                <span className="font-semibold uppercase tracking-wide text-muted-foreground">Margin loan</span>
-                <span className="tabular">{fmtUSD(-marginDebit)}</span>
+                  <span className="font-semibold uppercase tracking-wide text-muted-foreground">
+                    Margin loan
+                  </span>
+                  <span className="tabular">{fmtUSD(-marginDebit)}</span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="font-semibold uppercase tracking-wide">Total account value</span>
+                  <span className="tabular font-semibold">
+                    {noScope ? "—" : fmtUSD(totalAccountValue)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="font-semibold uppercase tracking-wide text-muted-foreground">
+                    Today's change
+                  </span>
+                  <span className="tabular">
+                    {(() => {
+                      const day = liveHoldings.reduce((sum, h) => {
+                        const q = liveQuotes?.[h.symbol];
+                        return q && q.prevClose > 0
+                          ? sum + h.quantity * (q.price - q.prevClose)
+                          : sum;
+                      }, 0);
+                      const prior = totalAccountValue - day; // Fidelity: % vs yesterday's account value
+                      return (
+                        <span className={day >= 0 ? "text-success" : "text-destructive"}>
+                          {day >= 0 ? "+" : ""}
+                          {fmtUSD(day)} ({prior > 0 ? fmtPct(day / prior) : "—"})
+                        </span>
+                      );
+                    })()}
+                  </span>
+                </div>
+                <p className="pt-2 text-[11px] text-muted-foreground">
+                  <span className="align-super text-[9px]">t</span> Not priced today — last known
+                  price shown; excluded from Today&apos;s G/L.
+                </p>
               </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="font-semibold uppercase tracking-wide">Total account value</span>
-                <span className="tabular font-semibold">
-                  {noScope ? "—" : fmtUSD(totalAccountValue)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="font-semibold uppercase tracking-wide text-muted-foreground">Today's change</span>
-                <span className="tabular">
-                  {(() => {
-                    const day = liveHoldings.reduce((sum, h) => {
-                      const q = liveQuotes?.[h.symbol];
-                      return q && q.prevClose > 0 ? sum + h.quantity * (q.price - q.prevClose) : sum;
-                    }, 0);
-                    const prior = totalAccountValue - day; // Fidelity: % vs yesterday's account value
-                    return (
-                      <span className={day >= 0 ? "text-success" : "text-destructive"}>
-                        {day >= 0 ? "+" : ""}{fmtUSD(day)} ({prior > 0 ? fmtPct(day / prior) : "—"})
-                      </span>
-                    );
-                  })()}
-                </span>
-              </div>
-              <p className="pt-2 text-[11px] text-muted-foreground">
-                <span className="align-super text-[9px]">t</span> Not priced today — last known price shown; excluded from Today&apos;s G/L.
-              </p>
-            </div>
             </>
           )}
         </div>
@@ -450,21 +588,25 @@ function PortfolioPage() {
         )}
       </div>
 
-
-
       {/* Position detail drawer */}
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           {selected && (
             <PositionDetail
               holding={selected}
-              onSaved={() => { setSelected(null); qc.invalidateQueries({ queryKey: ["holdings"] }); }}
-              onDeleted={() => { setSelected(null); qc.invalidateQueries({ queryKey: ["holdings"] }); }}
+              onSaved={() => {
+                setSelected(null);
+                qc.invalidateQueries({ queryKey: ["holdings"] });
+              }}
+              onDeleted={() => {
+                setSelected(null);
+                qc.invalidateQueries({ queryKey: ["holdings"] });
+              }}
             />
           )}
         </SheetContent>
       </Sheet>
-          <div className="mt-4 rounded-2xl border bg-card p-5">
+      <div className="mt-4 rounded-2xl border bg-card p-5">
         <div className="mb-3 text-sm font-medium">Sector allocation</div>
         {(() => {
           const total = liveHoldings.reduce((s2, h) => s2 + h.quantity * h.current_price, 0);
@@ -481,7 +623,10 @@ function PortfolioPage() {
                 <div key={sector} className="flex items-center gap-3 text-sm">
                   <span className="w-40 truncate">{sector}</span>
                   <div className="h-2 flex-1 overflow-hidden rounded bg-muted">
-                    <div className="h-full bg-primary" style={{ width: `${Math.max(2, (v / total) * 100)}%` }} />
+                    <div
+                      className="h-full bg-primary"
+                      style={{ width: `${Math.max(2, (v / total) * 100)}%` }}
+                    />
                   </div>
                   <span className="w-28 text-right tabular-nums text-muted-foreground">
                     {fmtUSD(v)} · {fmtPct(v / total)}
@@ -505,7 +650,10 @@ function AccountForm({
   account,
   onSave,
 }: {
-  account: { cash: number; margin_used: number; margin_limit: number; buying_power: number } | null | undefined;
+  account:
+    | { cash: number; margin_used: number; margin_limit: number; buying_power: number }
+    | null
+    | undefined;
   onSave: (patch: Record<string, number>) => void;
 }) {
   const [cash, setCash] = useState(account?.cash ?? 0);
@@ -602,15 +750,27 @@ function PositionDetail({
       <div className="grid grid-cols-3 gap-3">
         <div>
           <Label className="text-xs">Qty</Label>
-          <Input type="number" value={h.quantity} onChange={(e) => setH({ ...h, quantity: +e.target.value })} />
+          <Input
+            type="number"
+            value={h.quantity}
+            onChange={(e) => setH({ ...h, quantity: +e.target.value })}
+          />
         </div>
         <div>
           <Label className="text-xs">Cost</Label>
-          <Input type="number" value={h.cost_basis} onChange={(e) => setH({ ...h, cost_basis: +e.target.value })} />
+          <Input
+            type="number"
+            value={h.cost_basis}
+            onChange={(e) => setH({ ...h, cost_basis: +e.target.value })}
+          />
         </div>
         <div>
           <Label className="text-xs">Price</Label>
-          <Input type="number" value={h.current_price} onChange={(e) => setH({ ...h, current_price: +e.target.value })} />
+          <Input
+            type="number"
+            value={h.current_price}
+            onChange={(e) => setH({ ...h, current_price: +e.target.value })}
+          />
         </div>
       </div>
       <div>
@@ -619,23 +779,43 @@ function PositionDetail({
       </div>
       <div>
         <Label className="text-xs">Original thesis</Label>
-        <Textarea rows={2} value={h.original_thesis ?? ""} onChange={(e) => setH({ ...h, original_thesis: e.target.value })} />
+        <Textarea
+          rows={2}
+          value={h.original_thesis ?? ""}
+          onChange={(e) => setH({ ...h, original_thesis: e.target.value })}
+        />
       </div>
       <div>
         <Label className="text-xs">Current thesis</Label>
-        <Textarea rows={2} value={h.current_thesis ?? ""} onChange={(e) => setH({ ...h, current_thesis: e.target.value })} />
+        <Textarea
+          rows={2}
+          value={h.current_thesis ?? ""}
+          onChange={(e) => setH({ ...h, current_thesis: e.target.value })}
+        />
       </div>
       <div>
         <Label className="text-xs">Why I own it</Label>
-        <Textarea rows={2} value={h.why_own ?? ""} onChange={(e) => setH({ ...h, why_own: e.target.value })} />
+        <Textarea
+          rows={2}
+          value={h.why_own ?? ""}
+          onChange={(e) => setH({ ...h, why_own: e.target.value })}
+        />
       </div>
       <div>
         <Label className="text-xs">Last AI review</Label>
-        <Textarea rows={3} value={h.last_ai_review ?? ""} onChange={(e) => setH({ ...h, last_ai_review: e.target.value })} />
+        <Textarea
+          rows={3}
+          value={h.last_ai_review ?? ""}
+          onChange={(e) => setH({ ...h, last_ai_review: e.target.value })}
+        />
       </div>
       <div>
         <Label className="text-xs">My notes</Label>
-        <Textarea rows={3} value={h.notes ?? ""} onChange={(e) => setH({ ...h, notes: e.target.value })} />
+        <Textarea
+          rows={3}
+          value={h.notes ?? ""}
+          onChange={(e) => setH({ ...h, notes: e.target.value })}
+        />
       </div>
       <div className="flex gap-2">
         <Button onClick={save} disabled={saving} className="flex-1">

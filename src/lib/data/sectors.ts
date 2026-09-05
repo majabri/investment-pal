@@ -2,27 +2,54 @@
 // holding (📄 dialog) always overrides. Unknown symbols stay Unclassified.
 export const SECTOR_MAP: Record<string, string> = {
   // Semiconductors & AI infrastructure
-  NVDA: "Semiconductors", AVGO: "Semiconductors", LRCX: "Semiconductors",
-  TSM: "Semiconductors", AMD: "Semiconductors", ASML: "Semiconductors",
+  NVDA: "Semiconductors",
+  AVGO: "Semiconductors",
+  LRCX: "Semiconductors",
+  TSM: "Semiconductors",
+  AMD: "Semiconductors",
+  ASML: "Semiconductors",
   // Software & Cloud
-  MSFT: "Software & Cloud", NOW: "Software & Cloud", INTU: "Software & Cloud",
+  MSFT: "Software & Cloud",
+  NOW: "Software & Cloud",
+  INTU: "Software & Cloud",
   // Cybersecurity
-  CRWD: "Cybersecurity", PANW: "Cybersecurity",
+  CRWD: "Cybersecurity",
+  PANW: "Cybersecurity",
   // Internet & Communication
-  GOOGL: "Communication Services", META: "Communication Services", NFLX: "Communication Services",
+  GOOGL: "Communication Services",
+  META: "Communication Services",
+  NFLX: "Communication Services",
   // Consumer
-  AMZN: "Consumer Discretionary", TSLA: "Consumer Discretionary", COST: "Consumer Staples",
+  AMZN: "Consumer Discretionary",
+  TSLA: "Consumer Discretionary",
+  COST: "Consumer Staples",
   // Financials
-  RY: "Financials", V: "Financials", MA: "Financials", BLK: "Financials", "BRK.B": "Financials",
+  RY: "Financials",
+  V: "Financials",
+  MA: "Financials",
+  BLK: "Financials",
+  "BRK.B": "Financials",
   // Healthcare
-  ABT: "Healthcare", LLY: "Healthcare",
+  ABT: "Healthcare",
+  LLY: "Healthcare",
   // Crypto exposure
-  GBTC: "Crypto (BTC)", CLSK: "Crypto (miners)", "BTC/USD": "Crypto (BTC)", "ETH/USD": "Crypto (ETH)", "SOL/USD": "Crypto (SOL)",
+  GBTC: "Crypto (BTC)",
+  CLSK: "Crypto (miners)",
+  "BTC/USD": "Crypto (BTC)",
+  "ETH/USD": "Crypto (ETH)",
+  "SOL/USD": "Crypto (SOL)",
   // Commodities & Real Estate & Funds
-  GLD: "Commodities", SLV: "Commodities", ARE: "Real Estate", FAMRX: "Funds", FFSFX: "Funds",
+  GLD: "Commodities",
+  SLV: "Commodities",
+  ARE: "Real Estate",
+  FAMRX: "Funds",
+  FFSFX: "Funds",
   // Legacy / dead positions
-  CMGR: "Legacy / delisted", CCGY: "Legacy / delisted", CBYI: "Legacy / delisted",
-  ARYX: "Legacy / delisted", DJSP: "Legacy / delisted",
+  CMGR: "Legacy / delisted",
+  CCGY: "Legacy / delisted",
+  CBYI: "Legacy / delisted",
+  ARYX: "Legacy / delisted",
+  DJSP: "Legacy / delisted",
 };
 
 export const sectorFor = (symbol: string, saved?: string | null): string => {

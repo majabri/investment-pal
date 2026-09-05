@@ -131,9 +131,7 @@ export function SummaryMetricRow({
         <StatCard
           key={m.label}
           label={m.label}
-          value={
-            m.value === null ? "—" : m.kind === "percent" ? fmtPct(m.value) : fmtUSD(m.value)
-          }
+          value={m.value === null ? "—" : m.kind === "percent" ? fmtPct(m.value) : fmtUSD(m.value)}
           hint={name}
         />
       ))}
@@ -209,15 +207,15 @@ export function BalanceOverTime({
           // is true — the history could not be read — and offer the likeliest
           // cause as a possibility rather than a diagnosis.
           <p className="text-sm text-muted-foreground">
-            Could not read the balance history for this account. If the
-            portfolio_snapshots migrations have not been applied yet, that is the likeliest
-            cause — ask Lovable to apply pending migrations. Otherwise this is a connection or
-            permissions problem, and the figures above are unaffected.
+            Could not read the balance history for this account. If the portfolio_snapshots
+            migrations have not been applied yet, that is the likeliest cause — ask Lovable to apply
+            pending migrations. Otherwise this is a connection or permissions problem, and the
+            figures above are unaffected.
           </p>
         ) : scope.kind !== "account" ? (
           <p className="text-sm text-muted-foreground">
-            Select a single account to see its recorded history. A blended series across accounts
-            is what this chart used to draw, and it was not a portfolio anyone holds.
+            Select a single account to see its recorded history. A blended series across accounts is
+            what this chart used to draw, and it was not a portfolio anyone holds.
           </p>
         ) : !readiness.chartReady ? (
           <p className="text-sm text-muted-foreground">
@@ -314,9 +312,7 @@ export function PerformancePanel({
               <dt className="text-muted-foreground">
                 {p.label}
                 {p.truncated && p.change !== null ? (
-                  <span className="ml-1 text-[10px] uppercase text-amber-500">
-                    partial history
-                  </span>
+                  <span className="ml-1 text-[10px] uppercase text-amber-500">partial history</span>
                 ) : null}
               </dt>
               <dd className="tabular text-right">
@@ -483,7 +479,10 @@ export function EventsPanel({
           ) : (
             <ul className="divide-y text-sm">
               {earnings.slice(0, 12).map((e) => (
-                <li key={`${e.symbol}-${e.date}`} className="flex items-center justify-between py-1.5">
+                <li
+                  key={`${e.symbol}-${e.date}`}
+                  className="flex items-center justify-between py-1.5"
+                >
                   <span className="font-medium">{e.symbol}</span>
                   <span className="text-muted-foreground">
                     {e.date} · {e.session === "bmo" ? "pre-market" : "after close"}
