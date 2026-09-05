@@ -2,6 +2,7 @@
 // baked into the prompt templates (PR-UI-2). Before this, editing your goal
 // changed every screen except the prompt the model actually reads.
 import { describe, expect, test } from "bun:test";
+import { runChecks } from "../readiness";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -49,6 +50,18 @@ function ctx(overrides: Partial<PromptContext> = {}): PromptContext {
     ipsPositionCapHard: false,
     ipsMarginCapPct: 25,
     ipsCapsSource: "user_set",
+    // Every check passing, so these fixtures exercise the prompt rather than
+    // the gate. `readiness.test.ts` owns the gate's own behaviour.
+    readiness: runChecks({
+      reconciliation: "RECONCILED",
+      positions: "IMPORTED_SNAPSHOT",
+      quotes: "CURRENT",
+      cash: 0,
+      marginEnabled: false,
+      marginUsed: null,
+      openOrdersKnown: true,
+      policySource: "user_set",
+    }),
     objective: setObjective(),
     requiredCagr: 0.2,
     probability: 0.4,

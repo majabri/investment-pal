@@ -35,6 +35,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 import { objectiveOf } from "@/lib/objective";
 import { accountTotals } from "@/lib/accountTotals";
+import { useReadiness } from "@/hooks/useReadiness";
+import { ReadinessPanel } from "@/components/app/ReadinessPanel";
 
 // Map the Action Sheet's action verbs to a canonical set for the `action` column.
 // Priority markers ("HIGHEST PRIORITY ACTION") aren't a trade action → null.
@@ -103,6 +105,15 @@ function PromptCenter() {
   const { data: balance } = useScopedAccount(scope);
   const { data: priorities = [] } = usePriorities();
   const { data: ipsLite } = useIpsLite();
+  // The readiness gate (Phase 5, rule 17). This screen's output is a brief
+  // that asks a model to recommend against a real account, so it is gated on
+  // the inputs that recommendation would rest on. Nothing else on the screen
+  // is gated, and no other screen is.
+  const readinessTotals = useMemo(
+    () => accountTotals(scopedHoldings ?? [], balance ?? null),
+    [scopedHoldings, balance],
+  );
+  const readiness = useReadiness(readinessTotals);
   const addJournal = useAddJournal();
   const { data: journalEntries = [] } = useJournal("");
   const { data: news = [] } = useQuery({
@@ -270,6 +281,9 @@ function PromptCenter() {
       // Rule 15: the caps travel with where they came from, so the prompt can
       // say whether they are the user's decision or the app's default.
       ipsCapsSource: ipsLite.caps_source,
+      // Rule 17: the brief carries the gate's verdict, so the model is told
+      // what could not be verified rather than reasoning past it.
+      readiness,
       marginPolicy: ipsLite,
       holdings: holdings.map((h) => ({
         symbol: h.symbol,
@@ -328,6 +342,7 @@ function PromptCenter() {
     committeeScorecard,
     liveEconCal,
     liveEarnCal,
+    readiness,
   ]);
 
   const MEETING: Record<string, MeetingType> = {
@@ -420,6 +435,11 @@ function PromptCenter() {
       subtitle="Build a complete review prompt, run it in ChatGPT, save the summary."
     >
       <AccountNotice status={accountStatus} />
+      <ReadinessPanel
+        checks={readiness}
+        capability="committee_recommendation"
+        what="a committee brief for this account"
+      />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="morning">Morning</TabsTrigger>

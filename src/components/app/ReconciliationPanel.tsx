@@ -22,7 +22,7 @@ import {
   wasChecked,
   type ReconciliationStatus,
 } from "@/lib/reconciliation";
-import type { SourceType } from "@/lib/freshness";
+import { reconciliationInputFor } from "@/lib/reconciliationInput";
 import { usdOrUnavailable } from "@/lib/unavailable";
 
 /** Colour by what the status MEANS, not by severity alone: the four unchecked
@@ -47,28 +47,17 @@ export function ReconciliationPanel({ totals }: { totals: AccountTotals | null }
   if (scope.kind !== "account" || isLoading) return null;
   const account = accounts.find((a) => a.id === scope.accountId) ?? null;
 
+  // Built by `reconciliationInputFor` rather than inline, because the
+  // readiness gate (Phase 5, rule 17) reconciles the same account and two
+  // copies of this mapping would eventually disagree about what the app is
+  // comparing — while both rendered a confident status.
   const result = reconcileAccount(
-    {
-      external: {
-        value: latest?.total_account_value ?? null,
-        provenance: {
-          sourceType: "imported_snapshot",
-          asOf: latest?.imported_at ?? null,
-        },
-      },
-      calculated: {
-        value: totals?.totalAccountValue ?? null,
-        // The balance's provenance, because the app's total is only as current
-        // as the cash and margin figures underneath it (Phase 1d).
-        positions: {
-          sourceType: (account?.balances_source_type ?? null) as SourceType | null,
-          asOf: account?.balances_as_of ?? null,
-        },
-        // Quotes refresh on their own cadence; the holdings are re-priced live
-        // where a quote exists, so this is the moment they were fetched.
-        quotes: { sourceType: "live_quote", asOf: new Date().toISOString() },
-      },
-    },
+    reconciliationInputFor({
+      latestValue: latest?.total_account_value ?? null,
+      latestAsOf: latest?.imported_at ?? null,
+      account,
+      calculatedValue: totals?.totalAccountValue ?? null,
+    }),
     DEFAULT_TOLERANCE,
   );
 

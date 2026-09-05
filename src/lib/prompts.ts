@@ -5,6 +5,7 @@ import { isRealCalendarDate } from "./localDate";
 import { NOT_KNOWN, usdOrNotKnown } from "./unavailable";
 import type { Objective } from "./objective";
 import type { PolicySource } from "./policy";
+import { gate, type ReadinessCheck } from "./readiness";
 
 export type PromptContext = {
   /** Name of the portfolio the mandate is written about (the goal's name). */
@@ -68,6 +69,18 @@ export type PromptContext = {
   ipsPositionCapHard: boolean;
   ipsMarginCapPct: number;
   ipsCapsSource: PolicySource;
+  /**
+   * The readiness gate's verdict for this brief (Phase 5, rule 17).
+   *
+   * Required, and required to be the real one. A brief that asks a model to
+   * recommend against a portfolio must say which of that portfolio's inputs
+   * could not be verified — otherwise the model reasons from whatever numbers
+   * are present and produces a confident answer built on a figure nobody
+   * supplied. Rule 18 is the reason this is an INPUT and not something the
+   * model decides: the gate is deterministic and the model cannot argue with
+   * it.
+   */
+  readiness: ReadinessCheck[];
   /** Margin policy from ips_lite (ADR-APP-007). Omitted = rate not set. */
   marginPolicy?: MarginPolicy;
   holdings: Array<{
@@ -235,6 +248,35 @@ const money = usdOrNotKnown;
  * argue for it, cite it back, and treat a breach of it as the user breaking
  * their own commitment.
  */
+/**
+ * The block that tells the model what could not be verified.
+ *
+ * Written as an instruction rather than a note, because a note gets summarised
+ * away. Naming the specific checks matters for the same reason it does in the
+ * UI: "some data is missing" invites the model to guess which, and it will.
+ */
+function readinessBlock(checks: ReadinessCheck[]): string {
+  const g = gate("committee_recommendation", checks);
+  if (g.allowed) {
+    return "DATA READINESS: every input this brief depends on was verified.";
+  }
+  const lines = g.because.map(
+    (c) => `- ${c.label}: ${c.state === "fail" ? "FAILED" : NOT_KNOWN}. ${c.detail}`,
+  );
+  return [
+    "DATA READINESS — READ THIS BEFORE RECOMMENDING ANYTHING",
+    "The following inputs could NOT be verified:",
+    ...lines,
+    "",
+    "Do not produce position sizes, dollar amounts, or buy/sell quantities that",
+    "depend on any input listed above. Do not substitute a figure for one marked",
+    `${NOT_KNOWN}, do not infer it from the other figures, and do not proceed on the`,
+    "assumption that a missing figure is zero. Say plainly which recommendations",
+    "you are withholding and why. Analysis, research and commentary that do not",
+    "depend on these inputs remain in scope.",
+  ].join("\n");
+}
+
 function capsProvenanceLine(source: PolicySource): string {
   switch (source) {
     case "user_set":
@@ -292,6 +334,8 @@ Today's P/L (vs prior close, live-quoted positions): ${fmtUSD(ctx.todaysPL)} (${
 Cash: ${money(ctx.cash)} | Margin used: ${money(ctx.marginUsed)} | Buying power: ${money(ctx.buyingPower)}
 Goal: ${objectiveLine(ctx)}
 Required pace: ${paceLine(ctx.requiredCagr)}
+
+${readinessBlock(ctx.readiness)}
 
 INVESTMENT POLICY (IPS-lite) — HARD GOVERNANCE
 ${capsProvenanceLine(ctx.ipsCapsSource)}
