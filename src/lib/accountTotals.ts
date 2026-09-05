@@ -30,17 +30,33 @@ export type BalanceLike = {
   margin_used: number | null | undefined;
 };
 
+/**
+ * Every money field here is `number | null`, and NULL means NOT KNOWN.
+ *
+ * `accounts.cash` and `accounts.margin_used` became nullable in Phase 1a
+ * (rule 13): a never-populated account, a balance block that omitted a field
+ * and a broker that does not report one are all distinguishable from a real
+ * zero now, and this module is where that distinction either survives or is
+ * thrown away. It used to be thrown away — `num()` coerced null to 0, so an
+ * account with no imported cash reported a total account value short by the
+ * whole missing figure, in the same typeface as a correct one.
+ *
+ * Positions are a separate dataset and stay non-null: an empty position list is
+ * a known fact (we asked, there are none), not a missing one.
+ */
 export type AccountTotals = {
   /** Sum of quantity × current price. Fidelity's "margin market value". */
   positionsValue: number;
-  /** Cash market value. */
-  cash: number;
-  /** Margin debit, as a positive number. */
-  marginDebit: number;
-  /** cash + positions. Gross, before the debit — NOT the account value. */
-  grossValue: number;
-  /** cash + positions − debit. Fidelity's "Total account value". */
-  totalAccountValue: number;
+  /** Cash market value. NULL = not known. */
+  cash: number | null;
+  /** Margin debit, as a positive number. NULL = not known. */
+  marginDebit: number | null;
+  /** cash + positions. Gross, before the debit — NOT the account value.
+   *  NULL when cash is not known. */
+  grossValue: number | null;
+  /** cash + positions − debit. Fidelity's "Total account value".
+   *  NULL when either cash or the debit is not known. */
+  totalAccountValue: number | null;
   /** Sum of quantity × cost basis, over the same positions. */
   costBasis: number;
   /** positionsValue − costBasis, over the same positions. */
@@ -52,8 +68,21 @@ export type AccountTotals = {
   positionCount: number;
 };
 
+/** A position figure: absent or unusable reads as 0, which for a quantity or a
+ *  price is the arithmetic identity, not a claim about a balance. */
 const num = (v: number | null | undefined): number =>
   typeof v === "number" && Number.isFinite(v) ? v : 0;
+
+/**
+ * A balance figure: absent or unusable stays UNKNOWN.
+ *
+ * Deliberately a different function from `num` above, and deliberately not a
+ * flag on it. The two coercions look identical at the call site and mean
+ * opposite things — one is "no shares", the other is "we were never told" —
+ * and the whole defect this phase repairs is that they were the same function.
+ */
+const money = (v: number | null | undefined): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? v : null;
 
 /**
  * Totals for one scope's positions and balances.
@@ -74,12 +103,17 @@ export function accountTotals<T extends PositionLike>(
     costBasis += qty * num(p.cost_basis);
   }
 
-  const cash = num(balance?.cash);
+  const cash = money(balance?.cash);
   // Stored as a positive magnitude; Fidelity prints it as a negative debit.
-  const marginDebit = num(balance?.margin_used);
+  const marginDebit = money(balance?.margin_used);
 
-  const grossValue = cash + positionsValue;
-  const totalAccountValue = grossValue - marginDebit;
+  // Unknown propagates. A gross value computed with cash treated as zero is a
+  // real number that is wrong, which is worse than no number: it is indexed,
+  // compared, charted and reconciled against the broker exactly like a right
+  // one.
+  const grossValue = cash === null ? null : cash + positionsValue;
+  const totalAccountValue =
+    grossValue === null || marginDebit === null ? null : grossValue - marginDebit;
   const unrealizedPL = positionsValue - costBasis;
 
   return {
@@ -91,7 +125,10 @@ export function accountTotals<T extends PositionLike>(
     costBasis,
     unrealizedPL,
     unrealizedPLPct: costBasis > 0 ? unrealizedPL / costBasis : null,
-    equityPct: grossValue > 0 ? totalAccountValue / grossValue : null,
+    equityPct:
+      grossValue !== null && grossValue > 0 && totalAccountValue !== null
+        ? totalAccountValue / grossValue
+        : null,
     positionCount: positions.length,
   };
 }

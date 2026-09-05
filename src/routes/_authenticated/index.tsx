@@ -53,6 +53,7 @@ import {
   riskToVol,
   riskToExpectedReturn,
 } from "@/lib/finance";
+import { UNAVAILABLE } from "@/lib/unavailable";
 import { objectiveOf } from "@/lib/objective";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -218,7 +219,11 @@ function Dashboard() {
   // number (rule 13).
   const objective = useMemo(() => objectiveOf(goal), [goal]);
   const goalMetrics = useMemo(() => {
-    if (objective.kind !== "set") return null;
+    // The current value is as load-bearing as the objective: every figure below
+    // projects FROM it. Without it, `startVal` silently falls back to the
+    // objective's own starting value, so the dashboard reports the pace
+    // required from the day the goal was written as though it were today's.
+    if (objective.kind !== "set" || portfolioValue === null) return null;
     const years = Math.max(yearsBetween(new Date(), new Date(objective.targetDate)), 0.01);
     const startVal = portfolioValue > 0 ? portfolioValue : objective.startingValue;
     const cagr = requiredCAGRWithContrib(
@@ -298,7 +303,15 @@ function Dashboard() {
         const scopedHoldings = holdings;
         const gross = grossValue;
         const net = portfolioValue;
-        const equityPct = totals.equityPct ?? 1;
+        // NOT `?? 1`. Assuming full equity when it is unknown makes the
+        // "equity below 50%" breach unfireable on exactly the accounts whose
+        // data is missing — a governance check that passes because it checked
+        // nothing is worse than one that fails.
+        const equityPct = totals.equityPct;
+        // Whether the constitution can be checked at all. Every limit below is
+        // a fraction of the account value, so an unknown value means unchecked,
+        // not clean.
+        const checkable = net !== null && marginUsed !== null;
         const rateState = rateStatus(ipsLite);
         const lastUpdate = scopedHoldings.reduce<string | null>((m, h) => {
           const u = (h as { updated_at?: string }).updated_at ?? null;
@@ -312,15 +325,18 @@ function Dashboard() {
         const posCap = ipsLite.position_cap_pct / 100;
         for (const h of scopedHoldings) {
           const v = h.quantity * px(h);
-          if (net > 0 && v / net > posCap)
+          if (net !== null && net > 0 && v / net > posCap)
             breaches.push(
               `${h.symbol} ${fmtPct(v / net)} > ${ipsLite.position_cap_pct}% cap${ipsLite.position_cap_hard ? " (HARD)" : ""}`,
             );
         }
-        const marginUtil = net > 0 ? marginUsed / net : 0;
-        if (marginUsed > 0 && marginUtil > ipsLite.margin_cap_pct / 100)
-          breaches.push(`Margin util ${fmtPct(marginUtil)} > ${ipsLite.margin_cap_pct}% cap`);
-        if (marginUsed > 0 && equityPct < 0.5) breaches.push(`Equity ${fmtPct(equityPct)} < 50%`);
+        const marginUtil =
+          net !== null && net > 0 && marginUsed !== null ? marginUsed / net : null;
+        if (marginUsed !== null && marginUsed > 0 && marginUtil !== null)
+          if (marginUtil > ipsLite.margin_cap_pct / 100)
+            breaches.push(`Margin util ${fmtPct(marginUtil)} > ${ipsLite.margin_cap_pct}% cap`);
+        if (marginUsed !== null && marginUsed > 0 && equityPct !== null && equityPct < 0.5)
+          breaches.push(`Equity ${fmtPct(equityPct)} < 50%`);
         return (
           <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-xs">
             <span
@@ -343,21 +359,25 @@ function Dashboard() {
               {/* Provenance wording comes from marginCost, never from here —
                   a call site that writes its own is how "(estimate)" quietly
                   stops appearing on one screen. */}
-              {marginUsed > 0
-                ? `${fmtUSD(marginUsed)} · ${
+              {marginUsed === null
+                ? "not known"
+                : marginUsed > 0
+                  ? `${fmtUSD(marginUsed)} · ${
                     interest.kind === "actual"
                       ? `${fmtUSD(interest.accruedMtd, 2)} interest this month`
                       : interest.kind === "estimate"
                         ? `~${fmtUSD(interest.daily, 2)}/day interest`
                         : "no interest figure"
-                  } (${interestProvenanceShort(interest)}) · equity ${fmtPct(equityPct)}`
-                : "not set"}
+                    } (${interestProvenanceShort(interest)}) · equity ${
+                      equityPct === null ? UNAVAILABLE : fmtPct(equityPct)
+                    }`
+                  : "not set"}
             </span>
             <span className="text-muted-foreground">·</span>
             {/* Rate staleness, flagged only when there is a margin balance for
                 it to matter to. Amber, not red: an ageing rate is a prompt to
                 re-check, not a policy breach — those keep red to themselves. */}
-            {marginUsed > 0 && rateState.kind === "stale" ? (
+            {marginUsed !== null && marginUsed > 0 && rateState.kind === "stale" ? (
               <>
                 <span className="font-medium text-amber-500">
                   Margin rate {rateState.ageDays}d old
@@ -365,7 +385,7 @@ function Dashboard() {
                 <span className="text-muted-foreground">·</span>
               </>
             ) : null}
-            {marginUsed > 0 && rateState.kind === "unset" ? (
+            {marginUsed !== null && marginUsed > 0 && rateState.kind === "unset" ? (
               <>
                 <Link to="/settings" className="font-medium text-amber-500 hover:underline">
                   Set margin rate →
@@ -378,6 +398,12 @@ function Dashboard() {
                 instead. */}
             {noScope ? (
               <span className="text-muted-foreground">Constitution: {scopeName.toLowerCase()}</span>
+            ) : !checkable ? (
+              /* "clean" here would assert that nothing breached, having been
+                 unable to evaluate a single limit. */
+              <span className="font-medium text-amber-500">
+                Constitution: not checked — account value unknown
+              </span>
             ) : breaches.length === 0 ? (
               <span className="text-emerald-500">Constitution: clean</span>
             ) : (
