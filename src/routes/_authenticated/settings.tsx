@@ -710,6 +710,13 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
         // nothing. See the Objective card above.
         // An emptied or half-typed box clears the figure back to unknown.
         cash: numberOrUnknown(form.cash),
+        // Provenance travels with the figures (Phase 1d). Typed is a weaker
+        // claim than imported and the app now says which it is holding —
+        // per BLOCK, so editing one box marks all four, which is the known
+        // limitation the migration records.
+        balances_source_type: "user_entry",
+        balances_source: "settings_form",
+        balances_as_of: new Date().toISOString(),
         margin_used: numberOrUnknown(form.margin_used),
         margin_limit: numberOrUnknown(form.margin_limit),
         buying_power: numberOrUnknown(form.buying_power),

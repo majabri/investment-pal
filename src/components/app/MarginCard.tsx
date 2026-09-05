@@ -51,7 +51,13 @@ export function MarginCard({
       if (!userId) throw new Error("Not signed in");
       const { error } = await supabase
         .from("accounts")
-        .update({ margin_used: n })
+        .update({
+          margin_used: n,
+          // Provenance travels with the figure (Phase 1d, rule 14).
+          balances_source_type: "user_entry",
+          balances_source: "margin_card",
+          balances_as_of: new Date().toISOString(),
+        })
         .eq("id", accountId);
       if (error) throw error;
       toast.success(`Margin loan set: ${fmtUSD(n)}`);

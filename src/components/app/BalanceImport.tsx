@@ -51,6 +51,9 @@ export function BalanceImport() {
   // button whose result could go stale against an edited textarea.
   const parse = useMemo(() => parseBalanceBlock(raw), [raw]);
   const patch = useMemo(() => accountPatch(parse.fields), [parse]);
+  const moneyEntries = Object.entries(patch).filter(
+    (e): e is [string, number] => typeof e[1] === "number",
+  );
 
   // The rate the paste carries, offered only when it is actually different
   // from what IPS already holds. Re-confirming an identical rate would just
@@ -188,11 +191,21 @@ export function BalanceImport() {
           <div className="space-y-2">
             <div className="rounded-lg border bg-muted/40 px-3 py-2 text-xs">
               <span className="font-medium">This import will update {scope.accountName}:</span>{" "}
-              {Object.keys(patch).length === 0
+              {/* Money only. The patch also carries the provenance stamp
+                  (Phase 1d), which is not a figure and would render as "$NaN"
+                  through fmtUSD — so it is described in words below rather
+                  than listed as if it were a balance. */}
+              {moneyEntries.length === 0
                 ? "no live figures — the paste supplied none of cash, margin loan or buying power. The snapshot is still recorded."
-                : Object.entries(patch)
+                : moneyEntries
                     .map(([k, v]) => `${k.replace(/_/g, " ")} → ${fmtUSD(v)}`)
                     .join(" · ")}
+              {moneyEntries.length > 0 && (
+                <div className="mt-1 text-muted-foreground">
+                  Recorded as an imported snapshot, as of now — so the app can say how old these
+                  figures are rather than presenting them as current forever.
+                </div>
+              )}
             </div>
             <label className="flex items-start gap-2 text-sm">
               <input

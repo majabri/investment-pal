@@ -49,6 +49,7 @@ import {
   pctOrUnavailable,
   usdOrUnavailable,
 } from "@/lib/unavailable";
+import { freshnessLabel, freshnessOf, type SourceType } from "@/lib/freshness";
 import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated/portfolio")({
@@ -161,6 +162,13 @@ function PortfolioPage() {
     unrealizedPL: pl,
     unrealizedPLPct,
   } = totals;
+  // One state for the balance block, since the provenance is per block (Phase
+  // 1d). Reported against the ACCOUNT VALUE because that is the figure a
+  // decision rests on; the individual columns share its provenance.
+  const balanceFreshness = freshnessOf(totalAccountValue, {
+    sourceType: (selectedAccount?.balances_source_type ?? null) as SourceType | null,
+    asOf: selectedAccount?.balances_as_of ?? null,
+  });
   const plPct = unrealizedPLPct ?? 0;
 
   const sectorData = useMemo(() => {
@@ -239,7 +247,13 @@ function PortfolioPage() {
           hint={
             noScope
               ? scopeName
-              : `${scopeName} · gross − margin loan · matches Fidelity's Total account value`
+              : // How old the figure is, beside the figure (Phase 1d, rule 14).
+                // The provenance was recorded and read by nothing, which is the
+                // same defect as not recording it.
+                `${scopeName} · gross − margin loan · ${freshnessLabel(
+                  balanceFreshness,
+                  selectedAccount?.balances_as_of ?? null,
+                )}`
           }
         />
         {/* Same rule as the cards above: no scope, no figure. "$0.00 (0.00%)"
@@ -749,6 +763,9 @@ function AccountForm({
               margin_used: asValue(used),
               margin_limit: asValue(limit),
               buying_power: asValue(bp),
+              balances_source_type: "user_entry",
+              balances_source: "portfolio_cash_margin_form",
+              balances_as_of: new Date().toISOString(),
               last_synced_at: new Date().toISOString(),
             })
           }

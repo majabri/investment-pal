@@ -278,9 +278,14 @@ describe("reconciliation is the point of the import", () => {
 });
 
 describe("what an import writes back", () => {
+  const AS_OF = new Date("2026-09-05T12:00:00Z");
+  /** Just the money, for the assertions that are about the money. */
+  const money = (patch: Record<string, number | string>) =>
+    Object.fromEntries(Object.entries(patch).filter(([, v]) => typeof v === "number"));
+
   test("only the columns the paste supplied", () => {
     const p = parseBalanceBlock(FIXTURE);
-    expect(accountPatch(p.fields)).toEqual({
+    expect(money(accountPatch(p.fields, AS_OF))).toEqual({
       cash: 2_500,
       margin_used: 20_000,
       buying_power: 190_000,
@@ -291,13 +296,25 @@ describe("what an import writes back", () => {
     // This is the silent-partial-accept failure in one test: a paste with no
     // cash line must not set cash to 0.
     const p = parseBalanceBlock("Net debit −$20,000.00");
-    const patch = accountPatch(p.fields);
+    const patch = accountPatch(p.fields, AS_OF);
     expect("cash" in patch).toBe(false);
-    expect(patch).toEqual({ margin_used: 20_000 });
+    expect(money(patch)).toEqual({ margin_used: 20_000 });
   });
 
   test("an all-missing paste writes nothing at all", () => {
-    expect(accountPatch(parseBalanceBlock("").fields)).toEqual({});
+    // Provenance included. Stamping "imported snapshot, as of now" over figures
+    // this paste did not supply would date somebody else's numbers to this
+    // import (Phase 1d).
+    expect(accountPatch(parseBalanceBlock("").fields, AS_OF)).toEqual({});
+  });
+
+  test("provenance travels with the figures, in the same patch", () => {
+    // Two writes could half-fail, leaving figures that claim an origin they do
+    // not have — or worse, the previous import's origin.
+    const patch = accountPatch(parseBalanceBlock(FIXTURE).fields, AS_OF);
+    expect(patch.balances_source_type).toBe("imported_snapshot");
+    expect(patch.balances_source).toBe("broker_balances_paste");
+    expect(patch.balances_as_of).toBe(AS_OF.toISOString());
   });
 
   test("the snapshot keeps nulls as nulls and the paste verbatim", () => {

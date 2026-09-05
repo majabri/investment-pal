@@ -324,10 +324,24 @@ export function toSnapshot(
  * write 0 over a real cash balance — that is the silent-partial-accept failure
  * this stage exists to prevent, and it costs exactly as much as it sounds.
  */
-export function accountPatch(fields: BalanceFields): Record<string, number> {
-  const patch: Record<string, number> = {};
+export function accountPatch(
+  fields: BalanceFields,
+  /** When the figures were true. Defaults to now — a paste captures the page as
+   *  it stood, and the import UI has nothing better to offer. */
+  asOf: Date = new Date(),
+): Record<string, number | string> {
+  const patch: Record<string, number | string> = {};
   if (fields.cashMarketValue !== null) patch.cash = fields.cashMarketValue;
   if (fields.netDebit !== null) patch.margin_used = fields.netDebit;
   if (fields.marginBuyingPower !== null) patch.buying_power = fields.marginBuyingPower;
+  // Provenance travels WITH the figures, in the same patch (Phase 1d, rule 14).
+  // Writing it separately would let one succeed and the other fail, leaving
+  // figures that claim an origin they do not have — or worse, an origin that
+  // belongs to the previous import.
+  if (Object.keys(patch).length > 0) {
+    patch.balances_source_type = "imported_snapshot";
+    patch.balances_source = "broker_balances_paste";
+    patch.balances_as_of = asOf.toISOString();
+  }
   return patch;
 }
