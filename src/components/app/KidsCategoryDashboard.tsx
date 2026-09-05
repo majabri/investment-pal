@@ -10,6 +10,7 @@ import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { usdOrUnavailable } from "@/lib/unavailable";
 import { accountCategory, type AccountCategory } from "@/lib/data/accountGroups";
+import { accountTotals } from "@/lib/accountTotals";
 import { cn } from "@/lib/utils";
 
 type SortKey = "symbol" | "shares" | "avgCost" | "value" | "gl";
@@ -76,14 +77,13 @@ export function KidsCategoryDashboard({
 
   const rows = kidAccounts.map(({ a, kid }) => {
     const hs = allHoldings.filter((h) => h.account_id === a.id);
-    // `Number(a.cash ?? 0)` used to make a never-populated account report its
-    // positions as its whole value — right-looking, and short by the cash
-    // (Phase 1a, rule 13). The positions are still known; the account VALUE is
-    // not, and only it goes unavailable.
-    const mv = hs.reduce((s, h) => s + h.quantity * px(h), 0);
-    const cash = a.cash === null || a.cash === undefined ? null : Number(a.cash);
-    const value = cash === null ? null : mv + cash;
-    const cost = hs.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
+    // One engine (Phase 3a, rule 9), rather than this screen's own copy of
+    // `positions + cash`.
+    const t = accountTotals(hs, a, px);
+    const mv = t.positionsValue;
+    const cash = t.cash;
+    const value = t.totalAccountValue;
+    const cost = t.costBasis;
     const day = hs.reduce((s, h) => {
       const q = quotes?.[h.symbol];
       return q && q.prevClose > 0 ? s + h.quantity * (q.price - q.prevClose) : s;

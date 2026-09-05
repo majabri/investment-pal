@@ -34,6 +34,7 @@ import { getQuotesFn } from "@/lib/marketServer";
 import { supabase } from "@/lib/supabaseClient";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 import { objectiveOf } from "@/lib/objective";
+import { accountTotals } from "@/lib/accountTotals";
 
 // Map the Action Sheet's action verbs to a canonical set for the `action` column.
 // Priority markers ("HIGHEST PRIORITY ACTION") aren't a trade action → null.
@@ -193,18 +194,19 @@ function PromptCenter() {
     const holdings = scopedHoldings.map((h) =>
       liveQuotes?.[h.symbol] ? { ...h, current_price: liveQuotes[h.symbol].price } : h,
     );
-    const positionsValue = holdings.reduce((s, h) => s + h.quantity * h.current_price, 0);
-    const cost = holdings.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
-    const pl = positionsValue - cost;
+    // One engine (Phase 3a, rule 9). This was the fourth copy of
+    // `positions + cash − debt`, and the one whose output goes to the model.
+    const t = accountTotals(holdings, balance);
+    const positionsValue = t.positionsValue;
+    const cost = t.costBasis;
+    const pl = t.unrealizedPL;
     // NULL, never 0. These go into the block headed "MY VERIFIED DATA —
     // GROUND EVERY RECOMMENDATION ONLY IN THIS", so a fabricated $0.00 is a
     // false premise the committee is instructed to reason from (Phase 1a).
-    const cash = balance?.cash ?? null;
-    const marginUsed = balance?.margin_used ?? null;
-    const grossValue = cash === null ? null : positionsValue + cash;
-    // NET — Fidelity's Total account value.
-    const portfolioValue =
-      grossValue === null || marginUsed === null ? null : grossValue - marginUsed;
+    const cash = t.cash;
+    const marginUsed = t.marginDebit;
+    const grossValue = t.grossValue;
+    const portfolioValue = t.totalAccountValue;
     const dayPL = holdings.reduce((sum, h) => {
       const q = liveQuotes?.[h.symbol];
       return q && q.prevClose > 0 ? sum + h.quantity * (q.price - q.prevClose) : sum;
