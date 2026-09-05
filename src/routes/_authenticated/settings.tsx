@@ -27,6 +27,8 @@ import {
   useLogSync,
   useAccounts,
   useHouseholdMembers,
+  useStrategies,
+  useStrategySymbols,
   useGoal,
   useIpsLite,
   type Account,
@@ -44,6 +46,7 @@ import {
 import { rateStatus } from "@/lib/marginCost";
 import { isFutureLocalDate, isRealCalendarDate } from "@/lib/localDate";
 import { RELATIONSHIPS, ageOf } from "@/lib/household";
+import { BUCKET_LABEL, STRATEGY_BUCKETS, byBucket } from "@/lib/strategy";
 import {
   POLICY_CLASS_LABEL,
   POLICY_CLASS_MEANING,
@@ -548,6 +551,202 @@ function HouseholdCard() {
   );
 }
 
+
+/**
+ * Strategy rules — the approved universe and the rules with it (Phase 4,
+ * rules 16 and 21).
+ *
+ * `familyPolicy.ts` carried 28 tickers in four buckets, a 5% speculative cap
+ * and a parity rule, compiled into the application. They drove the
+ * "% in approved names" figure on /kids and an "Approved universe" paragraph
+ * in the committee prompt, with nothing saying whose approval it was — and a
+ * second user could change none of it without changing the source.
+ */
+function StrategyCard() {
+  const { data: strategies = [], create, update, remove } = useStrategies();
+  const { data: symbols = [], add, remove: removeSymbol } = useStrategySymbols();
+  const [newName, setNewName] = useState("");
+  const [sym, setSym] = useState("");
+  const [bucket, setBucket] = useState<string>("core");
+
+  const strategy = strategies[0] ?? null;
+  const mine = strategy === null ? [] : symbols.filter((s) => s.strategy_id === strategy.id);
+
+  return (
+    <section className="mb-4 rounded-2xl border bg-card p-5">
+      <div className="mb-1 flex items-center gap-2 text-sm font-medium">
+        Strategy
+        {/* Rule 21: a strategy rule is not the user's risk policy and not a
+            system safety rule. The IPS-lite card above is the risk policy. */}
+        <Badge variant="outline" className="text-[10px] uppercase">
+          {POLICY_CLASS_LABEL.strategy}
+        </Badge>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Optional. {POLICY_CLASS_MEANING.strategy} Nothing is approved for you — an empty universe
+        means &ldquo;in approved names&rdquo; reads Unavailable rather than 0%.
+      </p>
+
+      {strategy === null ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            className="max-w-xs"
+            placeholder="Strategy name (e.g. Long-term core)"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
+          <Button
+            disabled={create.isPending}
+            onClick={() => {
+              const n = newName.trim();
+              if (!n) return toast.error("Name required");
+              create.mutate(
+                { name: n },
+                {
+                  onSuccess: () => {
+                    setNewName("");
+                    toast.success("Strategy created");
+                  },
+                  onError: (e) => toast.error((e as Error).message),
+                },
+              );
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" /> Create strategy
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-[1fr_180px_auto]">
+            <div>
+              <Label className="text-xs">Name</Label>
+              <Input
+                value={strategy.name}
+                onChange={(e) => update.mutate({ id: strategy.id, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Speculative cap (%)</Label>
+              <Input
+                type="number"
+                placeholder="No cap"
+                value={
+                  strategy.speculative_max_pct === null ? "" : String(strategy.speculative_max_pct)
+                }
+                onChange={(e) =>
+                  // Empty box = no cap stated, stored as NULL. Not 0 — a cap of
+                  // zero forbids speculative holdings, which is a rule, and
+                  // "nobody set a cap" is not.
+                  update.mutate({
+                    id: strategy.id,
+                    speculative_max_pct: numberOrUnknown(e.target.value),
+                  })
+                }
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                variant="ghost"
+                className="text-destructive"
+                onClick={() => {
+                  if (!confirm(`Delete "${strategy.name}" and its symbols?`)) return;
+                  remove.mutate(strategy.id);
+                }}
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Delete
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs">Parity rule (optional, free text)</Label>
+            <Textarea
+              rows={2}
+              placeholder="A sentence for the committee to read. Left blank, none is shown."
+              defaultValue={strategy.parity_rule ?? ""}
+              onBlur={(e) =>
+                update.mutate({ id: strategy.id, parity_rule: e.target.value.trim() || null })
+              }
+            />
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-[1fr_200px_auto]">
+            <Input
+              placeholder="Symbol"
+              value={sym}
+              onChange={(e) => setSym(e.target.value.toUpperCase())}
+            />
+            <Select value={bucket} onValueChange={setBucket}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STRATEGY_BUCKETS.map((b) => (
+                  <SelectItem key={b} value={b}>
+                    {BUCKET_LABEL[b]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              disabled={add.isPending}
+              onClick={() => {
+                const t = sym.trim().toUpperCase();
+                if (!t) return toast.error("Symbol required");
+                add.mutate(
+                  { strategy_id: strategy.id, symbol: t, bucket },
+                  {
+                    onSuccess: () => {
+                      setSym("");
+                      toast.success(`${t} added`);
+                    },
+                    // A duplicate hits the unique index; the message says why
+                    // rather than showing a Postgres constraint name.
+                    onError: () =>
+                      toast.error(`${t} is already in this strategy — remove it to re-bucket it`),
+                  },
+                );
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add
+            </Button>
+          </div>
+
+          {mine.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No symbols yet. Until there are, /kids shows Unavailable for &ldquo;in approved
+              names&rdquo; and the committee prompt says no strategy is configured.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {byBucket(mine).map(([b, list]) => (
+                <div key={b} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="w-44 shrink-0 text-xs text-muted-foreground">
+                    {BUCKET_LABEL[b]}
+                  </span>
+                  {list.map((symbol) => {
+                    const row = mine.find((m) => m.symbol === symbol)!;
+                    return (
+                      <button
+                        key={symbol}
+                        className="rounded-lg border px-2 py-0.5 text-xs hover:border-destructive hover:text-destructive"
+                        title="Remove"
+                        onClick={() => removeSymbol.mutate(row.id)}
+                      >
+                        {symbol} ×
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SettingsPage() {
   const qc = useQueryClient();
   const { data: priorities = [], add: addPriority, dismiss: dismissP } = usePriorities();
@@ -578,6 +777,7 @@ function SettingsPage() {
       <ObjectiveCard />
       <IpsLiteCard />
       <MarginRateCard />
+      <StrategyCard />
       <HouseholdCard />
       {/* ACCOUNTS */}
       <section className="rounded-2xl border bg-card p-5">

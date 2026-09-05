@@ -398,6 +398,63 @@ export type Database = {
         };
         Relationships: [];
       };
+      strategies: {
+        Row: {
+          created_at: string;
+          id: string;
+          name: string;
+          parity_rule: string | null;
+          speculative_max_pct: number | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          name: string;
+          parity_rule?: string | null;
+          speculative_max_pct?: number | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          name?: string;
+          parity_rule?: string | null;
+          speculative_max_pct?: number | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      strategy_symbols: {
+        Row: {
+          bucket: string;
+          created_at: string;
+          id: string;
+          strategy_id: string;
+          symbol: string;
+          user_id: string;
+        };
+        Insert: {
+          bucket: string;
+          created_at?: string;
+          id?: string;
+          strategy_id: string;
+          symbol: string;
+          user_id: string;
+        };
+        Update: {
+          bucket?: string;
+          created_at?: string;
+          id?: string;
+          strategy_id?: string;
+          symbol?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       sync_log: {
         Row: {
           created_at: string;

@@ -10,7 +10,7 @@
 //     names and birth dates into a test file to prove they are gone from the
 //     rest of the tree would put them back in a public repository.
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import {
   RELATIONSHIPS,
   ageOf,
@@ -249,36 +249,56 @@ describe("holderLabel", () => {
 
 describe("the compiled-in roster cannot come back", () => {
   // Structural, not value-based — see the note at the top of this file.
-  test("familyPolicy carries no people", () => {
-    const text = readFileSync("src/lib/data/familyPolicy.ts", "utf8");
-    // Comments stripped first. The comment in that file EXPLAINS what was
-    // removed, and it has to name `children` and birth dates to do so. A guard
-    // that fires on its own explanation pressures the next person to delete
-    // the explanation, which is the opposite of what it is for.
-    const code = stripComments(text);
-    expect(code).not.toMatch(/\bchildren\s*:/);
-    expect(code).not.toMatch(/birth[_ ]?[Dd]ate/);
-    // The literal shape of the thing that was there: `{ key: ..., name: ... }`.
-    expect(code).not.toMatch(/\bkey\s*:\s*"/);
+  //
+  // Scanned across all of `src/lib/` rather than one named file. The first
+  // version read `src/lib/data/familyPolicy.ts` by path; that file has since
+  // been emptied and renamed, and a guard pinned to a path is a guard that
+  // stops guarding the moment somebody moves the thing. `src/lib` is where
+  // this data would go if it came back, and it holds no React components, so
+  // an ordinary `children:` prop cannot trip it.
+  const lib = libSources();
+
+  test("no module carries an array of people, or a literal birth date", () => {
+    const offenders: string[] = [];
+    for (const file of lib) {
+      // Comments stripped first. The comments in these modules EXPLAIN what
+      // was removed, and have to name `children` and birth dates to do so. A
+      // guard that fires on its own explanation pressures the next person to
+      // delete the explanation, which is the opposite of what it is for.
+      const code = stripComments(readFileSync(file, "utf8"));
+      if (/\bchildren\s*:\s*\[/.test(code)) offenders.push(`${file}: children array`);
+      if (/birth[_ ]?[Dd]ate\s*:\s*["']\d/.test(code)) offenders.push(`${file}: literal birth date`);
+    }
+    expect(offenders).toEqual([]);
   });
 
   test("NEGATIVE CONTROL: those patterns do match the array that was removed", () => {
-    // Otherwise the assertions above would pass against a regex that matches
+    // Otherwise the assertion above would pass against a regex that matches
     // nothing — the failure mode that has bitten this suite before.
     const removed = `children: [{ key: "a", name: "A", birthDate: "2014-06-03" }],`;
-    expect(removed).toMatch(/\bchildren\s*:/);
-    expect(removed).toMatch(/birth[_ ]?[Dd]ate/);
-    expect(removed).toMatch(/\bkey\s*:\s*"/);
+    expect(removed).toMatch(/\bchildren\s*:\s*\[/);
+    expect(removed).toMatch(/birth[_ ]?[Dd]ate\s*:\s*["']\d/);
   });
 
-  test("NEGATIVE CONTROL: comment stripping does not blank the file", () => {
+  test("NEGATIVE CONTROL: the patterns spare a nullable column declaration", () => {
+    // `birth_date: string | null;` is the row type and must survive; only a
+    // literal date is forbidden.
+    const kept = `birth_date: string | null;`;
+    expect(kept).not.toMatch(/birth[_ ]?[Dd]ate\s*:\s*["']\d/);
+  });
+
+  test("NEGATIVE CONTROL: the scan reaches real files", () => {
+    // A guard that walks an empty tree passes forever.
+    expect(lib.length).toBeGreaterThan(20);
+    expect(lib).toContain("src/lib/household.ts");
+    expect(lib).toContain("src/lib/objectiveMath.ts");
+    expect(lib.some((f) => f.includes("__tests__"))).toBe(false);
+  });
+
+  test("NEGATIVE CONTROL: comment stripping does not blank a file", () => {
     // If `stripComments` returned "" the guard above would pass forever.
-    const code = stripComments(readFileSync("src/lib/data/familyPolicy.ts", "utf8"));
-    expect(code).toContain("FAMILY_POLICY");
-    // Anchored on something this phase is not removing. It was
-    // `targetPerChild`, which the very next PR deleted — a control that has to
-    // be re-pointed every time the file changes is a control nobody trusts.
-    expect(code).toContain("approvedSymbols");
+    const code = stripComments(readFileSync("src/lib/objectiveMath.ts", "utf8"));
+    expect(code).toContain("fvWithContributions");
   });
 
   test("kidsSeed is gone and does not return", () => {
@@ -293,6 +313,19 @@ describe("the compiled-in roster cannot come back", () => {
     expect(RELATIONSHIPS as readonly string[]).not.toContain("child");
   });
 });
+
+/** Every non-test module under `src/lib`, as repo-relative paths. */
+function libSources(dir = "src/lib"): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const full = `${dir}/${entry}`;
+    if (statSync(full).isDirectory()) {
+      if (entry === "__tests__") continue;
+      out.push(...libSources(full));
+    } else if (/\.tsx?$/.test(entry)) out.push(full);
+  }
+  return out;
+}
 
 /** Strips `//` and block comments. Crude, and deliberately so — it only ever
  *  runs over source this repo controls. */

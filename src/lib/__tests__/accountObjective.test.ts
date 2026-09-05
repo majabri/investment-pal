@@ -7,7 +7,7 @@
 // progress bar, a required CAGR and a "Behind / On Track / Ahead" verdict, and
 // reached a model inside the committee prompt as the user's own objective.
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import {
   accountObjectiveOf,
   combinedTarget,
@@ -168,61 +168,90 @@ describe("no objective is compiled into the source", () => {
   const strip = (t: string) =>
     t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
-  test("familyPolicy carries no target, horizon or contribution plan", () => {
-    // Comments stripped: the file's header EXPLAINS what was removed and has
-    // to name the figures to do it. A guard that fires on its own explanation
-    // pressures the next person to delete the explanation.
-    const code = strip(readFileSync("src/lib/data/familyPolicy.ts", "utf8"));
-    expect(code).not.toMatch(/targetPerChild/);
-    expect(code).not.toMatch(/familyTarget/);
-    expect(code).not.toMatch(/targetDate/);
-    // A contribution PLAN — an object with an amount and a cadence — not the
-    // word. `fvWithContributions` and `requiredCagrWithContributions` still
-    // live in that file and are meant to: they are parameterised arithmetic
-    // that takes a contribution, not a contribution anybody set. A guard
-    // written as `/contribution/i` flagged them, which is the same too-coarse
-    // mistake this suite keeps catching.
-    expect(code).not.toMatch(/\bcontribution\s*:/i);
-    expect(code).not.toMatch(/amountUsd|cadenceDays|anchorDate/);
-    expect(code).not.toMatch(/200_000|600_000/);
-  });
-
-  test("NEGATIVE CONTROL: those patterns match the constants that were removed", () => {
-    const removed = `targetPerChild: 200_000, targetDate: "2036-07-01", familyTarget: 600_000,
-      contribution: { amountUsd: 100, cadenceDays: 14 },`;
-    expect(removed).toMatch(/targetPerChild/);
-    expect(removed).toMatch(/familyTarget/);
-    expect(removed).toMatch(/targetDate/);
-    expect(removed).toMatch(/\bcontribution\s*:/i);
-    expect(removed).toMatch(/amountUsd|cadenceDays|anchorDate/);
-    expect(removed).toMatch(/200_000|600_000/);
-  });
-
-  test("NEGATIVE CONTROL: the narrowed needle still spares the arithmetic", () => {
-    // The other half of narrowing it: prove it does NOT fire on the two
-    // parameterised functions that are supposed to stay.
-    const kept = `export function fvWithContributions(present: number, perPeriod: number) {}`;
-    expect(kept).not.toMatch(/\bcontribution\s*:/i);
-    expect(kept).not.toMatch(/amountUsd|cadenceDays|anchorDate/);
-  });
-
-  test("NEGATIVE CONTROL: stripping comments does not blank the file", () => {
-    const code = strip(readFileSync("src/lib/data/familyPolicy.ts", "utf8"));
-    expect(code).toContain("FAMILY_POLICY");
-    expect(code).toContain("approvedSymbols");
-  });
-
-  test("the kid screens do not restate a target either", () => {
-    // The constants moved out of `familyPolicy.ts` once before, into the call
-    // sites. This is the check that they did not.
-    for (const f of [
-      "src/routes/_authenticated/kids.tsx",
-      "src/routes/_authenticated/kids-prompt-center.tsx",
-    ]) {
-      const code = strip(readFileSync(f, "utf8"));
-      expect(code).not.toMatch(/200[,_]000/);
-      expect(code).not.toMatch(/600[,_]000/);
-      expect(code).not.toMatch(/2036-07-01/);
+  /** Every non-test module under `src/lib`, plus the screens that read a goal. */
+  function scanned(dir = "src/lib"): string[] {
+    const out: string[] = [];
+    for (const entry of readdirSync(dir)) {
+      const full = `${dir}/${entry}`;
+      if (statSync(full).isDirectory()) {
+        if (entry === "__tests__") continue;
+        out.push(...scanned(full));
+      } else if (/\.tsx?$/.test(entry)) out.push(full);
     }
+    return out;
+  }
+  const FILES = [
+    ...scanned(),
+    "src/routes/_authenticated/kids.tsx",
+    "src/routes/_authenticated/kids-prompt-center.tsx",
+  ];
+
+  // Scanned across the tree rather than one named file. The first version read
+  // `src/lib/data/familyPolicy.ts` by path — a file that has since been emptied
+  // and renamed, which would have left the guard reading a path that no longer
+  // exists. The constants moved out of that file once already, into the call
+  // sites; this is the check that they did not move again.
+  const NEEDLES: [string, RegExp][] = [
+    // The KEY with a literal, not the identifier. `familyTarget` is now a
+    // legitimate local in kids.tsx holding the DERIVED household target —
+    // `combinedTarget(...)` — and a guard on the bare name flagged it, which
+    // would have pushed the next person to rename a correctly-named variable
+    // to satisfy a test. The value needle below still catches
+    // `const familyTarget = 600_000`.
+    ["a compiled-in per-account target", /targetPerChild\s*[:=]\s*\d/],
+    ["a compiled-in household target", /familyTarget\s*[:=]\s*\d/],
+    ["a compiled-in horizon", /2036-07-01/],
+    ["one household's target figures", /\b(200[,_]000|600[,_]000)\b/],
+    // A contribution PLAN with literal values — not the word, and not the
+    // field names. `ContributionPlan` legitimately declares `amountUsd`,
+    // `cadenceDays` and `anchorDate`, and `fvWithContributions` /
+    // `requiredCagrWithContributions` are parameterised arithmetic that TAKES
+    // a contribution. A guard written as `/contribution/i` flagged both
+    // functions, which is the same too-coarse mistake this suite keeps
+    // catching.
+    ["a compiled-in contribution amount", /amountUsd\s*:\s*\d/],
+    ["a compiled-in contribution cadence", /cadenceDays\s*:\s*\d/],
+    ["a compiled-in contribution anchor", /anchorDate\s*:\s*["']\d/],
+  ];
+
+  test("no module carries a target, a horizon or a contribution plan", () => {
+    const offenders: string[] = [];
+    for (const file of FILES) {
+      // Comments stripped: several of these modules EXPLAIN what was removed
+      // and have to name the figures to do it.
+      const code = strip(readFileSync(file, "utf8"));
+      for (const [label, re] of NEEDLES) {
+        if (re.test(code)) offenders.push(`${file}: ${label}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("NEGATIVE CONTROL: every needle matches the constant it was written for", () => {
+    const removed = `targetPerChild: 200_000, targetDate: "2036-07-01", familyTarget: 600_000,
+      contribution: { amountUsd: 100, cadenceDays: 14, anchorDate: "2026-07-30" },`;
+    for (const [, re] of NEEDLES) expect(removed).toMatch(re);
+  });
+
+  test("NEGATIVE CONTROL: the narrowed needles spare the code that stays", () => {
+    // The other half of narrowing them: prove they do NOT fire on the
+    // parameterised arithmetic or on the plan's type declaration.
+    const kept = `export function fvWithContributions(present: number, perPeriod: number) {}
+      export type ContributionPlan = { amountUsd: number; cadenceDays: number; anchorDate: string };
+      const familyTarget = combinedTarget(kidsData.map((k) => k.objective));`;
+    for (const [, re] of NEEDLES) expect(kept).not.toMatch(re);
+  });
+
+  test("NEGATIVE CONTROL: the scan reaches real files, tests excluded", () => {
+    expect(FILES.length).toBeGreaterThan(20);
+    expect(FILES).toContain("src/lib/accountObjective.ts");
+    expect(FILES).toContain("src/lib/objectiveMath.ts");
+    expect(FILES.some((f) => f.includes("__tests__"))).toBe(false);
+  });
+
+  test("NEGATIVE CONTROL: stripping comments does not blank a file", () => {
+    const code = strip(readFileSync("src/lib/objectiveMath.ts", "utf8"));
+    expect(code).toContain("fvWithContributions");
+    expect(code).toContain("requiredCagrWithContributions");
   });
 });
