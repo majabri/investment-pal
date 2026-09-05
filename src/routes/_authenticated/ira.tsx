@@ -24,7 +24,7 @@ function reviewDue(): boolean {
 function Page() {
   const { data: accounts = [] } = useAccounts();
   const { data: allHoldings = [] } = useAllHoldings();
-  const iraAccounts = accounts.filter((a) => accountCategory(a.name) === "IRA");
+  const iraAccounts = accounts.filter((a) => accountCategory(a) === "IRA");
   const symbols = useMemo(
     () => [
       ...new Set(

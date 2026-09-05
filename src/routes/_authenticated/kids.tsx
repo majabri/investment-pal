@@ -13,6 +13,7 @@ import {
   fvWithContributions,
 } from "@/lib/data/familyPolicy";
 import { KIDS_SEED, type KidAccount } from "@/lib/data/kidsSeed";
+import { accountCategory } from "@/lib/data/accountGroups";
 import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { useQuery } from "@tanstack/react-query";
@@ -21,12 +22,16 @@ import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/kids")({ component: KidsPage });
 
-const KID_NAMES = ["Karim", "Zain", "Jude"];
 
 function KidsPage() {
   const { data: accounts = [] } = useAccounts();
   const { data: allHoldings = [] } = useAllHoldings();
-  const dbKidAccounts = accounts.filter((a) => KID_NAMES.includes(a.name));
+  // Custodial accounts, by TYPE. This filtered on a hardcoded list of the
+  // owner's children's first names, which meant the screen could not show a
+  // second household's children without a source change, and renaming an
+  // account removed a child from it (Phase 1b, rule 4). The child's label is
+  // now the account's own name rather than a compiled-in one.
+  const dbKidAccounts = accounts.filter((a) => accountCategory(a) === "Kids");
 
   // Database-first: imported kid accounts win; seed is the pre-import fallback.
   const kidsData: KidAccount[] = dbKidAccounts.length

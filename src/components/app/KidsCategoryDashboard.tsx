@@ -9,30 +9,40 @@ import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { usdOrUnavailable } from "@/lib/unavailable";
+import { accountCategory, type AccountCategory } from "@/lib/data/accountGroups";
 import { cn } from "@/lib/utils";
-
-const KID_ORDER = ["Karim", "Zain", "Jude"];
 
 type SortKey = "symbol" | "shares" | "avgCost" | "value" | "gl";
 
 export function KidsCategoryDashboard({
   title,
   subtitle,
-  matchAccount,
+  category,
   emptyHint,
 }: {
   title: string;
   subtitle: string;
-  matchAccount: (name: string) => string | null; // returns kid name or null
+  /**
+   * Which accounts this dashboard covers, by TYPE.
+   *
+   * This was a `(name: string) => string | null` matcher built from a regex
+   * over the owner's children's first names — it both selected the accounts and
+   * produced the label. Selection now comes from `account_type` and the label
+   * from the account's own name (Phase 1b, rule 4).
+   */
+  category: AccountCategory;
   emptyHint: string;
 }) {
   const { data: accounts = [] } = useAccounts();
   const { data: allHoldings = [] } = useAllHoldings();
 
   const kidAccounts = accounts
-    .map((a) => ({ a, kid: matchAccount(a.name) }))
-    .filter((x): x is { a: (typeof accounts)[number]; kid: string } => !!x.kid)
-    .sort((x, y) => KID_ORDER.indexOf(x.kid) - KID_ORDER.indexOf(y.kid));
+    .filter((a) => accountCategory(a) === category)
+    // Alphabetical by the account's own name. The previous order came from a
+    // hardcoded list of three children, so a fourth account sorted to the front
+    // (indexOf returns -1) and a second household had no order at all.
+    .map((a) => ({ a, kid: a.name.trim() }))
+    .sort((x, y) => x.kid.localeCompare(y.kid));
 
   const symbols = useMemo(
     () => [

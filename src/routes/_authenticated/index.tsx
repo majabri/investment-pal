@@ -436,7 +436,7 @@ function Dashboard() {
               const { net, day } = statsOf(a);
               total += net;
               totalDay += day;
-              const cat = accountCategory(a.name);
+              const cat = accountCategory(a);
               const g = groups.get(cat) ?? { net: 0, day: 0 };
               g.net += net;
               g.day += day;
