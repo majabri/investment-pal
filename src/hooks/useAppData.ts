@@ -11,6 +11,7 @@ import { isUniqueViolation } from "@/lib/postgresError";
 import type { HouseholdMember } from "@/lib/household";
 import { policySourceOf, type PolicySource } from "@/lib/policy";
 import type { Strategy, StrategySymbol } from "@/lib/strategy";
+import type { Order } from "@/lib/orders";
 
 export type Goal = {
   id: string;
@@ -83,6 +84,13 @@ export type Account = {
    * inferred from the account's name (rule 4, rule 22).
    */
   owner_member_id: string | null;
+  /**
+   * When the app was last TOLD about this account's orders (Phase 6, rule 19).
+   * NULL = never. An empty `orders` table for such an account is not "no open
+   * orders" — that is the distinction `openOrdersKnown` exists to keep.
+   */
+  orders_as_of: string | null;
+  orders_source: string | null;
   account_status: string | null;
   /** Provenance for the four money columns (Phase 1d, rule 14). Per BLOCK, not
    *  per field — the canonical model in Phase 2 is where that gets fixed. */
@@ -381,6 +389,57 @@ export function useStrategySymbols() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["strategy_symbols"] }),
   });
   return { ...query, add, remove };
+}
+
+/**
+ * Orders for the selected scope (Phase 6, rule 19).
+ *
+ * Account-scoped by the query, not by a filter afterwards: rule 29's "an
+ * import to one account must not touch another" has a read-side twin, and a
+ * screen that fetched every order and filtered client-side would show the
+ * wrong account's commitments for as long as the filter was wrong.
+ *
+ * An empty result is NOT "no open orders" — `openOrdersKnown` answers that
+ * from `accounts.orders_as_of`, never from this list's length.
+ */
+export function useOrders(accountId: string | null) {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["orders", accountId],
+    enabled: accountId !== null,
+    queryFn: async (): Promise<Order[]> => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("account_id", accountId!)
+        .order("placed_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Order[];
+    },
+  });
+  const create = useMutation({
+    mutationFn: async (patch: Omit<Order, "id" | "user_id" | "created_at" | "updated_at">) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("orders")
+        .insert({ ...patch, user_id: userData.user!.id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      // `accounts.orders_as_of` decides whether the readiness gate can state
+      // this account's orders, and a hand-entered order moves it.
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+    },
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("orders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
+  });
+  return { ...query, create, remove };
 }
 
 export function useAccounts() {

@@ -85,11 +85,11 @@ export type ReadinessInput = {
   /**
    * Whether the app can currently say what orders are open.
    *
-   * There is no order model yet (Phase 6), so this is `false` for every
-   * caller today — and that is the honest value. Rule 30: "Open-order status
-   * unavailable", never "No open orders". A recommendation to buy, made
-   * without knowing what is already committed to open orders, can double a
-   * position by accident.
+   * Computed by `openOrdersKnown` in `orders.ts` from when the account's
+   * orders were last reported — NOT from whether any order rows exist. An
+   * empty table for an account nobody has told the app about is not "no open
+   * orders" (rule 30), and a recommendation to buy made without knowing what
+   * is already working can double a position by accident.
    */
   openOrdersKnown: boolean;
   /** Where the risk caps came from. A default nobody chose is not a policy. */
