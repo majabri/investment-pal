@@ -11,14 +11,22 @@
 // .toml or .md. The scan filters nothing, and a coverage test below pins that
 // rather than leaving the claim to a comment (Copilot, #136).
 //
-// KNOWN GAPS, deliberately not asserted here because the data is still present
-// and removing it is not a cosmetic change (reported with this PR):
-//   - Three children's first names are load-bearing in application logic
-//     (KID_NAMES / KID_ORDER, route matchers, kids prompt templates).
-//   - src/lib/data/familyPolicy.ts carries three minors' birth dates.
-//   - src/lib/data/kidsSeed.ts carries account-number-shaped strings.
-// Adding those needles here before that data is removed would land a failing
-// test in CI, so they are listed in the PR instead and belong in the follow-up.
+// The three gaps this file used to list are CLOSED (Phase 4, rule 22): the
+// children's first names, the birth dates in `familyPolicy.ts` and the whole of
+// `kidsSeed.ts` are gone, and household membership is rows in
+// `household_members` with none provisioned.
+//
+// They are not replaced by value needles here. A needle is a literal, and
+// writing three minors' names and birth dates into this file to prove they are
+// absent everywhere else would put them back in the public repository — the
+// guard would become the leak. The account numbers get a SHAPE needle below,
+// which costs nothing to state, and the roster gets structural guards in
+// `household.test.ts`: `familyPolicy.ts` may not carry a `children` array or a
+// birth date under any name, and `kidsSeed.ts` may not come back.
+//
+// The owner's own first name stays a literal needle because it was already one
+// before this rule, and because it is the owner's own; the asymmetry is
+// deliberate, not an oversight.
 import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -53,6 +61,10 @@ const FORBIDDEN: { label: string; re: RegExp }[] = [
   { label: "real net house surplus", re: /30[,_]?803\.11/ },
   { label: "real accrued margin interest", re: /(?<![\d.])91\.22(?![\d])/ },
   { label: "the owner's real margin rate", re: /(?<![\d.])(11\.325|0\.11325)(?![\d])/ },
+  // Shape, not value. `kidsSeed.ts` carried three real Fidelity account numbers
+  // as string literals; stating them here to forbid them would reintroduce
+  // them. The shape catches any of them, and any sibling nobody has seen yet.
+  { label: "a brokerage-account-number-shaped literal", re: /\bZ\d{8}\b/ },
 ];
 
 // Exemptions are per FILE AND PER NEEDLE, not per file.
@@ -142,6 +154,19 @@ describe("personal data does not reappear in src/ or supabase/", () => {
     for (const ext of ["tsx", "ts", "sql", "css", "toml", "md"]) {
       expect([...exts]).toContain(ext);
     }
+  });
+
+  test("the account-number needle actually matches that shape", () => {
+    // Negative control. Every other needle in the list is proved live by the
+    // allowlist test — an exemption that no longer matches is reported as
+    // stale, so a needle that had stopped matching anything could not sit
+    // there unnoticed. This one matches nothing anywhere by design, so
+    // without this it would pass identically if the regex were `/$^/`.
+    const rule = FORBIDDEN.find((f) => f.label === "a brokerage-account-number-shaped literal");
+    expect(rule).toBeDefined();
+    expect(rule!.re.test('accountNumber: "Z12345678"')).toBe(true);
+    // And is not so loose that it fires on ordinary identifiers.
+    expect(rule!.re.test("const Z1 = 2; // ZONE 12345")).toBe(false);
   });
 
   test("every allowlisted needle still exists, and names a real needle", () => {

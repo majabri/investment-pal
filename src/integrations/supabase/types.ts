@@ -22,6 +22,7 @@ export type Database = {
           broker_account_id: string | null;
           currency: string | null;
           household_id: string | null;
+          owner_member_id: string | null;
           margin_enabled: boolean | null;
           tax_treatment: string | null;
           account_type: string | null;
@@ -50,6 +51,7 @@ export type Database = {
           broker_account_id?: string | null;
           currency?: string | null;
           household_id?: string | null;
+          owner_member_id?: string | null;
           margin_enabled?: boolean | null;
           tax_treatment?: string | null;
           account_type?: string | null;
@@ -78,6 +80,7 @@ export type Database = {
           broker_account_id?: string | null;
           currency?: string | null;
           household_id?: string | null;
+          owner_member_id?: string | null;
           margin_enabled?: boolean | null;
           tax_treatment?: string | null;
           account_type?: string | null;
@@ -139,6 +142,36 @@ export type Database = {
           starting_value?: number | null;
           target_date?: string | null;
           target_value?: number | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      household_members: {
+        Row: {
+          birth_date: string | null;
+          created_at: string;
+          display_name: string;
+          id: string;
+          relationship: string | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          birth_date?: string | null;
+          created_at?: string;
+          display_name: string;
+          id?: string;
+          relationship?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          birth_date?: string | null;
+          created_at?: string;
+          display_name?: string;
+          id?: string;
+          relationship?: string | null;
           updated_at?: string;
           user_id?: string;
         };

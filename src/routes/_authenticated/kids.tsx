@@ -6,15 +6,13 @@ import { fmtUSD, fmtPct, yearsBetween } from "@/lib/finance";
 import { UNAVAILABLE, usdOrUnavailable } from "@/lib/unavailable";
 import {
   FAMILY_POLICY,
-  ageOf,
   approvedSymbols,
   nextContributionDate,
   requiredCagrWithContributions,
   fvWithContributions,
 } from "@/lib/data/familyPolicy";
-import { KIDS_SEED, type KidAccount } from "@/lib/data/kidsSeed";
-import { accountCategory } from "@/lib/data/accountGroups";
-import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
+import { kidAccounts } from "@/lib/kidAccounts";
+import { useAccounts, useAllHoldings, useHouseholdMembers } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
@@ -26,31 +24,19 @@ export const Route = createFileRoute("/_authenticated/kids")({ component: KidsPa
 function KidsPage() {
   const { data: accounts = [] } = useAccounts();
   const { data: allHoldings = [] } = useAllHoldings();
-  // Custodial accounts, by TYPE. This filtered on a hardcoded list of the
-  // owner's children's first names, which meant the screen could not show a
-  // second household's children without a source change, and renaming an
-  // account removed a child from it (Phase 1b, rule 4). The child's label is
-  // now the account's own name rather than a compiled-in one.
-  const dbKidAccounts = accounts.filter((a) => accountCategory(a) === "Kids");
-
-  // Database-first: imported kid accounts win; seed is the pre-import fallback.
-  const kidsData: KidAccount[] = dbKidAccounts.length
-    ? dbKidAccounts.map((a) => ({
-        key: a.name.toLowerCase(),
-        name: a.name,
-        accountNumber: "",
-        cash: a.cash === null || a.cash === undefined ? null : Number(a.cash),
-        holdings: allHoldings
-          .filter((h) => h.account_id === a.id)
-          .map((h) => ({
-            symbol: h.symbol,
-            shares: Number(h.quantity),
-            price: Number(h.current_price),
-            avgCost: Number(h.cost_basis),
-          })),
-      }))
-    : KIDS_SEED;
-  const liveSource = dbKidAccounts.length > 0;
+  const { data: members = [] } = useHouseholdMembers();
+  // Custodial accounts, by TYPE, with whoever holds them.
+  //
+  // The seed fallback that used to sit here is gone. When there were no
+  // imported accounts this screen rendered `KIDS_SEED` — three named children
+  // with hand-copied share counts — and labelled it "seeded 2026-07-21". A
+  // second user of this app saw somebody else's children and somebody else's
+  // positions, presented exactly like their own. There is no fallback now: no
+  // custodial accounts means an empty state (rule 22, no assumed dependants).
+  const kidsData = useMemo(
+    () => kidAccounts(accounts, allHoldings, members),
+    [accounts, allHoldings, members],
+  );
 
   // Live prices: one source of truth, 60s cadence, merged upstream of all math
   const allSymbols = useMemo(
@@ -110,12 +96,52 @@ function KidsPage() {
   const approved = approvedSymbols();
   // All-or-nothing: a family total that quietly omits one child's cash is not
   // the family's total (Phase 1a).
-  const familyTotal = liveKids.some((k) => k.cash === null)
+  // No accounts is not a total of zero either. `[].reduce(..., 0)` returns 0,
+  // which would have printed "$0.00" against a $600,000 target and drawn a 0%
+  // bar for a household that has told the app nothing (rule 13).
+  const familyTotal = liveKids.length === 0 || liveKids.some((k) => k.cash === null)
     ? null
     : liveKids.reduce(
         (s, k) => s + (k.cash as number) + k.holdings.reduce((x, h) => x + h.shares * h.price, 0),
         0,
       );
+
+  // Rule 22: household is optional, and family surfaces appear only when the
+  // applicable account types exist. The screen this replaces could not reach
+  // this branch — it fell back to a compiled-in seed of three named children,
+  // so it always had something to show whether or not it was yours.
+  if (kidsData.length === 0) {
+    return (
+      <AppShell
+        title="Kids Trading Dashboard"
+        subtitle="No custodial accounts yet"
+      >
+        <Card>
+          <CardContent className="space-y-3 pt-6 text-sm">
+            <p className="font-medium">Nothing to show — and nothing assumed.</p>
+            <p className="text-muted-foreground">
+              This screen lists accounts whose type is <strong>custodial</strong>. You do not
+              have any yet, so there is nothing here. It will not invent a child, a target or a
+              balance to fill the space.
+            </p>
+            <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+              <li>
+                Add the account in <strong>Settings → Accounts</strong> and set its type to
+                Custodial. Account type is never guessed from the name.
+              </li>
+              <li>
+                Add whoever it is for under <strong>Settings → Household</strong>, with a birth
+                date if you want age-based guidance, and link it to the account.
+              </li>
+              <li>
+                Import positions with <strong>Settings → Portfolio CSV Import</strong>.
+              </li>
+            </ol>
+          </CardContent>
+        </Card>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell
@@ -178,14 +204,23 @@ function KidsPage() {
           )[0];
           const empty = kid.holdings.length === 0;
           const status = req === null ? null : req <= 0.08 ? "Ahead" : req <= 0.12 ? "On Track" : "Behind";
-          const child = FAMILY_POLICY.children.find((c) => c.key === kid.key);
-          const age = child ? ageOf(child.birthDate) : undefined;
           return (
-            <Card key={kid.key}>
+            <Card key={kid.id}>
               <CardHeader className="flex flex-row items-baseline justify-between">
-                <CardTitle className="text-base">
-                  {kid.name} ({age})
-                </CardTitle>
+                <div>
+                  <CardTitle className="text-base">{kid.name}</CardTitle>
+                  {/* The holder and their age come from the linked household
+                      member, not from a compiled-in list and not from the
+                      account's name. No link means no age — said out loud,
+                      because age is what drives the horizon below. */}
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {kid.holder === null
+                      ? "No household member linked — link one in Settings for age-based guidance"
+                      : kid.age === null
+                        ? `Held by ${kid.holder} · birth date not set`
+                        : `Held by ${kid.holder} · age ${kid.age}`}
+                  </p>
+                </div>
                 <span className="tabular-nums text-sm font-semibold">
                   {usdOrUnavailable(total)}
                 </span>
@@ -323,10 +358,7 @@ function KidsPage() {
                   </table>
                 )}
                 <p className="text-[11px] text-muted-foreground">
-                  {kid.holdings.length} positions
-                  {liveSource
-                    ? " · live from your Fidelity imports"
-                    : " · seeded 2026-07-21 — run a Fidelity Import to go live"}
+                  {kid.holdings.length} positions · live from your imports
                 </p>
               </CardContent>
             </Card>

@@ -8,6 +8,7 @@ import { scopedRows, type AccountScope } from "@/lib/accountTotals";
 import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 import { localIsoDate } from "@/lib/localDate";
 import { isUniqueViolation } from "@/lib/postgresError";
+import type { HouseholdMember } from "@/lib/household";
 
 export type Goal = {
   id: string;
@@ -72,7 +73,14 @@ export type Account = {
   currency: string | null;
   /** NULL = not known, which is not FALSE. */
   margin_enabled: boolean | null;
+  /** Unused; superseded by `owner_member_id` in Phase 4. Never written. */
   household_id: string | null;
+  /**
+   * Which household member holds this account. NULL = not stated, which is the
+   * shipped state for every existing row — the app has never asked. Never
+   * inferred from the account's name (rule 4, rule 22).
+   */
+  owner_member_id: string | null;
   account_status: string | null;
   /** Provenance for the four money columns (Phase 1d, rule 14). Per BLOCK, not
    *  per field — the canonical model in Phase 2 is where that gets fixed. */
@@ -218,6 +226,61 @@ export function useScopedHoldings(
     [all, scope, includeUnassigned],
   );
   return { ...query, data };
+}
+
+/**
+ * Household members — who the accounts belong to (Phase 4, rule 22).
+ *
+ * There are no rows for a new user and none are provisioned. An empty list is
+ * the normal state, not an error and not a loading artefact: family surfaces
+ * render an empty state that says so rather than assuming a dependant.
+ */
+export function useHouseholdMembers() {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["household_members"],
+    queryFn: async (): Promise<HouseholdMember[]> => {
+      const { data, error } = await supabase
+        .from("household_members")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as HouseholdMember[];
+    },
+  });
+  const create = useMutation({
+    mutationFn: async (patch: { display_name: string; birth_date?: string | null; relationship?: string | null }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("household_members")
+        .insert({ ...patch, user_id: userData.user!.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as HouseholdMember;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["household_members"] }),
+  });
+  const update = useMutation({
+    mutationFn: async ({ id, ...patch }: Partial<HouseholdMember> & { id: string }) => {
+      const { error } = await supabase.from("household_members").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["household_members"] }),
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("household_members").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["household_members"] });
+      // An account's owner_member_id is set to NULL by the delete; the accounts
+      // in cache still carry the old id until they are refetched.
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+    },
+  });
+  return { ...query, create, update, remove };
 }
 
 export function useAccounts() {

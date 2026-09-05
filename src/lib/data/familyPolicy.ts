@@ -1,14 +1,20 @@
 // Family Investment OS — Policy v1.0 (single source of truth, ported from the local OS)
+//
+// WHO the household contains is no longer here. This file used to carry a
+// `children` array of three names and BIRTH DATES: personal data about minors
+// in application source, in a public repository, and an assumed dependant that
+// a second user of this app inherited without being told (rule 22). Membership
+// is now rows in `public.household_members`, provisioned empty — see
+// `src/lib/household.ts`.
+//
+// What remains is policy: targets, cadence and an approved universe. Those are
+// still one household's numbers rather than configuration, which the rest of
+// Phase 4 addresses; they are not personal data and they are not a person.
 export const FAMILY_POLICY = {
   version: "1.0",
   targetPerChild: 200_000,
   targetDate: "2036-07-01",
   familyTarget: 600_000,
-  children: [
-    { key: "karim", name: "Karim", birthDate: "2014-06-03" },
-    { key: "zain", name: "Zain", birthDate: "2017-11-25" },
-    { key: "jude", name: "Jude", birthDate: "2019-08-08" },
-  ],
   contribution: { amountUsd: 100, cadenceDays: 14, anchorDate: "2026-07-30" },
   core: ["MSFT", "AMZN", "GOOGL", "V", "AVGO", "BLK", "ABT", "RY"],
   supporting: ["GLD", "SLV", "ARE", "FAMRX", "FFSFX"],
@@ -19,15 +25,8 @@ export const FAMILY_POLICY = {
   scoreWeights: { quality: 30, diversification: 25, progress: 20, valuation: 15, risk: 10 },
 } as const;
 
-/** Current age from birth date — never hardcode ages. */
-export function ageOf(birthDateIso: string, at = new Date()): number {
-  const b = new Date(birthDateIso + "T12:00:00");
-  let age = at.getFullYear() - b.getFullYear();
-  const beforeBirthday =
-    at.getMonth() < b.getMonth() || (at.getMonth() === b.getMonth() && at.getDate() < b.getDate());
-  if (beforeBirthday) age -= 1;
-  return age;
-}
+// `ageOf` moved to `src/lib/household.ts` with the membership it belongs to,
+// and now returns `number | null` — see the note there on NaN and negative ages.
 
 export const approvedSymbols = () =>
   new Set<string>([

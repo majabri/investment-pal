@@ -26,6 +26,7 @@ import {
   useSyncLog,
   useLogSync,
   useAccounts,
+  useHouseholdMembers,
   useGoal,
   useIpsLite,
   type Account,
@@ -41,7 +42,8 @@ import {
   unconfirmedAccounts,
 } from "@/lib/accountMetadata";
 import { rateStatus } from "@/lib/marginCost";
-import { isFutureLocalDate } from "@/lib/localDate";
+import { isFutureLocalDate, isRealCalendarDate } from "@/lib/localDate";
+import { RELATIONSHIPS, ageOf } from "@/lib/household";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -392,6 +394,131 @@ function MarginRateCard() {
   );
 }
 
+
+/**
+ * Who the accounts belong to (Phase 4, rule 22).
+ *
+ * There is nothing here for a new user and nothing is provisioned. The list
+ * this replaces was a `children` array compiled into `familyPolicy.ts` — three
+ * names and birth dates, in application source — which every user of the app
+ * inherited, and which no screen could tell had been made up.
+ */
+function HouseholdCard() {
+  const { data: members = [], create, update, remove } = useHouseholdMembers();
+  const [name, setName] = useState("");
+  const [birth, setBirth] = useState("");
+  const [rel, setRel] = useState<string>("");
+
+  const add = () => {
+    const n = name.trim();
+    if (!n) return toast.error("Name required");
+    // Empty box = not known, stored as NULL. Never today's date, and never a
+    // placeholder: an invented birth date drives an invented age, and age
+    // drives the horizon on /kids (rule 13).
+    if (birth !== "" && !isRealCalendarDate(birth)) return toast.error("Birth date is not a real date");
+    create.mutate(
+      { display_name: n, birth_date: birth || null, relationship: rel || null },
+      {
+        onSuccess: () => {
+          setName("");
+          setBirth("");
+          setRel("");
+          toast.success("Member added");
+        },
+        onError: (e) => toast.error((e as Error).message),
+      },
+    );
+  };
+
+  return (
+    <section className="mb-4 rounded-2xl border bg-card p-5">
+      <div className="mb-1 text-sm font-medium">Household</div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Optional. Add people so an account can say whose it is. A birth date is only needed where
+        you want age-based guidance — leave it blank and it stays unknown rather than becoming a
+        guess. Nobody is added for you.
+      </p>
+
+      <div className="mb-4 grid gap-2 sm:grid-cols-[1fr_170px_150px_auto]">
+        <Input
+          placeholder="Name as it should appear"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Input type="date" value={birth} onChange={(e) => setBirth(e.target.value)} />
+        <Select value={rel} onValueChange={setRel}>
+          <SelectTrigger>
+            <SelectValue placeholder="Relationship" />
+          </SelectTrigger>
+          <SelectContent>
+            {RELATIONSHIPS.map((r) => (
+              <SelectItem key={r} value={r}>
+                {r[0].toUpperCase() + r.slice(1)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button onClick={add} disabled={create.isPending}>
+          <Plus className="mr-2 h-4 w-4" /> Add member
+        </Button>
+      </div>
+
+      {members.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No household members. Custodial and family screens will say they have nothing to show
+          rather than assume anyone.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {members.map((m) => {
+            const age = ageOf(m.birth_date);
+            return (
+              <div
+                key={m.id}
+                className="flex flex-wrap items-center gap-3 rounded-xl border bg-background/40 px-4 py-2 text-sm"
+              >
+                <span className="font-medium">{m.display_name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {m.relationship ?? "relationship not stated"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {/* Not "age 0". A member with no birth date has an unknown
+                      age, and the screens that use it must be able to see the
+                      difference. */}
+                  {age === null ? "birth date not set" : `age ${age}`}
+                </span>
+                <Input
+                  type="date"
+                  className="h-8 w-40 text-xs"
+                  value={m.birth_date ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v !== "" && !isRealCalendarDate(v)) return;
+                    update.mutate({ id: m.id, birth_date: v || null });
+                  }}
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto h-8 text-xs text-destructive"
+                  onClick={() => {
+                    // Accounts survive: the FK is ON DELETE SET NULL, so they
+                    // become "no member linked" rather than disappearing.
+                    if (!confirm(`Remove ${m.display_name}? Their accounts stay, unlinked.`)) return;
+                    remove.mutate(m.id);
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SettingsPage() {
   const qc = useQueryClient();
   const { data: priorities = [], add: addPriority, dismiss: dismissP } = usePriorities();
@@ -422,6 +549,7 @@ function SettingsPage() {
       <ObjectiveCard />
       <IpsLiteCard />
       <MarginRateCard />
+      <HouseholdCard />
       {/* ACCOUNTS */}
       <section className="rounded-2xl border bg-card p-5">
         <div className="mb-3 flex items-center justify-between">
@@ -656,11 +784,16 @@ function SettingsPage() {
 }
 
 /** A money field as text: empty means the figure is not known, never 0. */
+// Radix Select cannot hold "" as a value, so "not stated" needs a token. It is
+// mapped back to NULL on save — the database stores absence, not a sentinel.
+const NO_MEMBER = "__none__";
+
 const asText = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
 
 function AccountCard({ account, onSynced }: { account: Account; onSynced: () => void }) {
   const qc = useQueryClient();
   const { update, remove } = useAccounts();
+  const { data: members = [] } = useHouseholdMembers();
   const logSync = useLogSync();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
@@ -675,6 +808,9 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
     // and "we were not told" are the same value.
     margin_enabled: account.margin_enabled === null ? "" : account.margin_enabled ? "yes" : "no",
     account_status: account.account_status ?? "",
+    // "" = nobody linked. Never defaulted to the first member: guessing who an
+    // account belongs to is the same class of error as guessing what it is.
+    owner_member_id: account.owner_member_id ?? "",
     // Text, not `?? 0`. An unknown balance shown as 0 in the box is written to
     // the database as a real 0 by the first Save — turning "not known" into
     // "no cash" with no deliberate act (Phase 1a, rule 13). This editor was
@@ -702,6 +838,7 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
         currency: form.currency || null,
         margin_enabled: form.margin_enabled === "" ? null : form.margin_enabled === "yes",
         account_status: form.account_status || null,
+        owner_member_id: form.owner_member_id || null,
         broker: form.broker || null,
         // starting_value / target_value / target_date are deliberately NOT
         // written. They are a second objective that nothing in the app reads —
@@ -893,6 +1030,35 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
                 ))}
               </SelectContent>
             </Select>
+          </Field>
+          <Field label="Belongs to">
+            <Select
+              value={form.owner_member_id === "" ? NO_MEMBER : form.owner_member_id}
+              onValueChange={(v) =>
+                setForm({ ...form, owner_member_id: v === NO_MEMBER ? "" : v })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {/* First, and the shipped value for every existing row. The
+                    app has never asked whose an account is, and the answer it
+                    would have guessed — from the account's NAME — is the
+                    defect Phase 1b removed. */}
+                <SelectItem value={NO_MEMBER}>Not stated</SelectItem>
+                {members.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {members.length === 0 && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                No household members yet — add one in the Household card above.
+              </p>
+            )}
           </Field>
           <Field label="Currency">
             <Input
