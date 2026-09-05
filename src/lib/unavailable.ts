@@ -31,3 +31,19 @@ export function pctOrUnavailable(v: number | null | undefined, decimals?: number
     ? UNAVAILABLE
     : fmtPct(v, decimals);
 }
+
+/**
+ * What a number box means, when the figure it edits may be unknown.
+ *
+ * Empty is UNKNOWN, not 0: clearing the box says "I do not know this", and
+ * writing 0 would say "this account has no cash" on the user's behalf.
+ *
+ * A partially-typed value is also unknown. `<input type="number">` permits "-",
+ * "." and "1e" mid-entry, each of which parses to NaN — and NaN written to a
+ * NUMERIC column is neither a figure nor an honest absence (Copilot, #140).
+ */
+export function numberOrUnknown(text: string): number | null {
+  if (text.trim() === "") return null;
+  const n = Number(text);
+  return Number.isFinite(n) ? n : null;
+}

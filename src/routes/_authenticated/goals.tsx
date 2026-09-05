@@ -33,6 +33,7 @@ import {
   riskToVol,
   yearsBetween,
 } from "@/lib/finance";
+import { usdOrUnavailable } from "@/lib/unavailable";
 import { objectiveOf } from "@/lib/objective";
 
 export const Route = createFileRoute("/_authenticated/goals")({
@@ -231,7 +232,7 @@ function GoalsPage() {
               knowing which account it is progress in. */}
           <StatCard
             label="Current value"
-            value={portfolioValue === null ? "Unavailable" : fmtUSD(portfolioValue)}
+            value={usdOrUnavailable(portfolioValue)}
             hint={
               portfolioValue === null
                 ? `${scopeName} · cash or margin not known`

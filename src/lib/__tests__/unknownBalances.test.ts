@@ -14,7 +14,12 @@ import {
   interestProvenanceShort,
   type MarginPolicy,
 } from "../marginCost";
-import { UNAVAILABLE, usdOrUnavailable, pctOrUnavailable } from "../unavailable";
+import {
+  UNAVAILABLE,
+  numberOrUnknown,
+  usdOrUnavailable,
+  pctOrUnavailable,
+} from "../unavailable";
 
 const account = (over: Partial<BalanceFields>): BalanceFields => ({
   cash: 100,
@@ -110,5 +115,31 @@ describe("rendering a figure the app does not have", () => {
     // is selected and the figure is not known. Collapsing them loses which
     // action fixes it.
     expect(UNAVAILABLE).not.toBe("—");
+  });
+});
+
+describe("what a number box means when the figure may be unknown", () => {
+  test("an emptied box is unknown, not zero", () => {
+    // Writing 0 here would say "this account has no cash" on the user's behalf.
+    expect(numberOrUnknown("")).toBeNull();
+    expect(numberOrUnknown("   ")).toBeNull();
+  });
+
+  test("a half-typed value is unknown, not NaN", () => {
+    // `<input type="number">` permits each of these mid-entry, and NaN in a
+    // NUMERIC column is neither a figure nor an honest absence.
+    for (const partial of ["-", ".", "-.", "1e", "e5", "abc"]) {
+      expect(numberOrUnknown(partial)).toBeNull();
+    }
+  });
+
+  test("a typed zero is a real zero, because the user typed it", () => {
+    expect(numberOrUnknown("0")).toBe(0);
+    expect(numberOrUnknown("0.00")).toBe(0);
+  });
+
+  test("ordinary figures survive, negatives included", () => {
+    expect(numberOrUnknown("23119.31")).toBe(23_119.31);
+    expect(numberOrUnknown("-12.5")).toBe(-12.5);
   });
 });

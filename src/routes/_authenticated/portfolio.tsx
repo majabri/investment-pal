@@ -43,7 +43,12 @@ import { getEarningsCalendarFn } from "@/lib/calendarServer";
 import { computeSwing, tradingDaysUntil, type SwingResult } from "@/lib/swingScore";
 import { fmtChartUSD } from "@/lib/chartFormat";
 import { fmtUSD, fmtPct } from "@/lib/finance";
-import { UNAVAILABLE, usdOrUnavailable } from "@/lib/unavailable";
+import {
+  UNAVAILABLE,
+  numberOrUnknown,
+  pctOrUnavailable,
+  usdOrUnavailable,
+} from "@/lib/unavailable";
 import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated/portfolio")({
@@ -217,7 +222,9 @@ function PortfolioPage() {
         {selectedAccount ? (
           <MarginCard
             accountId={selectedAccount.id}
-            marginUsed={Number(selectedAccount.margin_used ?? 0)}
+            marginUsed={
+              selectedAccount.margin_used === null ? null : Number(selectedAccount.margin_used)
+            }
           />
         ) : (
           <StatCard
@@ -444,7 +451,7 @@ function PortfolioPage() {
                             {value > 0.005 ? fmtUSD(value) : value > 0 ? fmtUSD(value, 2) : "--"}
                           </TableCell>
                           <TableCell className="text-right tabular text-muted-foreground">
-                            {fmtPct(pctOfAcct)}
+                            {pctOrUnavailable(pctOfAcct)}
                           </TableCell>
                           <TableCell className="text-right tabular">
                             {h.quantity.toLocaleString("en-US")}
@@ -680,13 +687,17 @@ function AccountForm({
   const [used, setUsed] = useState(asText(account?.margin_used));
   const [limit, setLimit] = useState(asText(account?.margin_limit));
   const [bp, setBp] = useState(asText(account?.buying_power));
-  // An emptied box clears the figure back to unknown; it does not write 0.
-  const asValue = (t: string) => (t.trim() === "" ? null : Number(t));
+  // An emptied or half-typed box reads as unknown, never as 0. The rule lives
+  // in lib/unavailable so it is testable without mounting a route.
+  const asValue = numberOrUnknown;
   return (
     <div className="grid gap-3 md:grid-cols-4">
       <div>
-        <Label className="text-xs">Cash</Label>
+        <Label className="text-xs" htmlFor="account-cash">
+          Cash
+        </Label>
         <Input
+          id="account-cash"
           type="number"
           value={cash}
           placeholder={UNAVAILABLE}
@@ -694,8 +705,11 @@ function AccountForm({
         />
       </div>
       <div>
-        <Label className="text-xs">Margin used</Label>
+        <Label className="text-xs" htmlFor="account-used">
+          Margin used
+        </Label>
         <Input
+          id="account-used"
           type="number"
           value={used}
           placeholder={UNAVAILABLE}
@@ -703,8 +717,11 @@ function AccountForm({
         />
       </div>
       <div>
-        <Label className="text-xs">Margin limit</Label>
+        <Label className="text-xs" htmlFor="account-limit">
+          Margin limit
+        </Label>
         <Input
+          id="account-limit"
           type="number"
           value={limit}
           placeholder={UNAVAILABLE}
@@ -712,8 +729,11 @@ function AccountForm({
         />
       </div>
       <div>
-        <Label className="text-xs">Buying power</Label>
+        <Label className="text-xs" htmlFor="account-bp">
+          Buying power
+        </Label>
         <Input
+          id="account-bp"
           type="number"
           value={bp}
           placeholder={UNAVAILABLE}

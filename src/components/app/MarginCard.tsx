@@ -22,11 +22,19 @@ export function MarginCard({
    *  would create an account literally named "—" and attach a margin loan to
    *  it. Callers must not render this card without a resolved account. */
   accountId: string;
-  marginUsed: number;
+  /**
+   * The margin debit, or NULL when the account does not know it (Phase 1a).
+   *
+   * NULL and 0 read differently and are fixed differently: NULL means nobody
+   * has recorded a loan, 0 means the broker reported none. This card showed
+   * "Not set" for both, so an account the broker confirmed carries no margin
+   * was indistinguishable from one whose loan has never been entered.
+   */
+  marginUsed: number | null;
 }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(String(marginUsed || ""));
+  const [val, setVal] = useState(marginUsed === null ? "" : String(marginUsed));
   const [busy, setBusy] = useState(false);
   const { data: ipsLite } = useIpsLite();
 
@@ -66,7 +74,7 @@ export function MarginCard({
             size="sm"
             className="h-6 px-1.5"
             onClick={() => {
-              setVal(String(marginUsed || ""));
+              setVal(marginUsed === null ? "" : String(marginUsed));
               setEditing(true);
             }}
           >
@@ -94,14 +102,20 @@ export function MarginCard({
       ) : (
         <>
           <div
-            className={`mt-1 text-xl font-semibold tabular ${marginUsed > 0 ? "" : "text-muted-foreground"}`}
+            className={`mt-1 text-xl font-semibold tabular ${marginUsed !== null && marginUsed > 0 ? "" : "text-muted-foreground"}`}
           >
-            {marginUsed > 0 ? fmtUSD(marginUsed) : "Not set — click ✎"}
+            {marginUsed === null
+              ? "Not known — click ✎"
+              : marginUsed > 0
+                ? fmtUSD(marginUsed)
+                : "No margin loan"}
           </div>
           <div className="text-[11px] text-muted-foreground">
-            {marginUsed > 0
-              ? `Owed to Fidelity — ${marginRateLabel(ipsLite)}`
-              : "From Fidelity → Balances → Cash & Credits (as a positive number)"}
+            {marginUsed === null
+              ? "From Fidelity → Balances → Cash & Credits (as a positive number)"
+              : marginUsed > 0
+                ? `Owed to Fidelity — ${marginRateLabel(ipsLite)}`
+                : "Recorded as zero — the broker reported no loan on this account"}
           </div>
         </>
       )}
