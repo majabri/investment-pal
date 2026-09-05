@@ -222,12 +222,19 @@ function PromptCenter() {
     // pace required the day the goal was written as though it were today's.
     const cagr =
       objective.kind === "set" && years !== null && portfolioValue !== null
-        ? requiredCAGR(portfolioValue || objective.startingValue, objective.targetValue, years)
+        ? requiredCAGR(
+            // `||` treats a real 0 as missing and silently projects from the
+            // objective's own starting value instead. `> 0` matches the pattern
+            // the dashboard and the goal screen already use (Copilot, #141).
+            portfolioValue > 0 ? portfolioValue : objective.startingValue,
+            objective.targetValue,
+            years,
+          )
         : null;
     const prob =
       objective.kind === "set" && years !== null && goal && portfolioValue !== null
         ? probabilityOfReachingTarget(
-            portfolioValue || objective.startingValue,
+            portfolioValue > 0 ? portfolioValue : objective.startingValue,
             objective.targetValue,
             years,
             riskToExpectedReturn(goal.risk_preference),

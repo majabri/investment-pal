@@ -6,6 +6,7 @@
 // constraint is only half the fix — the other half is that nothing downstream
 // may quietly turn the resulting NULL back into a number.
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import { sumField, type BalanceFields } from "../accountAggregate";
 import {
@@ -15,8 +16,10 @@ import {
   type MarginPolicy,
 } from "../marginCost";
 import {
+  NOT_KNOWN,
   UNAVAILABLE,
   numberOrUnknown,
+  usdOrNotKnown,
   usdOrUnavailable,
   pctOrUnavailable,
 } from "../unavailable";
@@ -235,4 +238,46 @@ describe("an unknown balance reaches the committee as unknown", () => {
       expect(out).toContain("Cash: $0.00 | Margin used: $0.00 | Buying power: $0.00");
     });
   }
+});
+
+describe("the two registers stay one decision", () => {
+  test("the UI word and the prompt word are different", () => {
+    // Two audiences, two registers. A stat card reading "NOT KNOWN" shouts; a
+    // prompt reading "Unavailable" is a phrase a model may read as a value.
+    expect(UNAVAILABLE).not.toBe(NOT_KNOWN);
+  });
+
+  test("neither is the dash reserved for no-scope", () => {
+    expect(UNAVAILABLE).not.toBe("—");
+    expect(NOT_KNOWN).not.toBe("—");
+  });
+
+  test("the prompt helper agrees with the prompt builders' vocabulary", () => {
+    // Every prompt surface must route through this, not through the UI helper —
+    // two of them did not, and rendered "Unavailable" into prompt text
+    // (Copilot, #141).
+    expect(usdOrNotKnown(null)).toBe(NOT_KNOWN);
+    expect(usdOrNotKnown(undefined)).toBe(NOT_KNOWN);
+    expect(usdOrNotKnown(Number.NaN)).toBe(NOT_KNOWN);
+  });
+
+  test("a real zero still renders as a figure in prompt text", () => {
+    expect(usdOrNotKnown(0)).toBe("$0.00");
+    expect(usdOrNotKnown(0, 2)).toBe("$0.00");
+  });
+
+  test("no prompt surface leaks the UI wording", () => {
+    // The IRA and kids prompt builders are not in the seven above — they build
+    // their own text — so this asserts the rule where those two live.
+    for (const file of [
+      "src/routes/_authenticated/ira.tsx",
+      "src/routes/_authenticated/kids-prompt-center.tsx",
+    ]) {
+      const code = readFileSync(file, "utf8");
+      const promptLines = code
+        .split("\n")
+        .filter((l) => l.includes("usdOrUnavailable") && l.includes("`"));
+      expect(promptLines).toEqual([]);
+    }
+  });
 });

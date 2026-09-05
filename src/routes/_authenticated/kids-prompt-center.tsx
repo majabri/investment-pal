@@ -11,7 +11,7 @@ import { KIDS_SEED, type KidAccount } from "@/lib/data/kidsSeed";
 import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD } from "@/lib/finance";
-import { usdOrUnavailable } from "@/lib/unavailable";
+import { usdOrNotKnown } from "@/lib/unavailable";
 
 export const Route = createFileRoute("/_authenticated/kids-prompt-center")({ component: Page });
 
@@ -62,9 +62,10 @@ function Page() {
         return (
           // Into a prompt: "$0.00" for an unknown balance reaches the model as
           // a fact about the account, which it then reasons from (Phase 1a).
-          `${k.name}: ${usdOrUnavailable(k.cash === null ? null : mv + k.cash)} (cash ${
-            k.cash === null ? "NOT KNOWN" : fmtUSD(k.cash, 2)
-          }) — ` +
+          `${k.name}: ${usdOrNotKnown(k.cash === null ? null : mv + k.cash)} (cash ${usdOrNotKnown(
+            k.cash,
+            2,
+          )}) — ` +
           live
             .map(
               (h) =>

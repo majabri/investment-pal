@@ -2,6 +2,7 @@
 import { fmtPct, fmtUSD } from "./finance";
 import { marginRatePromptLine, MARGIN_POLICY_UNSET, type MarginPolicy } from "./marginCost";
 import { isRealCalendarDate } from "./localDate";
+import { NOT_KNOWN, usdOrNotKnown } from "./unavailable";
 import type { Objective } from "./objective";
 
 export type PromptContext = {
@@ -210,21 +211,14 @@ export function mandateOf(ctx: PromptContext): Mandate {
   };
 }
 
-/**
- * A money figure for the model, or an explicit statement that it is unknown.
- *
- * Upper case and wordy on purpose. This text is read by a language model, not
- * scanned by a person: "NOT KNOWN" is unambiguous where a dash would be
- * guessed at, and "$0.00" would be believed.
- */
-function money(v: number | null | undefined): string {
-  return v === null || v === undefined || !Number.isFinite(v) ? "NOT KNOWN" : fmtUSD(v);
-}
+/** A money figure for the model. The wording lives in lib/unavailable, beside
+ *  the UI's, so the two registers stay one decision rather than two. */
+const money = usdOrNotKnown;
 
 /** Equity as a percentage, or why it cannot be given. */
 function equityLine(ctx: PromptContext): string {
   const gross = ctx.grossValue ?? ctx.portfolioValue;
-  if (gross === null || ctx.portfolioValue === null) return "NOT KNOWN";
+  if (gross === null || ctx.portfolioValue === null) return NOT_KNOWN;
   return gross > 0 ? fmtPct(ctx.portfolioValue / gross) : "—";
 }
 
@@ -242,7 +236,7 @@ function dataBlock(ctx: PromptContext): string {
           const pct =
             ctx.portfolioValue !== null && ctx.portfolioValue > 0
               ? fmtPct(value / ctx.portfolioValue)
-              : "NOT KNOWN";
+              : NOT_KNOWN;
           return `- ${h.symbol}: ${h.quantity} sh @ avg ${fmtUSD(h.costBasis, 2)}, last ${fmtUSD(h.currentPrice, 2)}, value ${fmtUSD(value)} (${pct} of acct)${
             gl != null ? `, total G/L ${gl >= 0 ? "+" : ""}${fmtPct(gl)}` : ""
           }${h.thesis ? ` — thesis: ${h.thesis}` : ""}`;
@@ -262,7 +256,7 @@ TODAY IS ${today.toUpperCase()}.
 
 Account value (NET, investments + cash − margin): ${money(ctx.portfolioValue)}
 Gross investments: ${money(ctx.grossValue ?? ctx.portfolioValue)} | Account equity: ${equityLine(ctx)}
-Today's P/L (vs prior close, live-quoted positions): ${fmtUSD(ctx.todaysPL)} (${ctx.todaysPLPct === null ? "NOT KNOWN" : fmtPct(ctx.todaysPLPct)})
+Today's P/L (vs prior close, live-quoted positions): ${fmtUSD(ctx.todaysPL)} (${ctx.todaysPLPct === null ? NOT_KNOWN : fmtPct(ctx.todaysPLPct)})
 Cash: ${money(ctx.cash)} | Margin used: ${money(ctx.marginUsed)} | Buying power: ${money(ctx.buyingPower)}
 Goal: ${objectiveLine(ctx)}
 Required pace: ${paceLine(ctx.requiredCagr)}
