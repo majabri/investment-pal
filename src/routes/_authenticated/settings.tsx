@@ -32,8 +32,14 @@ import {
 } from "@/hooks/useAppData";
 import { useQueryClient } from "@tanstack/react-query";
 import { fmtUSD } from "@/lib/finance";
-import { UNAVAILABLE, numberOrUnknown } from "@/lib/unavailable";
-import { ACCOUNT_TYPES } from "@/lib/accountMetadata";
+import { UNAVAILABLE, numberOrUnknown, usdOrUnavailable } from "@/lib/unavailable";
+import {
+  ACCOUNT_STATUSES,
+  ACCOUNT_TYPES,
+  TAX_TREATMENTS,
+  accountTypeIsConfirmed,
+  unconfirmedAccounts,
+} from "@/lib/accountMetadata";
 import { rateStatus } from "@/lib/marginCost";
 import { isFutureLocalDate } from "@/lib/localDate";
 
@@ -393,6 +399,7 @@ function SettingsPage() {
   const { data: syncs = [] } = useSyncLog();
 
   const { data: accounts = [], create: createAccount } = useAccounts();
+  const unconfirmed = unconfirmedAccounts(accounts);
 
   const [pLabel, setPLabel] = useState("");
   const [pSev, setPSev] = useState<"info" | "warning" | "critical">("info");
@@ -422,8 +429,8 @@ function SettingsPage() {
             <div className="text-sm font-medium">Accounts</div>
             <AddAccountForm />
             <p className="text-xs text-muted-foreground">
-              Add each brokerage or retirement account. Set a target value and date per account —
-              the app will track progress independently.
+              Add each brokerage or retirement account, and say what kind it is — the type and tax
+              treatment decide how the account is handled, not its name.
             </p>
           </div>
         </div>
@@ -469,6 +476,20 @@ function SettingsPage() {
         <div className="space-y-3">
           {accounts.length === 0 && (
             <p className="text-sm text-muted-foreground">No accounts yet. Add one above.</p>
+          )}
+          {/* Named rather than counted. "3 accounts need attention" makes the
+              user hunt; the whole point is that the app is currently treating
+              these specific accounts as something nobody said they were. */}
+          {unconfirmed.length > 0 && (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs">
+              <span className="font-medium">
+                {unconfirmed.length === 1 ? "One account has" : `${unconfirmed.length} accounts have`}{" "}
+                a type nobody has confirmed
+              </span>{" "}
+              — {unconfirmed.map((a) => a.name).join(", ")}. The value was read off the account name
+              or inherited from an old column default, and it decides tax treatment and which
+              screens the account appears on. Open each one and confirm or correct the type.
+            </div>
           )}
           {accounts.map((a) => (
             <AccountCard
@@ -646,6 +667,14 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
     name: account.name,
     account_type: account.account_type,
     broker: account.broker ?? "",
+    tax_treatment: account.tax_treatment ?? "",
+    broker_account_id: account.broker_account_id ?? "",
+    currency: account.currency ?? "",
+    // "" = not known, distinct from "no" — a margin figure on a cash account
+    // is a data error worth catching, and it cannot be caught while "no margin"
+    // and "we were not told" are the same value.
+    margin_enabled: account.margin_enabled === null ? "" : account.margin_enabled ? "yes" : "no",
+    account_status: account.account_status ?? "",
     // Text, not `?? 0`. An unknown balance shown as 0 in the box is written to
     // the database as a real 0 by the first Save — turning "not known" into
     // "no cash" with no deliberate act (Phase 1a, rule 13). This editor was
@@ -662,7 +691,17 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
       {
         id: account.id,
         name: form.name,
-        account_type: form.account_type,
+        account_type: form.account_type || null,
+        // Saving here is a person answering. That is the whole distinction the
+        // 1b migration recorded: `inferred_from_name` and `legacy_default` are
+        // the app's own guesses wearing a stored value, and a guess that can
+        // never be promoted to an answer is a guess forever.
+        account_type_source: form.account_type ? "user_set" : null,
+        tax_treatment: form.tax_treatment || null,
+        broker_account_id: form.broker_account_id || null,
+        currency: form.currency || null,
+        margin_enabled: form.margin_enabled === "" ? null : form.margin_enabled === "yes",
+        account_status: form.account_status || null,
         broker: form.broker || null,
         // starting_value / target_value / target_date are deliberately NOT
         // written. They are a second objective that nothing in the app reads —
@@ -697,12 +736,30 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
                 ? "TYPE NOT SET"
                 : account.account_type.replace("_", " ")}
             </Badge>
+            {/* A stored type is not the same as an answered one. Until someone
+                confirms it, the value is the app's own guess — read off the
+                account name, or inherited from a schema default nobody chose —
+                and it decides tax treatment and which screens the account
+                appears on. */}
+            {account.account_type !== null && !accountTypeIsConfirmed(account.account_type_source) && (
+              <Badge
+                variant="outline"
+                className="border-amber-500/50 text-[10px] uppercase text-amber-600 dark:text-amber-400"
+                title={
+                  account.account_type_source === "inferred_from_name"
+                    ? "Guessed from the account name — confirm or correct it"
+                    : "Never chosen: this is the old column default — confirm or correct it"
+                }
+              >
+                unconfirmed
+              </Badge>
+            )}
             {account.broker && (
               <span className="text-xs text-muted-foreground">{account.broker}</span>
             )}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            Cash {fmtUSD(account.cash)} · BP {fmtUSD(account.buying_power)}
+            Cash {usdOrUnavailable(account.cash)} · BP {usdOrUnavailable(account.buying_power)}
             {/* A target recorded on the account itself is shown as what it is:
                 a leftover that nothing reads. Hiding it would make the value
                 vanish silently; presenting it as "Target" implied it drove
@@ -765,8 +822,8 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
               value={form.account_type ?? ""}
               onValueChange={(v) => setForm({ ...form, account_type: v })}
             >
-              <SelectTrigger>
-                <SelectValue />
+              <SelectTrigger aria-label="Account type">
+                <SelectValue placeholder="Not set" />
               </SelectTrigger>
               <SelectContent>
                 {ACCOUNT_TYPES.map((t) => (
@@ -776,6 +833,74 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
                 ))}
               </SelectContent>
             </Select>
+          </Field>
+          {/* A separate axis from the type on purpose: a Roth and a traditional
+              IRA are both retirement accounts and are taxed oppositely, so
+              deriving one from the other is the inference-from-a-label this
+              phase removes. The migration deliberately left it unset for
+              accounts whose name said only "IRA". */}
+          <Field label="Tax treatment">
+            <Select
+              value={form.tax_treatment}
+              onValueChange={(v) => setForm({ ...form, tax_treatment: v })}
+            >
+              <SelectTrigger aria-label="Tax treatment">
+                <SelectValue placeholder="Not known" />
+              </SelectTrigger>
+              <SelectContent>
+                {TAX_TREATMENTS.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t.replace("_", " ").toUpperCase()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Can borrow on margin">
+            <Select
+              value={form.margin_enabled}
+              onValueChange={(v) => setForm({ ...form, margin_enabled: v })}
+            >
+              <SelectTrigger aria-label="Can borrow on margin">
+                <SelectValue placeholder="Not known" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">YES</SelectItem>
+                <SelectItem value="no">NO</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Status">
+            <Select
+              value={form.account_status}
+              onValueChange={(v) => setForm({ ...form, account_status: v })}
+            >
+              <SelectTrigger aria-label="Account status">
+                <SelectValue placeholder="Not known" />
+              </SelectTrigger>
+              <SelectContent>
+                {ACCOUNT_STATUSES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t.toUpperCase()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Currency">
+            <Input
+              value={form.currency}
+              onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
+              placeholder="USD"
+              maxLength={3}
+            />
+          </Field>
+          <Field label="Broker account number">
+            <Input
+              value={form.broker_account_id}
+              onChange={(e) => setForm({ ...form, broker_account_id: e.target.value })}
+              placeholder="Not recorded"
+            />
           </Field>
           <Field label="Broker">
             <Input

@@ -14,6 +14,8 @@ import {
   ACCOUNT_STATUSES,
   TAX_TREATMENTS,
   accountTypeIsConfirmed,
+  unconfirmedAccounts,
+  type ClassifiableAccount,
 } from "../accountMetadata";
 
 const MIGRATION = "supabase/migrations/20260905210000_account_metadata.sql";
@@ -91,5 +93,79 @@ describe("a stored type is not the same as an answered one", () => {
   test("an absent source is not confirmed", () => {
     expect(accountTypeIsConfirmed(null)).toBe(false);
     expect(accountTypeIsConfirmed(undefined)).toBe(false);
+  });
+});
+
+describe("which accounts the app is still guessing about", () => {
+  const acct = (over: Partial<ClassifiableAccount>): ClassifiableAccount => ({
+    id: "a",
+    name: "Account",
+    account_type: "brokerage",
+    account_type_source: "user_set",
+    ...over,
+  });
+
+  test("a confirmed account is not listed", () => {
+    expect(unconfirmedAccounts([acct({ account_type_source: "user_set" })])).toEqual([]);
+    expect(unconfirmedAccounts([acct({ account_type_source: "imported" })])).toEqual([]);
+  });
+
+  test("a type read off the account name is a guess, not an answer", () => {
+    const rows = [acct({ id: "x", account_type_source: "inferred_from_name" })];
+    expect(unconfirmedAccounts(rows).map((a) => a.id)).toEqual(["x"]);
+  });
+
+  test("a type inherited from the old column default is also a guess", () => {
+    // The worse of the two: it means the app treats the account as a TAXABLE
+    // BROKERAGE account because a schema default said so.
+    const rows = [acct({ id: "y", account_type_source: "legacy_default" })];
+    expect(unconfirmedAccounts(rows).map((a) => a.id)).toEqual(["y"]);
+  });
+
+  test("an account with no type at all is listed too", () => {
+    // Same problem from the user's side — the app does not know what this is —
+    // and the same action fixes it. Surfacing only one of the two would leave
+    // the other silently wrong.
+    const rows = [acct({ id: "z", account_type: null, account_type_source: null })];
+    expect(unconfirmedAccounts(rows).map((a) => a.id)).toEqual(["z"]);
+  });
+
+  test("it separates a mixed list rather than flagging everything", () => {
+    // A banner that fires for every account is a banner nobody reads.
+    const rows = [
+      acct({ id: "ok1", account_type_source: "user_set" }),
+      acct({ id: "guess", account_type_source: "inferred_from_name" }),
+      acct({ id: "ok2", account_type_source: "imported" }),
+      acct({ id: "default", account_type_source: "legacy_default" }),
+    ];
+    expect(unconfirmedAccounts(rows).map((a) => a.id)).toEqual(["guess", "default"]);
+  });
+});
+
+// A guess that can never be promoted to an answer is a guess forever, and the
+// "unconfirmed" banner would then be permanent noise on every account. The
+// promotion happens in a route file, which the tests project excludes, so this
+// asserts it against the source.
+describe("saving an account type is what turns a guess into an answer", () => {
+  const settings = readFileSync("src/routes/_authenticated/settings.tsx", "utf8");
+
+  test("the account editor records the source as user_set on save", () => {
+    expect(settings).toContain('account_type_source: form.account_type ? "user_set" : null');
+  });
+
+  test("nothing in the UI writes one of the app's own guesses", () => {
+    // `inferred_from_name` and `legacy_default` are the migration's to write,
+    // once. A screen writing either would mean the app had re-inferred at
+    // runtime, which is the thing rule 4 forbids.
+    //
+    // Matched as an ASSIGNMENT, not as an occurrence. The first version of this
+    // test used `not.toContain("inferred_from_name")` and failed on a
+    // comparison that reads the value to decide a tooltip — a guard coarser
+    // than the fault it claims to catch, which is the same mistake as a
+    // negative control coarser than its fault.
+    const writes = /account_type_source:\s*"(inferred_from_name|legacy_default)"/;
+    expect(settings).not.toMatch(writes);
+    // ...and reading it is not only allowed, it is how the UI knows to ask.
+    expect(settings).toContain('account_type_source === "inferred_from_name"');
   });
 });

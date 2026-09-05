@@ -75,3 +75,23 @@ export const ACCOUNT_STATUSES = ["active", "closed", "archived"] as const;
 export function accountTypeIsConfirmed(source: string | null | undefined): boolean {
   return source === "user_set" || source === "imported";
 }
+
+/** Structural minimum for asking whether an account's type is settled. */
+export type ClassifiableAccount = {
+  id: string;
+  name: string;
+  account_type: string | null;
+  account_type_source: string | null;
+};
+
+/**
+ * The accounts whose type nobody has answered for.
+ *
+ * Includes accounts with NO type at all and accounts carrying one of the app's
+ * own guesses. Those two are the same problem from the user's side — the app
+ * does not know what this account is — and both are fixed by the same action,
+ * so a UI that surfaced only one would leave the other silently wrong.
+ */
+export function unconfirmedAccounts<T extends ClassifiableAccount>(accounts: readonly T[]): T[] {
+  return accounts.filter((a) => !accountTypeIsConfirmed(a.account_type_source));
+}
