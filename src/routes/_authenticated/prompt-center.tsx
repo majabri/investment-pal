@@ -267,6 +267,9 @@ function PromptCenter() {
       ipsPositionCapPct: ipsLite.position_cap_pct,
       ipsPositionCapHard: ipsLite.position_cap_hard,
       ipsMarginCapPct: ipsLite.margin_cap_pct,
+      // Rule 15: the caps travel with where they came from, so the prompt can
+      // say whether they are the user's decision or the app's default.
+      ipsCapsSource: ipsLite.caps_source,
       marginPolicy: ipsLite,
       holdings: holdings.map((h) => ({
         symbol: h.symbol,
