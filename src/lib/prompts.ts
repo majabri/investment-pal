@@ -5,6 +5,11 @@ import { marginRatePromptLine, MARGIN_POLICY_UNSET, type MarginPolicy } from "./
 export type PromptContext = {
   /** Name of the portfolio the mandate is written about (the goal's name). */
   accountName: string;
+  /**
+   * Household/office display name for the constitution header. Omitted or blank
+   * falls back to a generic label — never to a person.
+   */
+  officeName?: string;
   portfolioValue: number; // NET account value (investments + cash − margin)
   grossValue?: number;
   cash: number;
@@ -60,6 +65,21 @@ export type PromptContext = {
  * numbers, so output is unchanged for an unedited goal.
  */
 export type Mandate = {
+  /**
+   * The office the constitution addresses. Was a person's name compiled into
+   * the templates (rule 23 bans PII in prompt templates); it is now data.
+   *
+   * The token is the WHOLE identity phrase, not just a first name — the title
+   * line reads `${officeName.toUpperCase()} OS v5.0`, so the original
+   * `<NAME> INVESTMENT OS v5.0` is reproduced exactly by configuring
+   * "<Name> Investment". The word INVESTMENT was part of the identity string,
+   * not fixed template text, and treating it as fixed would have forced two
+   * config fields for one name (Copilot raised this on #137).
+   *
+   * Everything outside the identity slots is untouched: these are governance
+   * artifacts supplied verbatim.
+   */
+  officeName: string;
   account: string;
   start: string;
   target: string;
@@ -104,8 +124,12 @@ function paceLine(cagr: number | null): string {
   return `${fmtPct(Math.pow(1 + cagr, 1 / 52) - 1)}/week | ${fmtPct(Math.pow(1 + cagr, 1 / 12) - 1)}/month`;
 }
 
+/** Generic default. A deployment that sets no office name gets no person's name. */
+export const DEFAULT_OFFICE_NAME = "Investment Office";
+
 export function mandateOf(ctx: PromptContext): Mandate {
   return {
+    officeName: ctx.officeName?.trim() || DEFAULT_OFFICE_NAME,
     account: ctx.accountName.trim() || "this portfolio",
     start: fmtUSD(ctx.goalStartingValue, 0),
     target: fmtUSD(ctx.goalTarget, 0),
@@ -924,10 +948,10 @@ export function buildUniversalPrompt(
 // ─── AMIR INVESTMENT OS v5.0 — supplied by Amir 2026-07-25, stored verbatim ───
 // Supersedes the Universal Review Prompt v1.0 and Morning v4.0 as the single
 // master constitution for all five meeting types.
-const OS_V5_TEMPLATE = (m: Mandate) => String.raw`AMIR INVESTMENT OS v5.0
+const OS_V5_TEMPLATE = (m: Mandate) => String.raw`${m.officeName.toUpperCase()} OS v5.0
 
 The application should no longer behave as a portfolio tracker or dashboard.
-It should operate as the complete institutional investment office for the Amir Family Investment Office.
+It should operate as the complete institutional investment office for the ${m.officeName}.
 Its purpose is to maximize the probability of achieving the portfolio objective—not simply report information.
 
 PRIMARY OBJECTIVE
@@ -1088,14 +1112,17 @@ Before presenting the final recommendation, the Investment OS must perform a sel
 export function buildV5Prompt(
   ctx: PromptContext & { meeting: MeetingType; tradesToday?: string },
 ): string {
-  const header = `You are the Amir Investment OS v5.0 — the complete institutional investment office. Operate strictly per the following constitution.\n\nTODAY'S MEETING TYPE: ${ctx.meeting} CIO Meeting`;
+  // One mandate for the header and the body. Building it twice let the two
+  // diverge on any future edit to the defaulting logic (Copilot, #137).
+  const mandate = mandateOf(ctx);
+  const header = `You are the ${mandate.officeName} OS v5.0 — the complete institutional investment office. Operate strictly per the following constitution.\n\nTODAY'S MEETING TYPE: ${ctx.meeting} CIO Meeting`;
   const rateNote = marginRatePromptLine(ctx.marginPolicy ?? MARGIN_POLICY_UNSET);
   const trades =
     ctx.meeting === "Evening" ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n` : "";
   return [
     header,
     "",
-    OS_V5_TEMPLATE(mandateOf(ctx)),
+    OS_V5_TEMPLATE(mandate),
     "",
     dataBlock(ctx),
     rateNote,
@@ -1108,12 +1135,12 @@ export function buildV5Prompt(
 // Supersedes v5.0. New: Red Team Committee, Portfolio Constraints (30% cap,
 // 60-80% core), Scenario Analysis, Rotation Framework, Confidence Framework,
 // Strategy Engine, base/bull/bear probability cases.
-const OS_V6_TEMPLATE = (m: Mandate) => String.raw`AMIR INVESTMENT OS v6.0
+const OS_V6_TEMPLATE = (m: Mandate) => String.raw`${m.officeName.toUpperCase()} OS v6.0
 Institutional Investment Office Constitution
 
-You are Amir Investment OS v6.0.
+You are ${m.officeName} OS v6.0.
 You are no longer a chatbot, portfolio tracker, dashboard, or stock screener.
-You are the complete institutional investment office for the Amir Family Investment Office.
+You are the complete institutional investment office for the ${m.officeName}.
 Operate exactly like the CIO office of a multi-billion dollar investment firm.
 Your responsibility is to maximize the probability of achieving the investment objective—not to simply answer questions.
 
