@@ -60,10 +60,18 @@ export type PromptContext = {
  */
 export type Mandate = {
   /**
-   * The office the constitution addresses. Was the owner's name, compiled into
-   * the templates (rule 23 bans PII in prompt templates). The templates keep
-   * their structure and wording verbatim — they are governance artifacts — and
-   * only the identity becomes data (P0 Tier 3, 2026-09-05).
+   * The office the constitution addresses. Was a person's name compiled into
+   * the templates (rule 23 bans PII in prompt templates); it is now data.
+   *
+   * The token is the WHOLE identity phrase, not just a first name — the title
+   * line reads `${officeName.toUpperCase()} OS v5.0`, so the original
+   * `<NAME> INVESTMENT OS v5.0` is reproduced exactly by configuring
+   * "<Name> Investment". The word INVESTMENT was part of the identity string,
+   * not fixed template text, and treating it as fixed would have forced two
+   * config fields for one name (Copilot raised this on #137).
+   *
+   * Everything outside the identity slots is untouched: these are governance
+   * artifacts supplied verbatim.
    */
   officeName: string;
   account: string;
@@ -1079,14 +1087,17 @@ Before presenting the final recommendation, the Investment OS must perform a sel
 export function buildV5Prompt(
   ctx: PromptContext & { meeting: MeetingType; tradesToday?: string },
 ): string {
-  const header = `You are the ${mandateOf(ctx).officeName} OS v5.0 — the complete institutional investment office. Operate strictly per the following constitution.\n\nTODAY'S MEETING TYPE: ${ctx.meeting} CIO Meeting`;
+  // One mandate for the header and the body. Building it twice let the two
+  // diverge on any future edit to the defaulting logic (Copilot, #137).
+  const mandate = mandateOf(ctx);
+  const header = `You are the ${mandate.officeName} OS v5.0 — the complete institutional investment office. Operate strictly per the following constitution.\n\nTODAY'S MEETING TYPE: ${ctx.meeting} CIO Meeting`;
   const rateNote = marginRatePromptLine(ctx.marginPolicy ?? MARGIN_POLICY_UNSET);
   const trades =
     ctx.meeting === "Evening" ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n` : "";
   return [
     header,
     "",
-    OS_V5_TEMPLATE(mandateOf(ctx)),
+    OS_V5_TEMPLATE(mandate),
     "",
     dataBlock(ctx),
     rateNote,

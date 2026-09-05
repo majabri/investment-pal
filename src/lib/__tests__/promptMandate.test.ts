@@ -268,6 +268,14 @@ describe("the office identity in the constitutions is configuration, not a perso
       expect(out).not.toMatch(/\bamir\b/i);
     });
 
+    test(`${name}: the original artifact is reproducible from configuration`, () => {
+      // The identity token is the whole phrase, so a deployment can reproduce
+      // the constitution's original title verbatim — the word INVESTMENT was
+      // part of the name, not fixed text (Copilot, #137).
+      const out = build(ctx({ officeName: "Northwind Investment" }));
+      expect(out).toContain(`NORTHWIND INVESTMENT OS ${name === "v5" ? "v5.0" : "v6.0"}`);
+    });
+
     test(`${name}: a configured office name fills every slot`, () => {
       const office = "Northwind Family Office";
       const out = build(ctx({ officeName: office }));
