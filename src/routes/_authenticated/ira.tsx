@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { accountCategory } from "@/lib/data/accountGroups";
+import { accountTotals } from "@/lib/accountTotals";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { usdOrNotKnown, usdOrUnavailable } from "@/lib/unavailable";
@@ -46,13 +47,13 @@ function Page() {
 
   const rows = iraAccounts.map((a) => {
     const hs = allHoldings.filter((h) => h.account_id === a.id);
-    // Positions stay known; the account VALUE is unknown without the cash
-    // (Phase 1a, rule 13). `?? 0` made an unpopulated account report its
-    // positions as its whole value — short by the cash, and stated as fact.
-    const positions = hs.reduce((s, h) => s + h.quantity * px(h), 0);
-    const cash = a.cash === null || a.cash === undefined ? null : Number(a.cash);
-    const value = cash === null ? null : positions + cash;
-    const cost = hs.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
+    // One engine (Phase 3a, rule 9). This screen used to do its own
+    // `positions + cash`, which agreed with the Portfolio screen's arithmetic
+    // only by luck — and silently stopped agreeing whenever one was changed.
+    const t = accountTotals(hs, a, px);
+    const cash = t.cash;
+    const value = t.totalAccountValue;
+    const cost = t.costBasis;
     const day = hs.reduce((s, h) => {
       const q = quotes?.[h.symbol];
       return q && q.prevClose > 0 ? s + h.quantity * (q.price - q.prevClose) : s;

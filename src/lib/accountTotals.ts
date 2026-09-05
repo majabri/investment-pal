@@ -28,6 +28,10 @@ export type PositionLike = {
 export type BalanceLike = {
   cash: number | null | undefined;
   margin_used: number | null | undefined;
+  /** The broker's own buying-power figure. Informational — never summed into
+   *  equity (rule 8) — but it IS what "available capital" means, because the
+   *  broker's margin rules decide it and the app does not know them. */
+  buying_power?: number | null | undefined;
 };
 
 /**
@@ -66,6 +70,28 @@ export type AccountTotals = {
   /** Equity as a fraction of gross, or null when gross is zero. */
   equityPct: number | null;
   positionCount: number;
+
+  // ── rule 9: the concepts every page was computing for itself ──────────────
+  //
+  // Five screens each did their own `positions + cash − debt`, and they agreed
+  // only by luck. These are here so no page has to, and so a change to what
+  // "available capital" means happens once.
+
+  /** Everything owed. Today that is the margin debt; the field exists
+   *  separately because a second liability would otherwise be added to the
+   *  debt and lose its identity. NULL when any component is unknown. */
+  liabilities: number | null;
+  /** What could be deployed, borrowing included. The broker's own buying-power
+   *  figure where one exists — this is NOT computed from equity, because the
+   *  broker's margin rules decide it and the app does not know them. */
+  availableCapital: number | null;
+  /** What could be deployed WITHOUT borrowing. Cash, and only cash. */
+  availableWithoutBorrowing: number | null;
+  /** Gross ÷ equity. 1 means unlevered; NULL when either is unknown, or when
+   *  equity is zero — leverage against nothing is undefined, not infinite. */
+  leverage: number | null;
+  /** Debt ÷ gross. The figure the IPS margin cap is expressed against. */
+  marginUtilisation: number | null;
 };
 
 /** A position figure: absent or unusable reads as 0, which for a quantity or a
@@ -124,6 +150,20 @@ export function accountTotals<T extends PositionLike>(
     totalAccountValue,
     costBasis,
     unrealizedPL,
+    liabilities: marginDebit,
+    availableCapital: money(balance?.buying_power),
+    availableWithoutBorrowing: cash,
+    // Leverage against nothing is undefined, not infinite. An account with no
+    // equity and a debt is a margin call, not a 500x position, and rendering it
+    // as a number invites someone to read it as one.
+    leverage:
+      grossValue !== null && totalAccountValue !== null && totalAccountValue !== 0
+        ? grossValue / totalAccountValue
+        : null,
+    marginUtilisation:
+      marginDebit !== null && grossValue !== null && grossValue > 0
+        ? marginDebit / grossValue
+        : null,
     unrealizedPLPct: costBasis > 0 ? unrealizedPL / costBasis : null,
     equityPct:
       grossValue !== null && grossValue > 0 && totalAccountValue !== null

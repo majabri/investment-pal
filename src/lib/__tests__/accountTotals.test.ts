@@ -5,6 +5,8 @@
 // The anchor test is the real Fidelity statement — if the arithmetic does not
 // reconcile to the cent against that, nothing else here matters.
 import { describe, expect, test } from "bun:test";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   accountTotals,
@@ -264,5 +266,127 @@ describe("totals over a scope match the formula, not the household", () => {
   test("blending every account overstates the same figure", () => {
     const blended = accountTotals(holdings, { cash: 2_500, margin_used: 20_000 });
     expect(blended.totalAccountValue).toBeGreaterThan(128_450);
+  });
+});
+
+// Rule 9: one engine. Five screens each did their own `positions + cash − debt`
+// and agreed only by luck — a change to one silently stopped matching the rest.
+// These are the concepts they were each computing, now computed once.
+describe("the concepts every screen was computing for itself", () => {
+  const positions = [{ quantity: 100, cost_basis: 50, current_price: 80 }];
+  const balance = { cash: 2_500, margin_used: 20_000, buying_power: 190_000 };
+
+  test("liabilities are held apart from the debt they currently equal", () => {
+    // A second liability would otherwise be added to the margin debt and lose
+    // its identity, which is how a figure stops being auditable.
+    const t = accountTotals(positions, balance);
+    expect(t.liabilities).toBe(20_000);
+    expect(t.marginDebit).toBe(20_000);
+  });
+
+  test("available capital is the broker's figure, not one the app derives", () => {
+    // The broker's margin rules decide it and the app does not know them.
+    // Computing it from equity would be inventing a broker state.
+    const t = accountTotals(positions, balance);
+    expect(t.availableCapital).toBe(190_000);
+  });
+
+  test("available without borrowing is cash, and only cash", () => {
+    const t = accountTotals(positions, balance);
+    expect(t.availableWithoutBorrowing).toBe(2_500);
+  });
+
+  test("leverage against nothing is undefined, not infinite", () => {
+    // An account with no equity and a debt is a margin call, not a 500x
+    // position — and rendering it as a number invites someone to read it as one.
+    const t = accountTotals(positions, { cash: 0, margin_used: 8_000 });
+    expect(t.totalAccountValue).toBe(0);
+    expect(t.leverage).toBeNull();
+  });
+
+  test("leverage is gross over equity where both are known", () => {
+    // gross 10,500 / equity 500 = 21x
+    const t = accountTotals([{ quantity: 100, cost_basis: 50, current_price: 100 }], {
+      cash: 500,
+      margin_used: 10_000,
+    });
+    expect(t.leverage).toBeCloseTo(21, 4);
+  });
+
+  test("margin utilisation is debt over gross — the figure the IPS cap uses", () => {
+    const t = accountTotals(positions, balance);
+    // 20,000 / 10,500 — a breach, and the point is that it is ONE definition.
+    expect(t.marginUtilisation).toBeCloseTo(20_000 / 10_500, 6);
+  });
+
+  test("every derived concept goes unknown when its inputs do", () => {
+    const t = accountTotals(positions, { cash: null, margin_used: null });
+    expect(t.liabilities).toBeNull();
+    expect(t.availableWithoutBorrowing).toBeNull();
+    expect(t.leverage).toBeNull();
+    expect(t.marginUtilisation).toBeNull();
+    // ...and buying power is separately unknown, not inherited from the others.
+    expect(t.availableCapital).toBeNull();
+  });
+
+  test("buying power is not summed into anything", () => {
+    // Rule 8. It is available capital and nothing else — the account is not
+    // worth more because the broker would lend against it.
+    const withBp = accountTotals(positions, balance);
+    const withoutBp = accountTotals(positions, { cash: 2_500, margin_used: 20_000 });
+    expect(withBp.totalAccountValue).toBe(withoutBp.totalAccountValue);
+    expect(withBp.grossValue).toBe(withoutBp.grossValue);
+  });
+});
+
+// The rule is "every page consumes it, no page recomputes". A convention that
+// holds only while someone remembers it is how five copies appeared in the
+// first place, so it is asserted against the source.
+describe("no screen recomputes the account arithmetic", () => {
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((e) => {
+      const full = join(dir, e);
+      return statSync(full).isDirectory() ? walk(full) : [full];
+    });
+
+  /**
+   * Live code only.
+   *
+   * Every source guard in this repo needs this, and this one needed it for a
+   * reason worth writing down: the comment explaining WHY the arithmetic was
+   * removed necessarily quotes the arithmetic. So the first version of this
+   * guard flagged its own documentation — a guard coarser than the fault it
+   * catches, which is the recurring own-goal of this whole rebuild. A guard
+   * that fires on the explanation pressures the next person to delete the
+   * explanation.
+   */
+  const live = (code: string) =>
+    code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  test("nothing outside the engine sums positions and then adds cash", () => {
+    // The specific shape that was duplicated: a reduce over quantity × price,
+    // with the account's cash added to it. Matching the PAIR rather than either
+    // half — a reduce alone is legitimate (day change, cost basis, sector
+    // weights all do one) and flagging it would make this guard noise.
+    const offenders: string[] = [];
+    for (const file of [...walk("src/routes"), ...walk("src/components")]) {
+      const code = live(readFileSync(file, "utf8"));
+      const sumsPositions = /reduce\(\([^)]*\)\s*=>[^;]*\.quantity\s*\*/.test(code);
+      const addsCash = /\+\s*Number\(\s*\w+\.cash|cash\s*===\s*null\s*\?\s*null\s*:\s*\w+\s*\+/.test(
+        code,
+      );
+      if (sumsPositions && addsCash) offenders.push(file);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("nothing outside the engine subtracts the margin debt", () => {
+    // `positions + cash − margin_used` written out by hand is the whole defect.
+    const offenders: string[] = [];
+    for (const file of [...walk("src/routes"), ...walk("src/components")]) {
+      const code = live(readFileSync(file, "utf8"));
+      if (/-\s*Number\(\s*\w+\.margin_used/.test(code)) offenders.push(file);
+    }
+    expect(offenders).toEqual([]);
   });
 });

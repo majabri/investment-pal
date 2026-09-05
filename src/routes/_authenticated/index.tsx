@@ -53,7 +53,7 @@ import {
   riskToVol,
   riskToExpectedReturn,
 } from "@/lib/finance";
-import { UNAVAILABLE } from "@/lib/unavailable";
+import { UNAVAILABLE, usdOrUnavailable } from "@/lib/unavailable";
 import { objectiveOf } from "@/lib/objective";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -420,25 +420,32 @@ function Dashboard() {
       {accountsList.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-sm">
           {(() => {
+            // One engine (Phase 3a, rule 9) — this strip had its own copy of
+            // `positions + cash − debt`, and with it a Phase 1a site that was
+            // missed: `Number(a.cash ?? 0) - Number(a.margin_used ?? 0)` turned
+            // an unpopulated account's unknown balance into a real zero inside
+            // the HOUSEHOLD total, where it is least visible.
             const statsOf = (a: (typeof accountsList)[number]) => {
               const rows = allHoldings.filter((h) => h.account_id === a.id);
-              const pos = rows.reduce((x, h) => x + h.quantity * px(h), 0);
               const day = rows.reduce((x, h) => {
                 const q = liveQuotes?.[h.symbol];
                 return q && q.prevClose > 0 ? x + h.quantity * (q.price - q.prevClose) : x;
               }, 0);
-              return { net: pos + Number(a.cash ?? 0) - Number(a.margin_used ?? 0), day };
+              return { net: accountTotals(rows, a, px).totalAccountValue, day };
             };
-            const groups = new Map<string, { net: number; day: number }>();
-            let total = 0,
-              totalDay = 0;
+            // All-or-nothing per group, like every other blend since Phase 1a:
+            // a category total that silently omits one account is not that
+            // category's total. The day change is quote-derived and stays known.
+            const groups = new Map<string, { net: number | null; day: number }>();
+            let total: number | null = 0;
+            let totalDay = 0;
             for (const a of accountsList) {
               const { net, day } = statsOf(a);
-              total += net;
               totalDay += day;
+              total = total === null || net === null ? null : total + net;
               const cat = accountCategory(a);
               const g = groups.get(cat) ?? { net: 0, day: 0 };
-              g.net += net;
+              g.net = g.net === null || net === null ? null : g.net + net;
               g.day += day;
               groups.set(cat, g);
             }
@@ -453,14 +460,14 @@ function Dashboard() {
             return (
               <>
                 <span className="font-medium">
-                  Household {fmtUSD(total)}
+                  Household {usdOrUnavailable(total)}
                   <Day v={totalDay} />
                 </span>
                 {CATEGORY_ORDER.filter((c) => groups.has(c)).map((c) => (
                   <span key={c} className="text-muted-foreground">
                     {c}{" "}
                     <span className="tabular-nums text-foreground">
-                      {fmtUSD(groups.get(c)!.net)}
+                      {usdOrUnavailable(groups.get(c)!.net)}
                     </span>
                     <Day v={groups.get(c)!.day} />
                   </span>
