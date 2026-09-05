@@ -94,11 +94,13 @@ const ALLOWED: Record<string, { why: string; needles: string[] }> = {
     why: "pending Tier 2: personal default on portfolio_snapshots.scope",
     needles: ["the owner's first name"],
   },
-  // PENDING TIER 3 — the committee templates embed the office identity. They
-  // are governance artifacts supplied verbatim, so the identity gets
-  // parameterised rather than reworded, which is money-adjacent.
+  // Tier 3 is DONE: the templates carry a configurable office name and no
+  // longer name a person. What remains are provenance comments recording who
+  // supplied each constitution and when — project history, retained by design
+  // (the P0 brief keeps them explicitly), and never sent to the model. The
+  // promptMandate suite asserts the rendered prompts contain no such name.
   "src/lib/prompts.ts": {
-    why: "pending Tier 3: office identity to be parameterised",
+    why: "provenance comments only; templates are parameterised and prompts assert no name",
     needles: ["the owner's first name"],
   },
 };
