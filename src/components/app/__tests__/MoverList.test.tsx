@@ -25,13 +25,25 @@ describe("MoverList", () => {
     expect(screen.getByText("-1.03%")).toBeInTheDocument();
   });
 
-  test("badges only the symbols that are held, matching on normalised case", () => {
-    // The set holds normalised symbols; a holding stored as "aapl" must still
-    // badge the "AAPL" row, which is the bug a previous review caught on this page.
+  test("badges only the symbols that are held", () => {
     render(<MoverList title="Movers" items={rows} tone="up" held={new Set(["AAPL"])} />);
 
-    const badges = screen.getAllByText("Held");
-    expect(badges).toHaveLength(1);
+    expect(screen.getAllByText("Held")).toHaveLength(1);
+  });
+
+  test("matches a held symbol whose row form is not canonical", () => {
+    // `heldSymbolSet` upper-cases what goes into the set, but the row symbols come
+    // from quote keys and are not guaranteed canonical. The row must therefore be
+    // normalised at lookup time too, or a lower-case row silently loses its badge —
+    // the bug a previous review caught on this page.
+    //
+    // The row symbol here is deliberately NOT already canonical: with matching
+    // cases on both sides, dropping `normaliseSymbol` from the lookup would still
+    // pass and the test would assert nothing (Copilot, #134).
+    const lower: MoverRow[] = [{ sym: "aapl", price: 231.5, changePct: 2.14 }];
+    render(<MoverList title="Movers" items={lower} tone="up" held={new Set(["AAPL"])} />);
+
+    expect(screen.getAllByText("Held")).toHaveLength(1);
   });
 
   test("renders nothing but the header when there are no rows", () => {
