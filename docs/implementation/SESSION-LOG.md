@@ -736,3 +736,281 @@ reading it is how the UI knows which accounts to ask about.
   pending.
 - **Git history** still contains everything the P0 remediation removed (§5).
 - **CI still does not run lint**, unchanged from 2026-09-04.
+
+---
+
+## 2026-09-05 — Master Brief (user-agnostic rebuild), Phases 2 and 3: the canonical model, the adapter contract, and one accounting engine
+
+Six PRs.
+
+| PR | part | what |
+|---|---|---|
+| #151 | 2a | the canonical model, and what each broker field may mean |
+| #152 | 2b | the adapter contract, proven with a synthetic second broker |
+| #153 | 3-pre | the formatters take a `number`, not `number \| null` |
+| #154 | 3b | the reconciliation engine, seven states |
+| #155 | 3a | one accounting engine; five screens stop recomputing |
+| #156 | 3d | the reconciliation panel |
+
+### "Verified against Fidelity" meant one sample that happened to reconcile
+
+The brief named the defect precisely and it was worse on inspection. The
+equity formula in `accountTotals.ts` was documented as verified because a
+single real statement's numbers added up. That is curve-fitting: with enough
+fields, several wrong formulas reproduce one sample.
+
+The fix was not a better formula. It was **saying, per field, what is
+actually known about it** — and admitting that for most of them the answer is
+"less than the arithmetic assumed". `canonicalBalances.ts` ended up with a
+three-value `SemanticBasis`:
+
+- `checked_identity` — the field participates in an identity that can be
+  checked against other fields on the same statement;
+- `reported_scalar` — the broker reports it and the app stores it, but nothing
+  independently confirms what it means;
+- `unsupported` — the meaning could not be established, so it is excluded from
+  equity entirely.
+
+**Exactly three fields came out calculable.** Everything else is stored,
+displayed, and kept out of the equity computation. That is a smaller app than
+the one that shipped, and a truthful one.
+
+Two attempts to establish the definitions from Fidelity's own documentation
+failed: the egress proxy blocks `fidelity.com` and `www2.advisorchannel.com`.
+Recorded as blocked rather than filled in from memory — a remembered
+definition presented as the broker's is exactly the class of claim this phase
+exists to remove.
+
+### The second adapter is the test, not the feature
+
+Rule 3 asks that a second broker be addable without touching portfolio logic.
+The only honest way to check that is to add one, so #152 ships a synthetic
+second-broker fixture in tests. It has different field names, a different sign
+convention on margin debt, and one field the contract marks unsupported.
+
+The contract has a single `read` method rather than `parse` / `validate` /
+`map`, for one reason: three methods let a caller skip validation and still
+get a canonical record. One method cannot be half-used.
+
+### Making the formatters reject `null` was the largest mechanical change
+
+`fmtUSD(v: number | null)` returning `—` was flagged four separate times in
+Phase 1 as the thing that made every unknown-value bug silent. #153 changed
+the signature to `number` and let the compiler find every site — several
+hundred — that had been relying on the fallback.
+
+The replacement for a non-finite input is `(error)`, not `—` and not `$0.00`.
+A NaN reaching a formatter is a bug in the caller, and a dash hides it while
+`$0.00` states it as a fact.
+
+### Precedence is the whole design of the reconciliation engine
+
+Seven states, and the order they are evaluated in matters more than the
+thresholds:
+
+```
+unsupported → missing data → staleness → tolerance bands
+```
+
+A stale figure that also fails the tolerance check is STALE, not
+NOT_RECONCILED: telling someone their books disagree by $4,000 when the real
+problem is that one side is nine days old sends them to fix the wrong thing.
+
+Tolerance fires on **either** dollars or percentage, which is what makes
+rule 31 hold: a $300 gap on $5,000,000 is 0.006% and must still be material,
+and $0.01 of rounding on $500 must not be. A test asserting the first case
+was written badly the first time — $5,000 on $5m is 0.1%, already over the
+percentage threshold, so it passed with the dollar check deleted. The control
+caught it; the test was rewritten to $300 with an explicit assertion that it
+sits below the percentage band.
+
+### "Leverage against nothing is undefined, not infinite"
+
+`accountTotals.ts` gained `liabilities`, `availableCapital`,
+`availableWithoutBorrowing`, `leverage` and `marginUtilisation`. Two decisions
+worth keeping:
+
+- `availableCapital` is the **broker's own buying-power figure**, never
+  derived. Deriving it means inventing the broker's margin rules.
+- `leverage` is `null` when equity is zero. Not `Infinity`, which renders, and
+  not a large number, which reads as a reading.
+
+The panel in #156 removed the line "Treat the broker's figure as correct."
+Rule 5 says do not assume either value is right; a panel that tells the user
+which side to believe is not a reconciliation panel, it is a preference.
+
+### The recurring own-goal, twice more
+
+A guard coarser than the fault it claims to catch — instances five and six.
+
+In #155 the guard flagged **its own documentation**: the comment explaining
+which arithmetic had been removed necessarily quotes that arithmetic. Fixed by
+stripping comments before matching, and the reason is worth stating plainly —
+*a guard that fires on the explanation pressures the next person to delete the
+explanation*, which leaves the codebase with the rule and without the reason
+for it.
+
+---
+
+## 2026-09-05 — Master Brief (user-agnostic rebuild), Phase 4: the configuration layer
+
+Four PRs. This is the phase that removed the last of one household from the
+application.
+
+| PR | rules | what |
+|---|---|---|
+| #157 | 22 | household membership becomes data; nobody is assumed |
+| #158 | 20, 15 | goals are data, per account; unset means unset |
+| #159 | 15, 21 | policy classes and provenance — a default is labelled a default |
+| #160 | 16, 21 | strategy rules become data; the core stops knowing about them |
+
+### One file was the whole phase
+
+`src/lib/data/familyPolicy.ts` held, in a single frozen object:
+
+- **who** — three children's first names and birth dates;
+- **the goal** — $200,000 per child, $600,000 for the family, a 2036 horizon,
+  $100 every fourteen days from a fixed anchor;
+- **the strategy** — 28 tickers in four buckets, a 5% speculative cap, a
+  parity rule, and scoring weights nothing read.
+
+Every user of the app inherited all of it, and **no screen could tell it had
+been made up.** `/kids` rendered three named children with hand-copied
+positions when no accounts had been imported, and labelled the result "seeded
+2026-07-21". The committee prompt named those children, by name and age, to a
+model, in the first person, and asked it to vote BUY/HOLD/SELL on each.
+
+The file is now two parameterised functions and is renamed `objectiveMath.ts`.
+
+### The consequence was the reason it took six flags to move
+
+This was reported to Amir six times across Phases 1–3 and never answered,
+because the fix empties screens: `/kids`, `/kids-watchlist` and
+`/kids-prompt-center` show empty states until a household, targets and a
+strategy are entered. Phase 4 point 5 of the brief — *"No assumed
+dependants"* — is the explicit authority that made it a decision already
+taken rather than one still open.
+
+Worth stating for the next time this shape appears: **an empty screen that
+says what is missing is not a regression from a full screen that is wrong
+about whose money it is.**
+
+### A guard cannot use the value it is guarding
+
+`personalData.test.ts` lists literal needles — a name, a balance figure — and
+fails when one reappears. The obvious extension was to add the three
+children's names and birth dates.
+
+That would have put them back in the public repository. The guard would have
+become the leak.
+
+So the roster gets **structural** guards instead (no `children:` array, no
+literal birth date, anywhere under `src/lib`), and the account numbers get a
+**shape** needle — `\bZ\d{8}\b` — which costs nothing to state and catches
+siblings nobody has seen. The owner's own first name stays a literal needle
+because it already was one and it is his own; the asymmetry is deliberate.
+
+### Rule 13 keeps finding new denominators
+
+Three more sites, all the same shape and all previously unreachable:
+
+- `[].reduce((s, k) => ..., 0)` returns **0**, so a household with no
+  custodial accounts would have shown `$0.00` against a $600,000 target with a
+  0% progress bar. Unreachable before only because a compiled-in seed
+  guaranteed three accounts.
+- `approvedShare = ... / Math.max(1, mv)` returns **0** for an empty account —
+  "0% in approved names", a failing grade — and would have returned the same
+  for any user who had not configured a strategy.
+- `ageOf` returned `number`, so a missing birth date produced `NaN` and a
+  future one produced a negative, and **both rendered as an age**.
+
+The pattern: a denominator or an accumulator that cannot distinguish "nothing
+to measure" from "measured, and it is zero". Each was invisible while a
+hardcoded constant guaranteed the input was never empty. **Making something
+configurable makes its empty case reachable for the first time** — that is
+where to look next time.
+
+### Rule 15 is not "remove the defaults"
+
+The 30% position cap and 25% margin cap are ADR-APP-004's signed-off defaults
+and they are legitimate. What was not legitimate is that nothing could tell
+them from a choice: Settings pre-filled them, the dashboard flagged
+`NVDA 34.2% > 30% cap` as though the user were breaching their own commitment,
+and the committee prompt stated them under "HARD GOVERNANCE" — all of it
+whether or not anybody had ever opened the form. The prompt template's
+`${ctx.ipsPositionCapPct ?? 30}` meant a caller that simply *forgot* the caps
+still asserted a 30% limit as the user's policy.
+
+The fix is a provenance column and four states, not a deletion —
+`accounts.account_type_source` from Phase 1b, again. `legacy_unknown` for
+existing rows is the honest answer: those values may be a choice or may be the
+schema default, and the app cannot tell retroactively.
+
+### Rule 21's distinction is not cosmetic
+
+Before this phase the dashboard listed the Reg-T 50% maintenance floor in the
+same breach line, in the same words, as two caps the user may move. An app
+that presents a regulatory constraint identically to a self-imposed one
+invites somebody to "adjust" the one they cannot adjust.
+
+### Rule 16 is checkable, so it is checked
+
+"Strategies sit on top; they never redefine the financial model" is a claim
+about imports. A test lists the accounting modules and asserts none of them
+imports strategy configuration — with a control proving the import scan finds
+the imports that *are* there, and another proving it *would* flag a strategy
+import.
+
+### A guard pinned to a path stops guarding when the path moves
+
+#160 renamed `familyPolicy.ts`. Two source guards read that file **by path**
+and would have thrown — loudly, in this case, which is the good outcome. But
+the lesson generalises: both were re-pointed to scan all of `src/lib`, which
+is where the data would go if it came back and which survives the next rename.
+
+One needle had to be narrowed in the process. `familyTarget` is now a
+legitimate local holding the *derived* household target, and a guard on the
+bare identifier flagged it — which would have pushed the next person to rename
+a correctly-named variable to satisfy a test. Guards must not make the code
+worse to keep them quiet.
+
+### An earlier decision reversed, on purpose
+
+The P0 remediation added "the objective has exactly one home", forbidding any
+objective field from being written to `accounts`. Sound at the time: nothing
+read those columns, so the Settings editor looked like setting a target and
+set nothing.
+
+Rule 20 puts a goal at account scope and `/kids` now reads it, so the guard
+was **narrowed rather than deleted**: `starting_value` is still never written
+to an account, and `target_value` / `target_date` only from the account
+editor, per file **and** per field. A per-file exemption would have handed
+`settings.tsx` `starting_value` too; a control asserts it did not.
+
+The first replacement control I wrote for that exemption — "these files
+contain no mutation" — **was wrong and failed on its first run**: `useAppData`
+is the hooks module and obviously mutates. The claim that actually needed
+holding was narrower: in those files an objective field only ever appears as a
+*type declaration*, never as a key assigned a value.
+
+### Still outstanding for Amir
+
+- **Apply the migrations.** Phase 4 adds four (`household_members`,
+  `account_objectives`, `policy_provenance`, `strategy_config`) on top of the
+  seven already pending from Phases 0–3. Nothing in Phase 4 backfills a value:
+  every new column is NULL for every existing row by design.
+- **Populate the configuration.** `/kids`, `/kids-watchlist` and
+  `/kids-prompt-center` are empty until household members, per-account targets
+  and a strategy are entered in Settings. This is the rule, not a regression,
+  but it is your data to enter.
+- **Confirm the IPS-lite caps.** Every existing row is `legacy_unknown` — the
+  app cannot tell your choice from the old column defaults. Saving the
+  Settings form once resolves it.
+- **Confirm the account types.** Unchanged from Phase 1: every account still
+  carries `inferred_from_name` or `legacy_default`.
+- **Copilot review is exhausted.** From #157 onward: *"unable to review — the
+  user who requested the review has reached their quota limit."* Phases 0–3
+  had ~14 defects found by review; Phase 4 had none found that way, and the
+  difference is not that the code got better.
+- **Git history** still contains everything the P0 remediation removed (§5).
+- **CI still does not run lint**, unchanged since 2026-09-04.
