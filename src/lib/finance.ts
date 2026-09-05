@@ -25,15 +25,74 @@
  * "Unavailable" (which would report a bug as a missing figure, sending the user
  * to import data that will not help).
  */
+import { PRESENTATION_CURRENCY } from "./currency";
+import { QUANTITY_DECIMALS, classOf, displayDecimals } from "./precision";
+
 const BROKEN = "(error)";
 
-export const fmtUSD = (v: number, digits = 2) => {
+/**
+ * Format an amount in a stated currency, to a stated number of decimals.
+ *
+ * The general form. `fmtUSD` below is the USD-only shorthand, kept because it
+ * is called from several hundred places and changing them all at once would be
+ * a diff nobody could review — but it now delegates here, so there is exactly
+ * one place where a currency code turns into a symbol.
+ *
+ * Rule 32: a USD-only implementation is acceptable, a USD-assumed
+ * ARCHITECTURE is not. Before this, `currency: "USD"` was written inline in
+ * the one function every screen calls, so a GBP balance rendered with a dollar
+ * sign and nothing anywhere could have noticed.
+ */
+export const fmtMoney = (v: number, currency: string, digits = 2) => {
   if (!Number.isFinite(v)) return BROKEN;
   return v.toLocaleString("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: currency.toUpperCase(),
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
+  });
+};
+
+/**
+ * The USD shorthand.
+ *
+ * Every existing call site. It is not deprecated — the app IS USD-only — but
+ * a figure whose currency is known should reach `fmtMoney` instead, and a
+ * figure whose currency is NOT known should not be given one silently.
+ */
+export const fmtUSD = (v: number, digits = 2) => fmtMoney(v, PRESENTATION_CURRENCY, digits);
+
+/**
+ * Format a unit price at the precision its instrument actually needs
+ * (rule 33).
+ *
+ * `fmtUSD(price)` renders a crypto price of $0.00003412 as "$0.00" — not a
+ * rounding error, an erasure — and makes a 10% move in a penny security
+ * invisible. This picks the decimals from the instrument's class and from the
+ * figure itself, and it is the function a price should go through.
+ */
+export const fmtPrice = (
+  v: number,
+  instrument: { instrument_class?: string | null; price?: number | null } = {},
+  currency = PRESENTATION_CURRENCY,
+) => {
+  if (!Number.isFinite(v)) return BROKEN;
+  const cls = classOf({
+    instrument_class: instrument.instrument_class,
+    price: instrument.price ?? v,
+  });
+  return fmtMoney(v, currency, displayDecimals(v, cls));
+};
+
+/** Format a quantity at the precision its instrument needs (rule 33). */
+export const fmtQuantity = (v: number, instrument: { instrument_class?: string | null } = {}) => {
+  if (!Number.isFinite(v)) return BROKEN;
+  const cls = classOf({ instrument_class: instrument.instrument_class });
+  // Trailing zeros on a share count are noise, so this is a maximum rather
+  // than a fixed width — unlike a price, where alignment matters.
+  return v.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: QUANTITY_DECIMALS[cls],
   });
 };
 
