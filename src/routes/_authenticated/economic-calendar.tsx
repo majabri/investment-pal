@@ -4,15 +4,22 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getEconCalendarFn } from "@/lib/calendarServer";
+import { coverageNotice, coverageOf } from "@/lib/coverage";
 
 export const Route = createFileRoute("/_authenticated/economic-calendar")({ component: Page });
 
 function Page() {
-  const { data: events = [], isLoading } = useQuery({
+  // The whole query, not just its data: a failed fetch settles `isLoading` to
+  // false and the `= []` default fills in, so this page rendered an empty card
+  // with no message — which reads as "no economic events in the next 10 days"
+  // (rule 30).
+  const query = useQuery({
     queryKey: ["econ-cal"],
     queryFn: () => getEconCalendarFn({ data: { days: 10 } }),
     refetchInterval: 60 * 60 * 1000,
   });
+  const events = query.data ?? [];
+  const coverage = coverageOf(query);
   const tone = { high: "destructive", medium: "default", low: "secondary" } as const;
   const shown = events.filter((e) => e.importance !== "low").slice(0, 40);
   return (
@@ -22,9 +29,25 @@ function Page() {
     >
       <Card>
         <CardContent className="space-y-2 pt-6">
-          {isLoading && (
-            <p className="text-sm text-muted-foreground">Loading live economic calendar…</p>
-          )}
+          {(() => {
+            const notice = coverageNotice(
+              "economic events",
+              coverage,
+              shown.length,
+              "No high- or medium-impact US events in the next 10 days.",
+            );
+            return notice === null ? null : (
+              <p
+                className={
+                  coverage === "UNAVAILABLE"
+                    ? "text-sm font-medium text-amber-600 dark:text-amber-400"
+                    : "text-sm text-muted-foreground"
+                }
+              >
+                {notice}
+              </p>
+            );
+          })()}
           {shown.map((e, i) => (
             <div
               key={e.name + e.date + i}

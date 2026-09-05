@@ -6,6 +6,7 @@ import { NOT_KNOWN, usdOrNotKnown } from "./unavailable";
 import type { Objective } from "./objective";
 import type { PolicySource } from "./policy";
 import { gate, type ReadinessCheck } from "./readiness";
+import { coveragePromptLines, type Coverage } from "./coverage";
 
 export type PromptContext = {
   /** Name of the portfolio the mandate is written about (the goal's name). */
@@ -96,6 +97,15 @@ export type PromptContext = {
   upcomingEarnings?: string[];
   upcomingEcon?: string[];
   topHeadlines?: string[];
+  /**
+   * Whether the news source was actually READ (Phase 5, rule 30).
+   *
+   * `topHeadlines` defaulted to `- (none)` when the fetch failed, so a model
+   * was told there was no market-moving news — a fact, which it then reasoned
+   * from. Optional only so existing fixtures keep compiling; absent is treated
+   * as UNAVAILABLE, which is the safe reading.
+   */
+  headlinesCoverage?: Coverage;
   recentJournal?: string[];
   recentDecisions?: string[];
   committeeScorecard?: string[];
@@ -366,7 +376,7 @@ UPCOMING ECONOMIC EVENTS (7 days)
 ${ctx.upcomingEcon?.length ? ctx.upcomingEcon.map((e) => `- ${e}`).join("\n") : "- (none)"}
 
 TOP HEADLINES RIGHT NOW
-${ctx.topHeadlines?.length ? ctx.topHeadlines.map((h) => `- ${h}`).join("\n") : "- (none)"}
+${coveragePromptLines("news", ctx.headlinesCoverage ?? "UNAVAILABLE", ctx.topHeadlines ?? [])}
 
 RECENT JOURNAL ENTRIES
 ${ctx.recentJournal?.length ? ctx.recentJournal.map((j) => `- ${j}`).join("\n") : "- (none)"}

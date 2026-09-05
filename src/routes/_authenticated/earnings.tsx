@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getEarningsCalendarFn } from "@/lib/calendarServer";
+import { coverageNotice, coverageOf } from "@/lib/coverage";
 import { useAllHoldings, useUniverse } from "@/hooks/useAppData";
 import {
   resolveUniverse,
@@ -21,12 +22,17 @@ function Page() {
   const heldSymbols = holdings.map((h) => h.symbol);
   const symbols = resolveUniverse(universeSymbols, heldSymbols);
   const emptyReason = universeEmptyReason(universeSymbols, heldSymbols);
-  const { data: events = [], isLoading } = useQuery({
+  // The whole query, not just its data (rule 30). A failed fetch used to
+  // render "No earnings for these names in the next 14 days." — which is a
+  // reason to hold through the week, from an error nobody saw.
+  const query = useQuery({
     queryKey: ["earnings-cal", symbols.join(",")],
     queryFn: () => getEarningsCalendarFn({ data: { symbols, days: 14 } }),
     enabled: symbols.length > 0,
     refetchInterval: 60 * 60 * 1000,
   });
+  const events = query.data ?? [];
+  const coverage = coverageOf(query);
   // Same normalisation as the scan list (Copilot, post-merge review).
   const held = heldSymbolSet(holdings.map((h) => h.symbol));
   return (
@@ -36,7 +42,7 @@ function Page() {
     >
       <Card>
         <CardContent className="pt-6">
-          {(universeLoading || isLoading) && (
+          {universeLoading && (
             <p className="text-sm text-muted-foreground">Loading live earnings calendar…</p>
           )}
           {/* Distinguish "nothing to scan" from "nothing reports soon" — the old
@@ -48,11 +54,27 @@ function Page() {
                 : "No investment universe configured — showing earnings for your holdings only."}
             </p>
           ) : null}
-          {!universeLoading && !isLoading && !emptyReason && events.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No earnings for these names in the next 14 days.
-            </p>
-          )}
+          {!universeLoading && !emptyReason
+            ? (() => {
+                const notice = coverageNotice(
+                  "earnings for these names",
+                  coverage,
+                  events.length,
+                  "No earnings for these names in the next 14 days.",
+                );
+                return notice === null ? null : (
+                  <p
+                    className={
+                      coverage === "UNAVAILABLE"
+                        ? "text-sm font-medium text-amber-600 dark:text-amber-400"
+                        : "text-sm text-muted-foreground"
+                    }
+                  >
+                    {notice}
+                  </p>
+                );
+              })()
+            : null}
           <table className="w-full text-sm">
             <tbody>
               {events.map((e) => (

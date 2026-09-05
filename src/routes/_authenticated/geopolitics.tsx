@@ -4,25 +4,46 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getGeopoliticsFn } from "@/lib/newsServer";
+import { coverageNotice, coverageOf } from "@/lib/coverage";
 
 export const Route = createFileRoute("/_authenticated/geopolitics")({ component: Page });
 
 function Page() {
-  const { data: items = [], isLoading } = useQuery({
+  // The whole query, not just its data (rule 30). A failed fetch used to
+  // render "Nothing market-relevant right now." — an explicit claim about the
+  // world, made from an error nobody saw.
+  const query = useQuery({
     queryKey: ["geo"],
     queryFn: () => getGeopoliticsFn(),
     refetchInterval: 15 * 60 * 1000,
   });
+  const items = query.data ?? [];
+  const coverage = coverageOf(query);
   const tone = { high: "destructive", medium: "default", low: "secondary" } as const;
   return (
     <AppShell
       title="Geopolitics"
       subtitle="Live market-relevant developments from world coverage, impact-rated"
     >
-      {isLoading && <p className="text-sm text-muted-foreground">Scanning world coverage…</p>}
-      {!isLoading && items.length === 0 && (
-        <p className="text-sm text-muted-foreground">Nothing market-relevant right now.</p>
-      )}
+      {(() => {
+        const notice = coverageNotice(
+          "market-relevant developments",
+          coverage,
+          items.length,
+          "Nothing market-relevant right now.",
+        );
+        return notice === null ? null : (
+          <p
+            className={
+              coverage === "UNAVAILABLE"
+                ? "mb-3 text-sm font-medium text-amber-600 dark:text-amber-400"
+                : "mb-3 text-sm text-muted-foreground"
+            }
+          >
+            {notice}
+          </p>
+        );
+      })()}
       <div className="grid gap-4 md:grid-cols-2">
         {items.map((g) => (
           <Card key={g.link}>

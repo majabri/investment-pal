@@ -14,6 +14,7 @@ import {
   usePriorities,
   useAddJournal,
   useIpsLite,
+  useUniverse,
 } from "@/hooks/useAppData";
 import {
   requiredCAGR,
@@ -36,6 +37,7 @@ import { CommitteeChat } from "@/components/app/CommitteeChat";
 import { objectiveOf } from "@/lib/objective";
 import { accountTotals } from "@/lib/accountTotals";
 import { assertAiWritable } from "@/lib/aiBoundary";
+import { coverageOf } from "@/lib/coverage";
 import { useReadiness } from "@/hooks/useReadiness";
 import { ReadinessPanel } from "@/components/app/ReadinessPanel";
 
@@ -106,6 +108,7 @@ function PromptCenter() {
   const { data: balance } = useScopedAccount(scope);
   const { data: priorities = [] } = usePriorities();
   const { data: ipsLite } = useIpsLite();
+  const { data: universe = [] } = useUniverse();
   // The readiness gate (Phase 5, rule 17). This screen's output is a brief
   // that asks a model to recommend against a real account, so it is gated on
   // the inputs that recommendation would rest on. Nothing else on the screen
@@ -117,11 +120,15 @@ function PromptCenter() {
   const readiness = useReadiness(readinessTotals);
   const addJournal = useAddJournal();
   const { data: journalEntries = [] } = useJournal("");
-  const { data: news = [] } = useQuery({
+  const newsQuery = useQuery({
     queryKey: ["news"],
     queryFn: () => getNewsFn(),
     staleTime: 10 * 60 * 1000,
   });
+  const news = newsQuery.data ?? [];
+  // Rule 30: whether the source was READ, not just what it returned. `- (none)`
+  // reached the model as a fact about the market when the fetch had failed.
+  const headlinesCoverage = coverageOf(newsQuery);
   const { data: decisions = [] } = useQuery({
     queryKey: ["decisions-for-prompt"],
     queryFn: async () => {
@@ -183,23 +190,31 @@ function PromptCenter() {
     refetchInterval: 60 * 60 * 1000,
   });
   const { data: liveEarnCal = [] } = useQuery({
-    queryKey: ["earn-cal-pc", scopedHoldings.map((h) => h.symbol).join(",")],
+    queryKey: [
+      "earn-cal-pc",
+      scopedHoldings.map((h) => h.symbol).join(","),
+      universe.map((u) => u.symbol).join(","),
+    ],
     queryFn: () =>
       getEarningsCalendarFn({
         data: {
+          // The holdings, plus the user's own stored universe. Six tickers
+          // were hardcoded here — one household's watchlist, compiled into the
+          // application and appended to every user's earnings lookup. Missed
+          // in the Phase 4 sweep because they are an argument to a fetch
+          // rather than a named constant (rules 16, 37).
           symbols: [
-            ...scopedHoldings.map((h) => h.symbol),
-            "NVDA",
-            "META",
-            "COST",
-            "PANW",
-            "TSM",
-            "AAPL",
+            ...new Set([
+              ...scopedHoldings.map((h) => h.symbol),
+              ...universe.map((u) => u.symbol),
+            ]),
           ],
           days: 7,
         },
       }),
-    enabled: scopedHoldings.length > 0,
+    // The universe alone is enough to ask about; it used to require holdings
+    // because the six hardcoded tickers were only ever a supplement to them.
+    enabled: scopedHoldings.length + universe.length > 0,
     refetchInterval: 60 * 60 * 1000,
   });
   const ctx: PromptContext = useMemo(() => {
@@ -319,6 +334,7 @@ function PromptCenter() {
           (e) => `${e.date} ${e.name} [${e.importance}]${e.consensus ? ` est ${e.consensus}` : ""}`,
         ),
       topHeadlines: news.slice(0, 6).map((n) => `${n.title} (${n.source})`),
+      headlinesCoverage,
       recentDecisions: decisions.map(
         (d) =>
           `${d.decided_on}${d.symbol ? ` ${d.symbol}` : ""}: "${d.recommendation}" → ${d.decision}${d.outcome_pl != null ? ` → ${d.outcome_pl >= 0 ? "+" : ""}$${d.outcome_pl.toFixed(2)}` : ""}`,
@@ -344,6 +360,7 @@ function PromptCenter() {
     liveEconCal,
     liveEarnCal,
     readiness,
+    headlinesCoverage,
   ]);
 
   const MEETING: Record<string, MeetingType> = {
