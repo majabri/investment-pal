@@ -12,9 +12,15 @@ export type Goal = {
   id: string;
   user_id: string;
   name: string;
-  starting_value: number;
-  target_value: number;
-  target_date: string;
+  /**
+   * NULL means not set (P0 Tier 2). The schema used to make an unset objective
+   * impossible to express — NOT NULL DEFAULT 50000 / 150000 / '2027-03-31' —
+   * so every consumer inherited a stranger's target as if it were the user's.
+   * Rule 13: unknown is not zero, and these must never render as $0.
+   */
+  starting_value: number | null;
+  target_value: number | null;
+  target_date: string | null;
   monthly_contribution: number;
   risk_preference: "conservative" | "moderate" | "aggressive";
   margin_preference: "none" | "conservative" | "moderate" | "aggressive";

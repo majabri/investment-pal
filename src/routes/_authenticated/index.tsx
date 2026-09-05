@@ -53,6 +53,7 @@ import {
   riskToVol,
   riskToExpectedReturn,
 } from "@/lib/finance";
+import { objectiveOf } from "@/lib/objective";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -211,37 +212,33 @@ function Dashboard() {
     policy: ipsLite,
   });
 
+  // An unset objective yields NO metrics rather than metrics computed from
+  // defaults. `new Date(null)` is the epoch, so a missing date used to produce
+  // a required CAGR measured against 1970 — a confident, enormous, wrong
+  // number (rule 13).
+  const objective = useMemo(() => objectiveOf(goal), [goal]);
   const goalMetrics = useMemo(() => {
-    if (!goal) return null;
-    const today = new Date();
-    const targetDate = new Date(goal.target_date);
-    const years = Math.max(yearsBetween(today, targetDate), 0.01);
-    const startVal = portfolioValue > 0 ? portfolioValue : goal.starting_value;
+    if (objective.kind !== "set") return null;
+    const years = Math.max(yearsBetween(new Date(), new Date(objective.targetDate)), 0.01);
+    const startVal = portfolioValue > 0 ? portfolioValue : objective.startingValue;
     const cagr = requiredCAGRWithContrib(
       startVal,
-      goal.target_value,
+      objective.targetValue,
       years,
-      Number(goal.monthly_contribution ?? 0),
+      objective.monthlyContribution,
     );
     const prob = probabilityOfReachingTarget(
       startVal,
-      goal.target_value,
+      objective.targetValue,
       years,
-      riskToExpectedReturn(goal.risk_preference),
-      riskToVol(goal.risk_preference),
+      riskToExpectedReturn(goal!.risk_preference),
+      riskToVol(goal!.risk_preference),
     );
+    const span = objective.targetValue - objective.startingValue;
     const progress =
-      goal.target_value > goal.starting_value
-        ? Math.min(
-            1,
-            Math.max(
-              0,
-              (portfolioValue - goal.starting_value) / (goal.target_value - goal.starting_value),
-            ),
-          )
-        : 0;
+      span > 0 ? Math.min(1, Math.max(0, (portfolioValue - objective.startingValue) / span)) : null;
     return { years, cagr, prob, progress };
-  }, [goal, portfolioValue]);
+  }, [objective, goal, portfolioValue]);
 
   const now = new Date();
   const hour = now.getHours();
@@ -529,11 +526,11 @@ function Dashboard() {
           series={series}
           totals={totals}
           objective={
-            goal
+            objective.kind === "set"
               ? {
-                  starting_value: Number(goal.starting_value),
-                  target_value: Number(goal.target_value),
-                  target_date: goal.target_date,
+                  starting_value: objective.startingValue,
+                  target_value: objective.targetValue,
+                  target_date: objective.targetDate,
                 }
               : null
           }
@@ -576,14 +573,18 @@ function Dashboard() {
                   {goalMetrics.years.toFixed(2)} yrs
                 </div>
               </div>
-              <div className="sm:col-span-3">
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full bg-primary transition-all"
-                    style={{ width: `${(goalMetrics.progress * 100).toFixed(1)}%` }}
-                  />
+              {goalMetrics.progress === null ? null : (
+                // No bar at all when progress cannot be computed. A bar at 0%
+                // is a claim of no progress, which is not what "unknown" means.
+                <div className="sm:col-span-3">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full bg-primary transition-all"
+                      style={{ width: `${(goalMetrics.progress * 100).toFixed(1)}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           ) : (
             <p className="mt-4 text-sm text-muted-foreground">

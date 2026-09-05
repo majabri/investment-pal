@@ -33,6 +33,7 @@ import { useJournal } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { supabase } from "@/lib/supabaseClient";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
+import { objectiveOf } from "@/lib/objective";
 
 // Map the Action Sheet's action verbs to a canonical set for the `action` column.
 // Priority markers ("HIGHEST PRIORITY ACTION") aren't a trade action → null.
@@ -203,20 +204,28 @@ function PromptCenter() {
       const q = liveQuotes?.[h.symbol];
       return q && q.prevClose > 0 ? sum + h.quantity * (q.price - q.prevClose) : sum;
     }, 0);
-    const today = new Date();
-    const years = goal ? Math.max(yearsBetween(today, new Date(goal.target_date)), 0.01) : 1;
-    const cagr = goal
-      ? requiredCAGR(portfolioValue || goal.starting_value, goal.target_value, years)
-      : 0;
-    const prob = goal
-      ? probabilityOfReachingTarget(
-          portfolioValue || goal.starting_value,
-          goal.target_value,
-          years,
-          riskToExpectedReturn(goal.risk_preference),
-          riskToVol(goal.risk_preference),
-        )
-      : 0;
+    // An unset objective produces no required CAGR and no probability. These
+    // used to fall back to 0, which reads as "no growth required" and "no
+    // chance of success" — two confident claims made from missing data.
+    const objective = objectiveOf(goal);
+    const years =
+      objective.kind === "set"
+        ? Math.max(yearsBetween(new Date(), new Date(objective.targetDate)), 0.01)
+        : null;
+    const cagr =
+      objective.kind === "set" && years !== null
+        ? requiredCAGR(portfolioValue || objective.startingValue, objective.targetValue, years)
+        : null;
+    const prob =
+      objective.kind === "set" && years !== null && goal
+        ? probabilityOfReachingTarget(
+            portfolioValue || objective.startingValue,
+            objective.targetValue,
+            years,
+            riskToExpectedReturn(goal.risk_preference),
+            riskToVol(goal.risk_preference),
+          )
+        : null;
     return {
       portfolioValue,
       grossValue,

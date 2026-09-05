@@ -15,8 +15,14 @@ export type PromptContext = {
   goalStartingValue: number;
   goalTarget: number;
   goalDate: string;
-  requiredCagr: number;
-  probability: number;
+  /**
+   * NULL when the objective is unset. Rendered as "not set", never as 0% —
+   * "Required CAGR: 0.0%" tells the committee no growth is required, which is
+   * a claim made from missing data (rule 13, P0 Tier 2).
+   */
+  requiredCagr: number | null;
+  /** NULL when the objective is unset. Never 0% — that reads as no chance. */
+  probability: number | null;
   ipsPositionCapPct?: number;
   ipsPositionCapHard?: boolean;
   ipsMarginCapPct?: number;
@@ -79,6 +85,25 @@ function formatGoalDate(iso: string): string {
   });
 }
 
+/**
+ * The goal line, or an explicit statement that there is no objective.
+ *
+ * Never emits a number it does not have: an unset objective used to reach the
+ * model as "Goal: $0.00 by  | Required CAGR: 0.0% | Model probability: 0.0%",
+ * which is four fabricated facts in one line.
+ */
+function objectiveLine(ctx: PromptContext): string {
+  if (ctx.requiredCagr === null || ctx.probability === null || !ctx.goalDate) {
+    return "NOT SET. No target, date or probability is available — do not assume one, and say so if a recommendation would depend on it.";
+  }
+  return `${fmtUSD(ctx.goalTarget)} by ${ctx.goalDate} | Required CAGR: ${fmtPct(ctx.requiredCagr)} | Model probability: ${fmtPct(ctx.probability)}`;
+}
+
+function paceLine(cagr: number | null): string {
+  if (cagr === null) return "not available while the objective is unset.";
+  return `${fmtPct(Math.pow(1 + cagr, 1 / 52) - 1)}/week | ${fmtPct(Math.pow(1 + cagr, 1 / 12) - 1)}/month`;
+}
+
 export function mandateOf(ctx: PromptContext): Mandate {
   return {
     account: ctx.accountName.trim() || "this portfolio",
@@ -118,8 +143,8 @@ Account value (NET, investments + cash − margin): ${fmtUSD(ctx.portfolioValue)
 Gross investments: ${fmtUSD(ctx.grossValue ?? ctx.portfolioValue)} | Account equity: ${ctx.grossValue && ctx.grossValue > 0 ? fmtPct(ctx.portfolioValue / ctx.grossValue) : "—"}
 Today's P/L (vs prior close, live-quoted positions): ${fmtUSD(ctx.todaysPL)} (${fmtPct(ctx.todaysPLPct)})
 Cash: ${fmtUSD(ctx.cash)} | Margin used: ${fmtUSD(ctx.marginUsed)} | Buying power: ${fmtUSD(ctx.buyingPower)}
-Goal: ${fmtUSD(ctx.goalTarget)} by ${ctx.goalDate} | Required CAGR: ${fmtPct(ctx.requiredCagr)} | Model probability: ${fmtPct(ctx.probability)}
-Required pace: ${fmtPct(Math.pow(1 + ctx.requiredCagr, 1 / 52) - 1)}/week | ${fmtPct(Math.pow(1 + ctx.requiredCagr, 1 / 12) - 1)}/month
+Goal: ${objectiveLine(ctx)}
+Required pace: ${paceLine(ctx.requiredCagr)}
 
 INVESTMENT POLICY (IPS-lite) — HARD GOVERNANCE
 Max single position: ${ctx.ipsPositionCapPct ?? 30}% of gross${ctx.ipsPositionCapHard ? " (HARD — do not exceed)" : " (soft — flag any breach; explicit justification required)"}.

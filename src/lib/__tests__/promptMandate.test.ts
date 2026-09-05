@@ -228,3 +228,46 @@ describe("the objective has exactly one home", () => {
     expect(after.date).toBe("January 31, 2032");
   });
 });
+
+// What the committee is told when there is no objective. This is the
+// money-adjacent half of Tier 2: an unset objective used to reach the model as
+// "Goal: $0.00 by  | Required CAGR: 0.0% | Model probability: 0.0%" — four
+// fabricated facts in one line, each of which reads as a real finding.
+describe("an unset objective reaches the model as unset, not as zero", () => {
+  const unset = () => ctx({ requiredCagr: null, probability: null, goalDate: "", goalTarget: 0 });
+  const all: Array<[string, (c: PromptContext) => string]> = [
+    ["v6", (c) => buildV6Prompt({ ...c, meeting: "Morning" })],
+    ["v5", (c) => buildV5Prompt({ ...c, meeting: "Morning" })],
+    ["universal", (c) => buildUniversalPrompt({ ...c, meeting: "Morning" })],
+    ["morning", buildMorningPrompt],
+    ["eod", (c) => buildEODPrompt({ ...c, tradesToday: "(none)" })],
+    ["weekly", buildWeeklyPrompt],
+    ["midday", buildMiddayPrompt],
+  ];
+
+  for (const [name, build] of all) {
+    test(`${name}: says the objective is not set`, () => {
+      const out = build(unset());
+      // Anchored to "Goal:" on purpose. A bare "NOT SET" is already in every
+      // prompt via the margin-rate line, so asserting that alone passes
+      // whether or not the objective line was fixed — my first version of this
+      // test did exactly that and a negative control caught it.
+      expect(out).toContain("Goal: NOT SET. No target, date or probability is available");
+      expect(out).not.toContain("Required CAGR: 0.0%");
+      expect(out).not.toContain("Model probability: 0.0%");
+    });
+
+    test(`${name}: emits no required pace it cannot compute`, () => {
+      const out = build(unset());
+      expect(out).toContain("not available while the objective is unset");
+      expect(out).not.toMatch(/Required pace: 0\.0%\/week/);
+    });
+
+    test(`${name}: a set objective still reports its figures`, () => {
+      // The unset path must not swallow the normal one.
+      const out = build(ctx());
+      expect(out).toContain("Required CAGR:");
+      expect(out).not.toContain("NOT SET. No target");
+    });
+  }
+});
