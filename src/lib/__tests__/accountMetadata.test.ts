@@ -169,3 +169,55 @@ describe("saving an account type is what turns a guess into an answer", () => {
     expect(settings).toContain('account_type_source === "inferred_from_name"');
   });
 });
+
+// Rule 2: no broker is assumed. `accounts.name` was `NOT NULL DEFAULT
+// 'Fidelity'`, so an account created without a label silently became one
+// brokerage's name — and it put the institution in the field the user reads as
+// a label, where `broker` is the column for it.
+describe("no brokerage is assumed by the schema", () => {
+  const migration = readFileSync(
+    "supabase/migrations/20260905220000_no_assumed_broker.sql",
+    "utf8",
+  );
+
+  test("the default is dropped, not replaced with another one", () => {
+    expect(migration).toMatch(/ALTER COLUMN name DROP DEFAULT/);
+    expect(migration).not.toMatch(/ALTER COLUMN name SET DEFAULT/);
+  });
+
+  test("name stays NOT NULL", () => {
+    // Different from the balance columns on purpose: a missing balance is a
+    // fact about money and has to stay expressible, where a missing label has
+    // no honest rendering — it cannot be picked in a switcher or named in a
+    // prompt.
+    expect(migration).not.toMatch(/ALTER COLUMN name DROP NOT NULL/);
+  });
+
+  test("a blank label is rejected going forward without re-checking old rows", () => {
+    // NOT VALID: applies to inserts and updates from here on. A migration that
+    // fails on one bad legacy row leaves the schema half-applied on a database
+    // that deploys live.
+    expect(migration).toMatch(/CHECK \(btrim\(name\) <> ''\) NOT VALID/);
+  });
+});
+
+describe("the app never creates an account without naming it", () => {
+  test("every insert into accounts supplies a name", () => {
+    // With the default gone, an insert that omits `name` fails at the database
+    // — visibly, but on a live deploy. Cheaper to assert here.
+    for (const file of [
+      "src/hooks/useAppData.ts",
+      "src/routes/_authenticated/settings.tsx",
+      "src/components/app/PortfolioCsvImport.tsx",
+    ]) {
+      const code = readFileSync(file, "utf8");
+      const inserts = [...code.matchAll(/\.from\("accounts"\)[\s\S]{0,120}?\.insert\(([^)]*)\)/g)];
+      expect(inserts.length).toBeGreaterThan(0);
+      for (const [, args] of inserts) {
+        // Either a literal `name:` or a spread of a patch the type requires a
+        // name on (`Partial<Account> & { name: string }`).
+        expect(args).toMatch(/name|\.\.\.patch/);
+      }
+    }
+  });
+});
