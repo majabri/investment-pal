@@ -6,6 +6,7 @@
 // constraint is only half the fix — the other half is that nothing downstream
 // may quietly turn the resulting NULL back into a number.
 import { describe, expect, test } from "bun:test";
+import { runChecks } from "../readiness";
 import { readFileSync } from "node:fs";
 
 import { sumField, type BalanceFields } from "../accountAggregate";
@@ -177,6 +178,18 @@ describe("an unknown balance reaches the committee as unknown", () => {
     ipsPositionCapHard: false,
     ipsMarginCapPct: 25,
     ipsCapsSource: "user_set",
+    // Every check passing, so these fixtures exercise the prompt rather than
+    // the gate. `readiness.test.ts` owns the gate's own behaviour.
+    readiness: runChecks({
+      reconciliation: "RECONCILED",
+      positions: "IMPORTED_SNAPSHOT",
+      quotes: "CURRENT",
+      cash: 0,
+      marginEnabled: false,
+      marginUsed: null,
+      openOrdersKnown: true,
+      policySource: "user_set",
+    }),
     objective: { kind: "unset", missing: [] },
     requiredCagr: null,
     probability: null,

@@ -23,6 +23,7 @@ import {
   type MarginPolicy,
 } from "../marginCost";
 import { buildV6Prompt, mandateOf, type PromptContext } from "../prompts";
+import { runChecks } from "../readiness";
 import type { Objective } from "../objective";
 
 const SET: MarginPolicy = {
@@ -167,6 +168,18 @@ function ctx(overrides: Partial<PromptContext> = {}): PromptContext {
     ipsPositionCapHard: false,
     ipsMarginCapPct: 25,
     ipsCapsSource: "user_set",
+    // Every check passing, so these fixtures exercise the prompt rather than
+    // the gate. `readiness.test.ts` owns the gate's own behaviour.
+    readiness: runChecks({
+      reconciliation: "RECONCILED",
+      positions: "IMPORTED_SNAPSHOT",
+      quotes: "CURRENT",
+      cash: 0,
+      marginEnabled: false,
+      marginUsed: null,
+      openOrdersKnown: true,
+      policySource: "user_set",
+    }),
     objective: setObjective(),
     requiredCagr: 0.2,
     probability: 0.4,
