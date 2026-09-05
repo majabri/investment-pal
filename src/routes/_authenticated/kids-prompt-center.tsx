@@ -6,10 +6,9 @@ import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
-import { FAMILY_POLICY, ageOf, nextContributionDate } from "@/lib/data/familyPolicy";
-import { accountCategory } from "@/lib/data/accountGroups";
-import { KIDS_SEED, type KidAccount } from "@/lib/data/kidsSeed";
-import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
+import { FAMILY_POLICY, nextContributionDate } from "@/lib/data/familyPolicy";
+import { kidAccounts, holderLabel } from "@/lib/kidAccounts";
+import { useAccounts, useAllHoldings, useHouseholdMembers } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD } from "@/lib/finance";
 import { usdOrNotKnown } from "@/lib/unavailable";
@@ -20,24 +19,15 @@ export const Route = createFileRoute("/_authenticated/kids-prompt-center")({ com
 function Page() {
   const { data: accounts = [] } = useAccounts();
   const { data: allHoldings = [] } = useAllHoldings();
-  // By TYPE, not by a hardcoded list of first names (Phase 1b, rule 4).
-  const dbKids = accounts.filter((a) => accountCategory(a) === "Kids");
-  const kidsData: KidAccount[] = dbKids.length
-    ? dbKids.map((a) => ({
-        key: a.name.toLowerCase(),
-        name: a.name,
-        accountNumber: "",
-        cash: a.cash === null || a.cash === undefined ? null : Number(a.cash),
-        holdings: allHoldings
-          .filter((h) => h.account_id === a.id)
-          .map((h) => ({
-            symbol: h.symbol,
-            shares: Number(h.quantity),
-            price: Number(h.current_price),
-            avgCost: Number(h.cost_basis),
-          })),
-      }))
-    : KIDS_SEED;
+  const { data: members = [] } = useHouseholdMembers();
+  // By TYPE, not by a hardcoded list of first names (Phase 1b, rule 4), and
+  // with no seed fallback: a prompt built from `KIDS_SEED` described somebody
+  // else's children and somebody else's positions to a model, in the first
+  // person, as the user's own (Phase 4, rule 22).
+  const kidsData = useMemo(
+    () => kidAccounts(accounts, allHoldings, members),
+    [accounts, allHoldings, members],
+  );
   const symbols = useMemo(
     () => [...new Set(kidsData.flatMap((k) => k.holdings.map((h) => h.symbol)))],
     [kidsData],
@@ -51,9 +41,11 @@ function Page() {
 
   const prompt = useMemo(() => {
     const next = nextContributionDate().toISOString().slice(0, 10);
-    const kidsLine = FAMILY_POLICY.children
-      .map((c) => `${c.name} ${ageOf(c.birthDate)}`)
-      .join(", ");
+    // Whoever actually holds the accounts, with their age where a birth date
+    // has been entered. This read a compiled-in list of three children, so the
+    // prompt asserted their names and ages to the model regardless of whose
+    // accounts were on screen.
+    const kidsLine = kidsData.map(holderLabel).join(", ");
     const data = kidsData
       .map((k) => {
         const live = k.holdings.map((h) =>
@@ -82,7 +74,7 @@ Today is my biweekly investment review for my children's accounts (${kidsLine}).
 Each account receives $${FAMILY_POLICY.contribution.amountUsd} today.
 
 Objective
-Maximize the probability of each child reaching $200,000 within 10 years through disciplined long-term investing.
+Maximize the probability of each account reaching $${FAMILY_POLICY.targetPerChild.toLocaleString("en-US")} by ${FAMILY_POLICY.targetDate} through disciplined long-term investing.
 These accounts are for:
 * College
 * First home
@@ -103,9 +95,7 @@ Investment Rules
 
 Existing Holdings
 Use the portfolio I provide for:
-* Karim
-* Zain
-* Jude
+${kidsData.map((k) => `* ${holderLabel(k)}`).join("\n")}
 Assume the portfolios should remain substantially identical unless there is a compelling reason otherwise.
 
 Investment Committee Tasks
@@ -144,7 +134,7 @@ Review each child's portfolio:
 * Weaknesses
 * Sector allocation
 * Concentration risk
-* Progress toward the $200,000 goal
+* Progress toward the $${FAMILY_POLICY.targetPerChild.toLocaleString("en-US")} goal
 * Required annual return from today to reach the target
 
 5. Contribution Decision
@@ -166,12 +156,10 @@ Challenge the recommendation by explaining:
 * Why the final recommendation still wins
 
 7. Next Contribution Plan
-If today's purchase is executed, identify the highest-priority purchase for the next $100 contribution in two weeks.
+If today's purchase is executed, identify the highest-priority purchase for the next $${FAMILY_POLICY.contribution.amountUsd} contribution in ${FAMILY_POLICY.contribution.cadenceDays} days.
 
 8. Final Investment Committee Vote
-For Karim: BUY / HOLD / SELL
-For Zain: BUY / HOLD / SELL
-For Jude: BUY / HOLD / SELL
+${kidsData.map((k) => `For ${holderLabel(k)}: BUY / HOLD / SELL`).join("\n")}
 Provide an overall confidence score (1–10).
 End with a one-page Family Action Sheet containing only the final actions.
 
@@ -180,6 +168,33 @@ Next contribution date: ${next}
 Approved universe (family policy — committee approval required for additions): Core ${FAMILY_POLICY.core.join(", ")}; Supporting ${FAMILY_POLICY.supporting.join(", ")}; Preferred future ${FAMILY_POLICY.preferredFuture.join(", ")}; Speculative cap ${FAMILY_POLICY.speculative.maxPct}% (${FAMILY_POLICY.speculative.symbols.join(", ")})
 ${data}`;
   }, [kidsData, quotes]);
+
+  // No custodial accounts: there is no prompt to build. Rendering the template
+  // anyway would send a model a first-person brief about "my children's
+  // accounts ()" with an empty holdings block and ask it to vote — the model
+  // would fill the gap, and the answer would look like advice about a real
+  // portfolio (rule 22, and rule 17's refusal to produce output without the
+  // inputs it claims to rest on).
+  if (kidsData.length === 0) {
+    return (
+      <AppShell title="Kids Prompt Center" subtitle="No custodial accounts yet">
+        <Card>
+          <CardContent className="space-y-3 pt-6 text-sm">
+            <p className="font-medium">No prompt — there is nothing to ask about.</p>
+            <p className="text-muted-foreground">
+              This page builds a committee brief from your custodial accounts and the household
+              members who hold them. You have none yet, so there is no brief. It will not send a
+              model an empty portfolio and let it fill in the gaps.
+            </p>
+            <p className="text-muted-foreground">
+              Add a custodial account in <strong>Settings → Accounts</strong>, add whoever it is
+              for under <strong>Settings → Household</strong>, and import positions.
+            </p>
+          </CardContent>
+        </Card>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell
