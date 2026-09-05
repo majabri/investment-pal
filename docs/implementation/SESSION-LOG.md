@@ -610,3 +610,129 @@ Not touched, and reported to Amir for decision:
   force-push is explicitly Amir's decision and was not attempted.
 - One **applied** migration's comment still names him; not edited in place
   (checksum risk), so it needs a forward migration or acceptance.
+
+---
+
+## 2026-09-05 — Master Brief (user-agnostic rebuild), Phase 1: financial truth foundations
+
+Seven PRs. `main` deployed live after each.
+
+| PR | part | what |
+|---|---|---|
+| #140 | 1a | `accounts` money columns lose `NOT NULL DEFAULT 0`; eight consumers stop reading the resulting NULL as a real zero |
+| #141 | 1a-ii | the prompt surfaces, including per-holding concentration |
+| #143 | 1b | account metadata; the one inference runs in the migration and is recorded |
+| #145 | 1b-ii | the editor that turns a guess into an answer |
+| #147 | 1b-iii | classification reads type, not name; every hardcoded name list gone |
+| #148 | 1c | no brokerage assumed by the schema |
+| #149 | 1d | provenance — a figure's age is part of the figure |
+
+### The whole phase was one defect wearing different clothes
+
+**The app could not say "I don't know."** Not for a balance, not for an
+objective, not for what an account is, not for how old a figure is. Every part
+of Phase 1 was the same two-step: make the unknown expressible in the schema,
+then find everything above that quietly converts it back into a confident
+number.
+
+The second step was always the larger one, and it is not a typing problem.
+`?? 0` accepts `null` without complaint, so **TypeScript surfaced exactly one
+of the eight sites in 1a.** The rest were found by reading. A schema change
+that "compiles clean" has told you nothing about whether the meaning survived.
+
+### Governance checks that pass because they checked nothing
+
+The most serious single line in the phase was `const equityPct = totals.equityPct ?? 1`.
+
+Assuming FULL equity when it is unknown makes the "equity below 50%" breach
+unfireable on exactly the accounts whose data is missing — so the dashboard
+reported `Constitution: clean` having been unable to evaluate a single limit.
+The same shape appeared twice more: per-holding concentration rendering
+`0.0% of acct` (telling the committee nothing breaches the position cap, from a
+denominator nobody supplied), and reconciliation receiving `?? 0` and reporting
+a discrepancy the size of the whole account.
+
+**A check that cannot fail is worse than one that does**, and all three read as
+reassurance.
+
+### Three places `main` was right and the brief was wrong
+
+Recorded because the brief's own closing line asks for it:
+
+- **The account-type vocabulary.** The brief proposes a coarse set; `main` has
+  nine values the Settings editor already writes. Adopting the brief's would
+  have made every existing account fail the new CHECK the next time someone
+  pressed Save — a production database error on the screen whose only job is
+  recording what an account is. Kept main's, added `529` and `crypto`: the two
+  categories the name-matcher could *see* and the metadata could not *record*.
+- **`provider` and `display_name`.** Already present as `broker` and `name`.
+  A second column for either would have drifted from the first.
+- **`name NOT NULL`.** The brief's instinct — make the unknown expressible —
+  does not transfer from balances to labels. A missing balance is a fact about
+  money and must stay expressible; a missing label has no honest rendering, as
+  it cannot be picked in a switcher or named in a prompt.
+
+### Two absences that are not the same absence
+
+`—` means NO SCOPE: no account is selected, fixed by choosing one. `Unavailable`
+means an account IS selected and the figure is genuinely not known, fixed by
+importing a balance. Prompt text uses a third register, `NOT KNOWN`, because a
+model reads it: a dash there is guessed at and `$0.00` is believed.
+
+`fmtUSD`/`fmtPct` are the leak. They accept `null` and return `—` rather than
+failing, so every site that forgets the distinction degrades silently into the
+no-scope glyph — and the type system cannot help, because `number | null` is
+exactly what they take. **Review caught this four separate times across the
+phase.** Making the formatters reject `null` is the structural fix; it touches
+every formatting call in the app and is the first item on the Phase 3 list.
+
+### Unknown is not stale
+
+Phase 1d's six states exist because the actions differ. The pair that earns its
+keep is UNKNOWN vs STALE: they look identical on screen and send the user to
+different places — record provenance, or import again.
+
+Two details worth carrying forward. A missing value is UNAVAILABLE *before*
+provenance is consulted, because reporting a missing figure as "current"
+fabricates a value AND vouches for it. And a figure stamped in the FUTURE is
+UNKNOWN, not CURRENT: a clock error must not read as the best possible data.
+
+### What review caught that the author did not
+
+Copilot found 14 defects across these PRs. Three are worth recording as classes:
+
+1. **A `NaN` I introduced.** `<input type="number">` permits `-`, `.` and `1e`
+   mid-entry, each parsing to NaN — and NaN in a NUMERIC column is neither a
+   figure nor an honest absence.
+2. **A rule stated in a PR description and broken in the same PR.** The
+   two-vocabulary rule above, violated in the two prompt builders the PR existed
+   to fix. Root cause: the rule lived in prose while the wording was duplicated
+   as a literal at each call site. Both now live in one module.
+3. **A correction that made the record worse.** The Phase 0 entry claimed "four
+   PRs" over a table of three; the fix added #127 — which merged the day BEFORE
+   the P0 brief. Checking the primary source rather than the reviewer's summary
+   is what caught it. Phase 0 was three PRs.
+
+The recurring own-goal, now four instances deep, is **a guard or control coarser
+than the fault it claims to catch.** The newest example: a source guard for
+"nothing re-infers at runtime" written as `not.toContain("inferred_from_name")`,
+which fired on a comparison that READS the value to pick a tooltip. Narrowed to
+match an assignment — and it now also asserts the read is present, because
+reading it is how the UI knows which accounts to ask about.
+
+### Still outstanding for Amir
+
+- **`src/lib/data/familyPolicy.ts` holds three minors' names and birth dates.**
+  Now the only personal data left in `src/`, and the brief's standing
+  constraints make it a permanent-rule violation rather than a backlog item.
+  Phase 1b removed the account-classification dependency on names; this file
+  survives because `/kids` reads the birth dates for age-based allocation. The
+  fix is rule 22's household model (Phase 4) pulled forward, which would empty
+  `/kids` until it is populated — hence a decision, not a default.
+- **Confirm the account types.** Every existing account carries either
+  `inferred_from_name` or `legacy_default`. Both are the app's own guesses; the
+  Settings banner names them.
+- **Apply the migrations.** Phase 1 adds four on top of the three already
+  pending.
+- **Git history** still contains everything the P0 remediation removed (§5).
+- **CI still does not run lint**, unchanged from 2026-09-04.
