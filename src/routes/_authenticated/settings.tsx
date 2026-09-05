@@ -367,9 +367,9 @@ function MarginRateCard() {
     <section className="mb-4 rounded-2xl border bg-card p-5">
       <div className="mb-1 text-sm font-medium">Margin rate</div>
       <p className="mb-3 text-xs text-muted-foreground">
-        Your current Fidelity margin rate. Nothing in the app supplies a default: while this is
+        Your current margin rate, from your broker. Nothing in the app supplies a default: while this is
         blank, the dashboard shows no interest cost and the committee is told the rate is not set.
-        Fidelity tiers by debit balance and floats with the base rate, so enter the tier that
+        Brokers tier by debit balance and float with the base rate, so enter the tier that
         applies to your balance and re-check it periodically.
       </p>
       {status.kind === "stale" ? (
@@ -1341,7 +1341,7 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
             <Input
               value={form.broker}
               onChange={(e) => setForm({ ...form, broker: e.target.value })}
-              placeholder="Fidelity"
+              placeholder="Your broker"
             />
           </Field>
           {/* THE ACCOUNT'S OBJECTIVE. All optional, and all unset by default —

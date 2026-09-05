@@ -403,8 +403,8 @@ Do not optimize for today's return alone.
 
 INVESTMENT POLICY
 - Portfolio: ${m.account} ONLY
-- Ignore all other Fidelity accounts.
-- Ignore children's portfolios.
+- Ignore every other account, at this or any other broker.
+- Ignore custodial accounts held for other people.
 - Ignore retirement accounts.
 - Ignore positions with less than $5 market value unless specifically evaluating tax-loss harvesting.
 - ${m.marginRate}

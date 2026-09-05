@@ -32,14 +32,14 @@ const CATEGORIES: Record<string, CategoryConfig> = Object.assign(Object.create(n
       "College savings accounts · live where quotable · 529 units priced from latest import",
     category: "529",
     emptyHint:
-      "No 529 accounts yet — they're created automatically by a Fidelity import with 'Create accounts for everything in the file' switched on.",
+      "No 529 accounts yet — they're created automatically by a portfolio import with 'Create accounts for everything in the file' switched on.",
   },
   crypto: {
     title: "Kids Crypto Dashboard",
-    subtitle: "Fidelity Crypto® accounts · live prices (BTC/ETH/SOL) every 60s",
+    subtitle: "Crypto accounts · live prices every 60s",
     category: "Crypto",
     emptyHint:
-      "No kids crypto accounts yet — they're created automatically by a Fidelity import with 'Create accounts for everything in the file' switched on.",
+      "No custodial crypto accounts yet — they're created automatically by a portfolio import with 'Create accounts for everything in the file' switched on.",
   },
 });
 

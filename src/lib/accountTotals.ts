@@ -28,6 +28,14 @@ export type PositionLike = {
 export type BalanceLike = {
   cash: number | null | undefined;
   margin_used: number | null | undefined;
+  /**
+   * Whether this account has margin at all. NULL = nobody has said.
+   *
+   * `false` is a stated fact and makes a null `margin_used` mean zero — see
+   * the note at the coercion below. Optional so every existing caller keeps
+   * compiling; absent behaves exactly as before.
+   */
+  margin_enabled?: boolean | null | undefined;
   /** The broker's own buying-power figure. Informational — never summed into
    *  equity (rule 8) — but it IS what "available capital" means, because the
    *  broker's margin rules decide it and the app does not know them. */
@@ -131,7 +139,23 @@ export function accountTotals<T extends PositionLike>(
 
   const cash = money(balance?.cash);
   // Stored as a positive magnitude; Fidelity prints it as a negative debit.
-  const marginDebit = money(balance?.margin_used);
+  //
+  // `margin_enabled === false` is a STATED FACT, not an absence: somebody
+  // opened Settings and said this account has no margin. An account in that
+  // state owes nothing by definition, and treating its null debt as unknown
+  // left a cash-only user's account value permanently "Unavailable" — with no
+  // action they could take, because no import will ever supply a debt figure
+  // for an account that cannot have one.
+  //
+  // Found by the rule-37 second-user test, which is exactly the failure that
+  // rule is about: the app worked for a margin user and quietly did not work
+  // for a cash one.
+  //
+  // NULL `margin_enabled` is still unknown. Nobody has said, so nothing is
+  // assumed — that distinction is the whole of Phase 1b.
+  const statedNoMargin = balance?.margin_enabled === false;
+  const rawDebit = money(balance?.margin_used);
+  const marginDebit = rawDebit === null && statedNoMargin ? 0 : rawDebit;
 
   // Unknown propagates. A gross value computed with cash treated as zero is a
   // real number that is wrong, which is worse than no number: it is indexed,

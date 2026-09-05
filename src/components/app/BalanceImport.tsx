@@ -124,7 +124,7 @@ export function BalanceImport() {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Copy the balances block from Fidelity and paste it here. Every figure it recognises is
+          Copy the balances block from your broker and paste it here. Every figure it recognises is
           listed below before anything is saved, along with anything it could not find. Each import
           is kept, so the history builds up rather than overwriting itself.
         </p>
@@ -196,7 +196,7 @@ export function BalanceImport() {
               ))}
             </ul>
             <p className="mt-1 text-xs">
-              These are not imported. If Fidelity has renamed a field, say so and the parser can
+              These are not imported. If your broker has renamed a field, say so and the parser can
               learn the new label.
             </p>
           </div>
@@ -239,7 +239,7 @@ export function BalanceImport() {
                 onChange={(e) => setConfirmed(e.target.checked)}
                 className="mt-0.5"
               />
-              <span>These figures match my Fidelity balances page for {scope.accountName}.</span>
+              <span>These figures match my broker's balances page for {scope.accountName}.</span>
             </label>
             {/* The margin rate is IPS policy, not an account figure, so it is
                 its own line item rather than part of the balances above. */}

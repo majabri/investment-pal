@@ -326,7 +326,12 @@ describe("observed interest beats computed interest", () => {
     const estimate = marginInterestFigure({ accruedMtd: null, marginUsed: 1, policy });
     expect(interestProvenanceShort(estimate)).toBe("estimate");
     const actual = marginInterestFigure({ accruedMtd: 175, marginUsed: 1, policy });
-    expect(interestProvenanceShort(actual)).toBe("per Fidelity");
+    // "per your broker", not "per Fidelity" — the wording stopped naming one
+    // broker in Phase 8's audit sweep (rules 2, 36, 37). What matters here is
+    // that the qualifier survives at all, so the test asserts the DISTINCTION
+    // rather than the exact firm.
+    expect(interestProvenanceShort(actual)).not.toBe("estimate");
+    expect(interestProvenanceShort(actual)).toContain("broker");
     for (const hasImport of [false, true]) {
       const none = marginInterestFigure({
         accruedMtd: null,
@@ -356,7 +361,7 @@ describe("observed interest beats computed interest", () => {
       marginUsed: 1,
       policy,
     });
-    expect(interestProvenance(actual)).toContain("Fidelity");
+    expect(interestProvenance(actual)).toContain("broker");
     expect(interestProvenance(actual)).toContain("2026-09-03");
 
     const estimate = marginInterestFigure({ accruedMtd: null, marginUsed: 1, policy });

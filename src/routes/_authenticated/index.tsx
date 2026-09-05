@@ -535,7 +535,7 @@ function Dashboard() {
             ))}
           </ul>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Anchor ≈ logged trim price (your Fidelity fill may differ). Advisory only — you execute.
+            Anchor ≈ logged trim price (your broker's fill may differ). Advisory only — you execute.
             Expires after 30 days or when the thesis invalidates.
           </p>
         </div>
