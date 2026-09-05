@@ -1,18 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { MoverList } from "@/components/app/MoverList";
 import { getQuotesFn } from "@/lib/marketServer";
 import { useAllHoldings, useUniverse } from "@/hooks/useAppData";
-import {
-  resolveUniverse,
-  universeEmptyReason,
-  heldSymbolSet,
-  normaliseSymbol,
-} from "@/lib/universe";
-import { fmtUSD } from "@/lib/finance";
-import { cn } from "@/lib/utils";
+import { resolveUniverse, universeEmptyReason, heldSymbolSet } from "@/lib/universe";
 
 export const Route = createFileRoute("/_authenticated/opportunities")({ component: Page });
 
@@ -35,49 +27,6 @@ function Page() {
   const rows = Object.entries(quotes ?? {})
     .map(([sym, q]) => ({ sym, price: q.price, changePct: q.changePct }))
     .filter((r) => Number.isFinite(r.changePct));
-
-  const List = ({
-    title,
-    items,
-    tone,
-  }: {
-    title: string;
-    items: typeof rows;
-    tone: "up" | "down";
-  }) => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {items.map((r) => (
-          <div
-            key={r.sym}
-            className="flex items-center justify-between border-b py-1.5 text-sm last:border-0"
-          >
-            <span className="flex items-center gap-2 font-medium">
-              {r.sym}
-              {held.has(normaliseSymbol(r.sym)) && (
-                <Badge className="px-1.5 py-0 text-[10px]">Held</Badge>
-              )}
-            </span>
-            <span className="flex gap-3 tabular-nums">
-              <span>{fmtUSD(r.price, 2)}</span>
-              <span
-                className={cn(
-                  "w-16 text-right",
-                  tone === "up" ? "text-emerald-500" : "text-red-500",
-                )}
-              >
-                {r.changePct >= 0 ? "+" : ""}
-                {r.changePct.toFixed(2)}%
-              </span>
-            </span>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
 
   const up = [...rows].sort((a, b) => b.changePct - a.changePct).slice(0, 8);
   const down = [...rows].sort((a, b) => a.changePct - b.changePct).slice(0, 8);
@@ -104,8 +53,18 @@ function Page() {
 
       {symbols.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
-          <List title="Today's strength (possible momentum)" items={up} tone="up" />
-          <List title="Today's weakness (possible entries)" items={down} tone="down" />
+          <MoverList
+            title="Today's strength (possible momentum)"
+            items={up}
+            tone="up"
+            held={held}
+          />
+          <MoverList
+            title="Today's weakness (possible entries)"
+            items={down}
+            tone="down"
+            held={held}
+          />
         </div>
       ) : null}
       <p className="mt-3 text-xs text-muted-foreground">

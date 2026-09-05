@@ -5,6 +5,13 @@
 import type { TestingLibraryMatchers } from "@testing-library/jest-dom/matchers";
 
 declare module "bun:test" {
+  // Both interfaces are deliberately empty: module augmentation merges them into
+  // bun's own declarations, and an empty body extending the jest-dom matchers is
+  // how that merge is expressed. `no-empty-object-type` is right in general and
+  // wrong here — a type alias cannot participate in declaration merging, so there
+  // is no non-empty form of this that still works.
+  /* eslint-disable @typescript-eslint/no-empty-object-type */
   interface Matchers<T = unknown> extends TestingLibraryMatchers<unknown, T> {}
   interface AsymmetricMatchers extends TestingLibraryMatchers<unknown, unknown> {}
+  /* eslint-enable @typescript-eslint/no-empty-object-type */
 }
