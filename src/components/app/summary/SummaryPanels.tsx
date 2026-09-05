@@ -32,6 +32,7 @@ import type { AccountTotals, AccountScope } from "@/lib/accountTotals";
 import { scopeLabel } from "@/lib/accountTotals";
 import { fmtChartUSD } from "@/lib/chartFormat";
 import { fmtPct, fmtUSD } from "@/lib/finance";
+import { usdOrUnavailable } from "@/lib/unavailable";
 import { interestProvenanceShort, marginRateLabel, type InterestFigure } from "@/lib/marginCost";
 import {
   allocation,
@@ -77,7 +78,11 @@ export function SummaryHeader({
       <div className="text-sm text-muted-foreground">{name}</div>
       <div className="mt-1 flex flex-wrap items-baseline gap-x-6 gap-y-1">
         <span className="text-3xl font-semibold tabular">
-          {totals === null ? "—" : fmtUSD(totals.totalAccountValue)}
+          {/* Two absences, two words. `totals === null` is NO SCOPE — nothing
+              selected. A null total inside real totals is UNKNOWN — an account
+              is selected and its cash or margin loan is not known. Both used to
+              render as the same dash, which pointed the user at the wrong fix. */}
+          {totals === null ? "—" : usdOrUnavailable(totals.totalAccountValue)}
         </span>
         <span className="text-sm">
           <span className="text-muted-foreground">Today </span>

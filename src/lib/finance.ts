@@ -1,7 +1,34 @@
 // Financial helpers: formatting, CAGR, probability model.
+//
+// THE FORMATTERS TAKE A NUMBER, NOT `number | null` (Phase 3).
+//
+// They used to accept null and return "—", which is the glyph reserved for NO
+// SCOPE — no account is selected. So every site that forgot the distinction
+// degraded silently from "we do not know this figure" into "you have not chosen
+// an account", pointing the user at the wrong fix. Review found that leak four
+// separate times across Phase 1, in four different files, and the type system
+// could not help because `number | null` was exactly what these took.
+//
+// Tightening the signature turned the whole class into compile errors. There
+// were two left in application code; both are fixed in the same change. A site
+// that genuinely holds a possibly-unknown figure now says so by calling
+// `usdOrUnavailable` / `pctOrUnavailable` in lib/unavailable, which is the
+// point — the choice is made deliberately at the call site instead of by
+// forgetting.
 
-export const fmtUSD = (v: number | null | undefined, digits = 2) => {
-  if (v == null || Number.isNaN(v)) return "—";
+/**
+ * What a non-finite number renders as.
+ *
+ * The type now stops `null`, but not `NaN` — that arrives from arithmetic, and
+ * arithmetic that produced NaN is a DEFECT, not an absence. Deliberately
+ * neither "—" (which would re-create the leak this change removes) nor
+ * "Unavailable" (which would report a bug as a missing figure, sending the user
+ * to import data that will not help).
+ */
+const BROKEN = "(error)";
+
+export const fmtUSD = (v: number, digits = 2) => {
+  if (!Number.isFinite(v)) return BROKEN;
   return v.toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
@@ -10,13 +37,13 @@ export const fmtUSD = (v: number | null | undefined, digits = 2) => {
   });
 };
 
-export const fmtPct = (v: number | null | undefined, digits = 1) => {
-  if (v == null || Number.isNaN(v)) return "—";
+export const fmtPct = (v: number, digits = 1) => {
+  if (!Number.isFinite(v)) return BROKEN;
   return `${(v * 100).toFixed(digits)}%`;
 };
 
-export const fmtNumber = (v: number | null | undefined, digits = 2) => {
-  if (v == null || Number.isNaN(v)) return "—";
+export const fmtNumber = (v: number, digits = 2) => {
+  if (!Number.isFinite(v)) return BROKEN;
   return v.toLocaleString("en-US", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
