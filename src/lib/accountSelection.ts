@@ -8,18 +8,24 @@
 import { accountCategory } from "./data/accountGroups";
 
 /** Structural minimum — avoids depending on the full row type. */
-export type AccountLike = { id: string; name: string };
+export type AccountLike = { id: string; name: string; account_type: string | null };
 export type HoldingLike = { account_id: string | null };
 
 /**
  * Default selection when the user has never chosen: the first account in the
  * primary (self) category, else the first account. Category comes from
  * `accountCategory()` — deliberately the one existing categorisation scheme,
- * not a second one.
+ * not a second one, and as of Phase 1b it reads the account's TYPE rather than
+ * matching its name.
+ *
+ * The `else the first account` fallback is what makes this safe while accounts
+ * are still being classified: an unclassified household selects something
+ * rather than nothing, and the Settings banner says why it could not do
+ * better.
  */
 export function defaultAccountId(accounts: AccountLike[]): string | null {
   if (accounts.length === 0) return null;
-  const primary = accounts.find((a) => accountCategory(a.name) === "Primary");
+  const primary = accounts.find((a) => accountCategory(a) === "Primary");
   return (primary ?? accounts[0]).id;
 }
 

@@ -7,6 +7,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { AppShell } from "@/components/app/AppShell";
 import { KidsCategoryDashboard } from "@/components/app/KidsCategoryDashboard";
+import type { AccountCategory } from "@/lib/data/accountGroups";
 
 export const Route = createFileRoute("/_authenticated/kids-category/$category")({
   component: Page,
@@ -15,17 +16,11 @@ export const Route = createFileRoute("/_authenticated/kids-category/$category")(
 type CategoryConfig = {
   title: string;
   subtitle: string;
-  matchAccount: (name: string) => string | null;
+  /** Which accounts belong here, by type. Was a regex over the owner's
+   *  children's first names (Phase 1b, rule 4). */
+  category: AccountCategory;
   emptyHint: string;
 };
-
-/** Match a kid's name against a suffix pattern, normalising its capitalisation. */
-function matchKid(pattern: RegExp) {
-  return (name: string): string | null => {
-    const m = pattern.exec(name.trim());
-    return m ? m[1][0].toUpperCase() + m[1].slice(1).toLowerCase() : null;
-  };
-}
 
 // Null-prototype: a crafted param like /kids-category/constructor would
 // otherwise return an inherited property, make `config` truthy, and then throw
@@ -35,14 +30,14 @@ const CATEGORIES: Record<string, CategoryConfig> = Object.assign(Object.create(n
     title: "Kids 529 Dashboard",
     subtitle:
       "College savings accounts · live where quotable · 529 units priced from latest import",
-    matchAccount: matchKid(/^(Karim|Zain|Jude)\s*529$/i),
+    category: "529",
     emptyHint:
       "No 529 accounts yet — they're created automatically by a Fidelity import with 'Create accounts for everything in the file' switched on.",
   },
   crypto: {
     title: "Kids Crypto Dashboard",
     subtitle: "Fidelity Crypto® accounts · live prices (BTC/ETH/SOL) every 60s",
-    matchAccount: matchKid(/^(Karim|Zain|Jude)\s*Crypto/i),
+    category: "Crypto",
     emptyHint:
       "No kids crypto accounts yet — they're created automatically by a Fidelity import with 'Create accounts for everything in the file' switched on.",
   },
@@ -82,7 +77,7 @@ function Page() {
     <KidsCategoryDashboard
       title={config.title}
       subtitle={config.subtitle}
-      matchAccount={config.matchAccount}
+      category={config.category}
       emptyHint={config.emptyHint}
     />
   );
