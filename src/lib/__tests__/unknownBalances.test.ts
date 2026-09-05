@@ -15,6 +15,7 @@ import {
   interestProvenanceShort,
   type MarginPolicy,
 } from "../marginCost";
+import { fmtPct, fmtUSD } from "../finance";
 import {
   NOT_KNOWN,
   UNAVAILABLE,
@@ -279,5 +280,44 @@ describe("the two registers stay one decision", () => {
         .filter((l) => l.includes("usdOrUnavailable") && l.includes("`"));
       expect(promptLines).toEqual([]);
     }
+  });
+});
+
+// The leak that produced four separate review findings across Phase 1, closed
+// at the source rather than at each call site.
+describe("the formatters refuse what they cannot format", () => {
+  test("a non-finite figure reads as a defect, not as an absence", () => {
+    // NOT "—", which is the no-scope glyph this whole distinction exists to
+    // protect, and NOT "Unavailable", which would report a bug as a missing
+    // figure and send the user to import data that will not help.
+    expect(fmtUSD(Number.NaN)).toBe("(error)");
+    expect(fmtPct(Number.NaN)).toBe("(error)");
+    expect(fmtUSD(Number.POSITIVE_INFINITY)).toBe("(error)");
+  });
+
+  test("real figures, including zero and negatives, are unaffected", () => {
+    // A guard that swallowed real values would have re-created the defect from
+    // the other direction.
+    expect(fmtUSD(0)).toBe("$0.00");
+    expect(fmtUSD(-20_000)).toBe("-$20,000.00");
+    expect(fmtPct(0)).toBe("0.0%");
+    expect(fmtPct(-0.125)).toBe("-12.5%");
+  });
+
+  test("a possibly-unknown figure has its own helpers, and they still work", () => {
+    // The call site now chooses deliberately instead of by forgetting.
+    expect(usdOrUnavailable(null)).toBe(UNAVAILABLE);
+    expect(usdOrUnavailable(1234.5)).toBe("$1,234.50");
+  });
+
+  test("nothing in src passes a nullable value straight to a formatter", () => {
+    // The type system enforces this now — `fmtUSD` takes `number` — so this
+    // asserts the TYPE has not been widened back, which is the only way the
+    // leak could return. A source check, because a type is not observable from
+    // a test at runtime.
+    const finance = readFileSync("src/lib/finance.ts", "utf8");
+    expect(finance).not.toMatch(/fmtUSD = \(v: number \| null/);
+    expect(finance).not.toMatch(/fmtPct = \(v: number \| null/);
+    expect(finance).not.toMatch(/fmtNumber = \(v: number \| null/);
   });
 });

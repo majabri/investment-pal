@@ -33,7 +33,7 @@ import {
   riskToVol,
   yearsBetween,
 } from "@/lib/finance";
-import { usdOrUnavailable } from "@/lib/unavailable";
+import { pctOrUnavailable, usdOrUnavailable } from "@/lib/unavailable";
 import { objectiveOf } from "@/lib/objective";
 
 export const Route = createFileRoute("/_authenticated/goals")({
@@ -236,7 +236,13 @@ function GoalsPage() {
             hint={
               portfolioValue === null
                 ? `${scopeName} · cash or margin not known`
-                : `${scopeName} · progress ${metrics ? fmtPct(metrics.progress) : "—"}`
+                : // `progress` is null when the objective's span is not positive —
+                  // a target at or below the starting value. That is unknown
+                  // progress, not no-scope, and it is a separate absence from
+                  // `metrics` being null (no objective at all).
+                  `${scopeName} · progress ${
+                    metrics ? pctOrUnavailable(metrics.progress) : "objective not set"
+                  }`
             }
           />
           <StatCard

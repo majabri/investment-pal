@@ -43,29 +43,39 @@ describe("chartNumber", () => {
 });
 
 describe("fmtChartUSD covers what fmtUSD alone does not", () => {
-  test('infinity is absent, not "$∞"', () => {
-    // `fmtUSD` guards NaN but not Infinity, so it formats it as currency.
-    expect(fmtUSD(Number.POSITIVE_INFINITY)).toBe("$∞");
+  // These four documented what `fmtUSD` did with hostile input, as the foil for
+  // what `fmtChartUSD` does instead. Phase 3 gave `fmtUSD` a non-finite guard,
+  // which closed three of them at the source — a category label can no longer
+  // reach a money slot raw. They are kept, and now assert the new contract:
+  // `fmtUSD` REFUSES what it cannot format, and `fmtChartUSD` is what knows how
+  // to recover a value from recharts' several shapes.
+  test("infinity is refused rather than formatted as currency", () => {
+    expect(fmtUSD(Number.POSITIVE_INFINITY)).toBe("(error)");
+    // "(error)" is right for a defect and wrong for a chart point that simply
+    // has no value, which is what the em dash means here.
     expect(fmtChartUSD(Number.POSITIVE_INFINITY)).toBe("—");
   });
 
-  test("a category label is absent, not printed raw in a money slot", () => {
+  test("a category label is refused, not printed raw in a money slot", () => {
     // `String.prototype.toLocaleString` ignores the currency options rather
-    // than failing, so the label reaches the screen unformatted.
-    expect(fmtUSD("abc" as never)).toBe("abc");
+    // than failing, so before the guard the label reached the screen
+    // unformatted, looking like data.
+    expect(fmtUSD("abc" as never)).toBe("(error)");
     expect(fmtChartUSD("abc")).toBe("—");
   });
 
-  test("a numeric string comes out currency-formatted, not raw", () => {
-    // The subtle one: passed straight to `fmtUSD` it renders with no "$" and no
-    // thousands separator, so it reads as a different kind of number from the
-    // properly-formatted figures beside it.
-    expect(fmtUSD("128450" as never)).toBe("128450");
+  test("only fmtChartUSD recovers a numeric string", () => {
+    // The reason this module still earns its keep. `fmtUSD` now refuses the
+    // string outright rather than rendering it with no "$" and no thousands
+    // separator, so it can no longer read as a different kind of number from
+    // the figures beside it — but refusing is not the right answer for a chart,
+    // where recharts legitimately passes numbers through as strings.
+    expect(fmtUSD("128450" as never)).toBe("(error)");
     expect(fmtChartUSD("128450")).toBe("$128,450.00");
   });
 
-  test("a range is absent, not two figures jammed together", () => {
-    expect(fmtUSD([1, 2] as never)).toBe("$1.00,$2.00");
+  test("a range is refused, not two figures jammed together", () => {
+    expect(fmtUSD([1, 2] as never)).toBe("(error)");
     expect(fmtChartUSD([1, 2])).toBe("—");
   });
 
