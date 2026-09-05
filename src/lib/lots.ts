@@ -172,9 +172,7 @@ export function exitScope(
   lots: { id: string }[],
 ): { kind: "position" } | { kind: "lot"; lotId: string } | null {
   if (order.lot_id === null) return { kind: "position" };
-  return lots.some((l) => l.id === order.lot_id)
-    ? { kind: "lot", lotId: order.lot_id }
-    : null;
+  return lots.some((l) => l.id === order.lot_id) ? { kind: "lot", lotId: order.lot_id } : null;
 }
 
 /**

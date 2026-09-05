@@ -17,12 +17,7 @@
 // that assertion is what rule 16 actually means in a codebase.
 import type { PolicyClass } from "./policy";
 
-export const STRATEGY_BUCKETS = [
-  "core",
-  "supporting",
-  "preferred_future",
-  "speculative",
-] as const;
+export const STRATEGY_BUCKETS = ["core", "supporting", "preferred_future", "speculative"] as const;
 export type StrategyBucket = (typeof STRATEGY_BUCKETS)[number];
 
 export const BUCKET_LABEL: Record<StrategyBucket, string> = {

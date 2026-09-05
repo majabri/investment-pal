@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { parsePositionsCsv, type ParsedHolding } from "@/lib/csvImport";
+import { cashForAccount } from "@/lib/importSafety";
 import { supabase } from "@/lib/supabaseClient";
 import { fmtUSD } from "@/lib/finance";
 import {
@@ -67,7 +68,6 @@ export function PortfolioCsvImport() {
   const [parsed, setParsed] = useState<ParsedHolding[] | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [cashByAccount, setCashByAccount] = useState<Record<string, number>>({});
-  const [fullOverwrite, setFullOverwrite] = useState(true);
   const [createAll, setCreateAll] = useState(true);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -159,29 +159,12 @@ export function PortfolioCsvImport() {
         return;
       }
 
-      let removed = 0;
-      if (fullOverwrite) {
-        // The Fidelity export is the complete truth: remove ALL existing
-        // holdings (including legacy rows with no account) before saving,
-        // so imports overwrite the portfolio rather than piling onto it.
-        const { count: before } = await supabase
-          .from("holdings")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", userId);
-        const { error: wipeErr } = await supabase.from("holdings").delete().eq("user_id", userId);
-        if (wipeErr) throw wipeErr;
-        const { count: after } = await supabase
-          .from("holdings")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", userId);
-        removed = (before ?? 0) - (after ?? 0);
-        if ((after ?? 0) > 0) {
-          throw new Error(
-            `Overwrite verification failed: ${after} old positions survived the wipe. Nothing was saved — report this exact message.`,
-          );
-        }
-      }
-
+      // The user-wide wipe is gone (rule 29). It deleted EVERY holding the
+      // user had — including accounts this import was not mapping and could
+      // not restore — on the argument that a broker export is the complete
+      // portfolio. It is not: a user may skip accounts, map only one, or hold
+      // positions at another broker entirely. Each destination account is now
+      // replaced by its own atomic call, and nothing else is touched.
       const { data: existingRaw } = await supabase
         .from("accounts")
         .select("id,name,created_at")
@@ -189,14 +172,13 @@ export function PortfolioCsvImport() {
         .order("created_at", { ascending: true });
       const seen = new Map<string, { id: string; name: string }>();
       for (const a of existingRaw ?? []) {
-        if (!seen.has(a.name)) {
-          seen.set(a.name, a);
-        } else if (fullOverwrite) {
-          await supabase.from("accounts").delete().eq("id", a.id).eq("user_id", userId);
-        }
+        if (!seen.has(a.name)) seen.set(a.name, a);
       }
       const existing = [...seen.values()];
+
+      const asOf = new Date().toISOString();
       let saved = 0;
+      let removed = 0;
       for (const [name, holdings] of groups) {
         let acct = existing?.find((a) => a.name === name);
         if (!acct) {
@@ -222,40 +204,44 @@ export function PortfolioCsvImport() {
           });
         }
         const rows = [...bySymbol.entries()].map(([symbol, x]) => ({
-          user_id: userId,
-          account_id: acct!.id,
           symbol,
           quantity: x.qty,
           cost_basis: x.qty > 0 ? x.cost / x.qty : 0,
           current_price: x.px,
-          last_price_at: new Date().toISOString(),
         }));
-        // Replace-mode: this import becomes the account's whole truth,
-        // so a corrected re-import heals any earlier bad mapping.
-        const { error: delErr } = await supabase
-          .from("holdings")
-          .delete()
-          .eq("account_id", acct!.id)
-          .eq("user_id", userId);
-        if (delErr) throw delErr;
-        // Plain insert — replace-mode deleted this account's holdings above,
-        // and the partial unique index cannot serve as an upsert arbiter.
-        const { error: insErr } = await supabase.from("holdings").insert(rows);
-        if (insErr) throw insErr;
+
         const sourceLabels = [
           ...new Set(holdings.map((h) => h.accountName ?? "Unlabeled account")),
         ];
-        const cash = sourceLabels.reduce((c, label) => c + (cashByAccount[label] ?? 0), 0);
-        await supabase
-          .from("accounts")
-          .update({ cash, last_synced_at: new Date().toISOString() })
-          .eq("id", acct!.id);
-        saved += rows.length;
+        // NULL when the export carried no cash line for this account. The
+        // code this replaces summed `?? 0`, writing a real $0.00 balance for
+        // an account nobody had told the app about (Phase 1a, rule 13).
+        const cash = cashForAccount(sourceLabels, cashByAccount);
+
+        // One atomic call per account. DELETE-then-INSERT in the client left
+        // an account with NO POSITIONS if the insert failed after the delete,
+        // and dropped every thesis, note and review on every import (rule 29).
+        const { data: result, error: rpcErr } = await supabase.rpc(
+          "import_account_positions" as never,
+          {
+            p_account_id: acct!.id,
+            p_rows: rows,
+            p_cash: cash,
+            p_as_of: asOf,
+            p_source: "portfolio_csv",
+          } as never,
+        );
+        if (rpcErr) throw rpcErr;
+        const r = (result ?? {}) as { inserted?: number; updated?: number; removed?: number };
+        saved += (r.inserted ?? 0) + (r.updated ?? 0);
+        removed += r.removed ?? 0;
       }
+      // Auditable (rule 29): says what happened, including the removals,
+      // which are the part the user cannot see in the file they chose.
       toast.success(
-        fullOverwrite
-          ? `Overwrite complete: removed ${removed} old position${removed === 1 ? "" : "s"}, saved ${saved} across ${groups.size} account(s).`
-          : `Saved ${saved} positions across ${groups.size} account(s).`,
+        removed > 0
+          ? `Saved ${saved} position${saved === 1 ? "" : "s"} across ${groups.size} account(s); removed ${removed} no longer in the file. Theses and notes were kept.`
+          : `Saved ${saved} position${saved === 1 ? "" : "s"} across ${groups.size} account(s). Theses and notes were kept.`,
       );
       setParsed(null);
       setRaw("");
@@ -380,23 +366,20 @@ export function PortfolioCsvImport() {
                 </div>
               );
             })}
-            <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
-              <div>
-                <Label htmlFor="full-overwrite" className="text-sm">
-                  Overwrite entire portfolio
-                </Label>
-                <p className="text-[11px] text-muted-foreground">
-                  This file becomes the complete truth — all previously imported positions are
-                  replaced. Turn off only to update the mapped accounts and leave everything else
-                  untouched.
-                </p>
-              </div>
-              <Switch
-                id="full-overwrite"
-                checked={fullOverwrite}
-                onCheckedChange={setFullOverwrite}
-              />
-            </div>
+            {/* The "Overwrite entire portfolio" switch is gone (rule 29). It
+                deleted every holding the user had, including accounts this
+                import was not mapping and could not restore, and it defaulted
+                to ON. Each mapped account is now replaced by its own atomic
+                call and nothing else is touched — which is what the switch's
+                own description claimed the OFF position did. */}
+            <p className="rounded-lg border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+              Each account you map above is replaced by what this file says about it: positions in
+              the file are added or updated, positions no longer in it are removed from that
+              account, and <strong>accounts you skip are not touched at all</strong>. Your theses,
+              notes and reviews are kept — only the broker&apos;s own figures are overwritten. If
+              the file carries no cash line for an account, its cash balance is left as it is rather
+              than set to zero.
+            </p>
             <div className="flex items-center gap-2">
               <Label htmlFor="create-all" className="text-xs text-muted-foreground">
                 Create accounts for everything in the file (529 / Crypto / IRA grouped on the

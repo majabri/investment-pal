@@ -43,10 +43,14 @@ export function readinessInputFor({
   const positions: Freshness =
     account === null
       ? "UNAVAILABLE"
-      : freshnessOf(totalAccountValue, {
-          sourceType: (account.balances_source_type ?? null) as SourceType | null,
-          asOf: account.balances_as_of ?? null,
-        }, now);
+      : freshnessOf(
+          totalAccountValue,
+          {
+            sourceType: (account.balances_source_type ?? null) as SourceType | null,
+            asOf: account.balances_as_of ?? null,
+          },
+          now,
+        );
 
   // Quotes are re-fetched on a 60s cadence wherever a screen asks for them.
   // `live_quote` at the current moment is the honest description of that for a

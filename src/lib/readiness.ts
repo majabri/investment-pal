@@ -368,9 +368,7 @@ export function combineChecks(
       return { id, label: CHECK_LABEL[id], state: "pass" as const, detail: "" };
     }
 
-    const affected = rows
-      .filter((r) => r.check.state === worst.check.state)
-      .map((r) => r.label);
+    const affected = rows.filter((r) => r.check.state === worst.check.state).map((r) => r.label);
     return {
       id,
       label: CHECK_LABEL[id],
