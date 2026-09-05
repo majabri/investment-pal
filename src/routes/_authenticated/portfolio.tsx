@@ -43,6 +43,12 @@ import { getEarningsCalendarFn } from "@/lib/calendarServer";
 import { computeSwing, tradingDaysUntil, type SwingResult } from "@/lib/swingScore";
 import { fmtChartUSD } from "@/lib/chartFormat";
 import { fmtUSD, fmtPct } from "@/lib/finance";
+import {
+  UNAVAILABLE,
+  numberOrUnknown,
+  pctOrUnavailable,
+  usdOrUnavailable,
+} from "@/lib/unavailable";
 import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated/portfolio")({
@@ -205,18 +211,20 @@ function PortfolioPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard
           label="Gross — investments"
-          value={noScope ? "—" : fmtUSD(grossValue)}
+          value={noScope ? "—" : usdOrUnavailable(grossValue)}
           hint={
             noScope
               ? scopeName
-              : `${scopeName} · ${holdings.length} positions${cash > 0 ? ` + cash ${fmtUSD(cash)}` : ""}`
+              : `${scopeName} · ${holdings.length} positions${cash === null ? " · cash not known" : cash > 0 ? ` + cash ${fmtUSD(cash)}` : ""}`
           }
           icon={<Wallet className="h-4 w-4" />}
         />
         {selectedAccount ? (
           <MarginCard
             accountId={selectedAccount.id}
-            marginUsed={Number(selectedAccount.margin_used ?? 0)}
+            marginUsed={
+              selectedAccount.margin_used === null ? null : Number(selectedAccount.margin_used)
+            }
           />
         ) : (
           <StatCard
@@ -227,7 +235,7 @@ function PortfolioPage() {
         )}
         <StatCard
           label="Net — actual account value"
-          value={noScope ? "—" : fmtUSD(totalAccountValue)}
+          value={noScope ? "—" : usdOrUnavailable(totalAccountValue)}
           hint={
             noScope
               ? scopeName
@@ -245,7 +253,7 @@ function PortfolioPage() {
         />
         <StatCard
           label="Buying power"
-          value={noScope ? "—" : fmtUSD(balance!.buying_power)}
+          value={noScope ? "—" : usdOrUnavailable(balance?.buying_power)}
           hint={scopeName}
         />
       </div>
@@ -384,7 +392,10 @@ function PortfolioPage() {
                         q && q.prevClose > 0 ? (price - q.prevClose) / q.prevClose : null;
                       // Fidelity divides % of Acct by TOTAL ACCOUNT VALUE (net equity) —
                       // verified against real statements (CRWD 32.24%, LRCX 26.84%, ...).
-                      const pctOfAcct = totalAccountValue > 0 ? value / totalAccountValue : 0;
+                      const pctOfAcct =
+                        totalAccountValue !== null && totalAccountValue > 0
+                          ? value / totalAccountValue
+                          : null;
                       const unpriced = !q;
                       return (
                         <TableRow
@@ -440,7 +451,7 @@ function PortfolioPage() {
                             {value > 0.005 ? fmtUSD(value) : value > 0 ? fmtUSD(value, 2) : "--"}
                           </TableCell>
                           <TableCell className="text-right tabular text-muted-foreground">
-                            {fmtPct(pctOfAcct)}
+                            {pctOrUnavailable(pctOfAcct)}
                           </TableCell>
                           <TableCell className="text-right tabular">
                             {h.quantity.toLocaleString("en-US")}
@@ -483,12 +494,14 @@ function PortfolioPage() {
                   <span className="font-semibold uppercase tracking-wide text-muted-foreground">
                     Margin loan
                   </span>
-                  <span className="tabular">{fmtUSD(-marginDebit)}</span>
+                  <span className="tabular">
+                    {marginDebit === null ? UNAVAILABLE : fmtUSD(-marginDebit)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between py-2">
                   <span className="font-semibold uppercase tracking-wide">Total account value</span>
                   <span className="tabular font-semibold">
-                    {noScope ? "—" : fmtUSD(totalAccountValue)}
+                    {noScope ? "—" : usdOrUnavailable(totalAccountValue)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between py-2">
@@ -503,11 +516,15 @@ function PortfolioPage() {
                           ? sum + h.quantity * (q.price - q.prevClose)
                           : sum;
                       }, 0);
-                      const prior = totalAccountValue - day; // Fidelity: % vs yesterday's account value
+                      // The dollar change comes from quotes and is known even
+                      // when the balance is not; only the PERCENTAGE needs
+                      // yesterday's account value, so only it goes unavailable.
+                      const prior = totalAccountValue === null ? null : totalAccountValue - day;
                       return (
                         <span className={day >= 0 ? "text-success" : "text-destructive"}>
                           {day >= 0 ? "+" : ""}
-                          {fmtUSD(day)} ({prior > 0 ? fmtPct(day / prior) : "—"})
+                          {fmtUSD(day)} (
+                          {prior !== null && prior > 0 ? fmtPct(day / prior) : UNAVAILABLE})
                         </span>
                       );
                     })()}
@@ -651,43 +668,88 @@ function AccountForm({
   onSave,
 }: {
   account:
-    | { cash: number; margin_used: number; margin_limit: number; buying_power: number }
+    | {
+        cash: number | null;
+        margin_used: number | null;
+        margin_limit: number | null;
+        buying_power: number | null;
+      }
     | null
     | undefined;
-  onSave: (patch: Record<string, number>) => void;
+  onSave: (patch: Record<string, number | null | string>) => void;
 }) {
-  const [cash, setCash] = useState(account?.cash ?? 0);
-  const [used, setUsed] = useState(account?.margin_used ?? 0);
-  const [limit, setLimit] = useState(account?.margin_limit ?? 0);
-  const [bp, setBp] = useState(account?.buying_power ?? 0);
+  // Empty string, not 0. `?? 0` put a zero in the box for a figure nobody has
+  // ever supplied, and the first Save then wrote that zero to the database as
+  // if the user had confirmed it — turning "not known" into "no cash" with no
+  // deliberate act (rule 13).
+  const asText = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
+  const [cash, setCash] = useState(asText(account?.cash));
+  const [used, setUsed] = useState(asText(account?.margin_used));
+  const [limit, setLimit] = useState(asText(account?.margin_limit));
+  const [bp, setBp] = useState(asText(account?.buying_power));
+  // An emptied or half-typed box reads as unknown, never as 0. The rule lives
+  // in lib/unavailable so it is testable without mounting a route.
+  const asValue = numberOrUnknown;
   return (
     <div className="grid gap-3 md:grid-cols-4">
       <div>
-        <Label className="text-xs">Cash</Label>
-        <Input type="number" value={cash} onChange={(e) => setCash(+e.target.value)} />
+        <Label className="text-xs" htmlFor="account-cash">
+          Cash
+        </Label>
+        <Input
+          id="account-cash"
+          type="number"
+          value={cash}
+          placeholder={UNAVAILABLE}
+          onChange={(e) => setCash(e.target.value)}
+        />
       </div>
       <div>
-        <Label className="text-xs">Margin used</Label>
-        <Input type="number" value={used} onChange={(e) => setUsed(+e.target.value)} />
+        <Label className="text-xs" htmlFor="account-used">
+          Margin used
+        </Label>
+        <Input
+          id="account-used"
+          type="number"
+          value={used}
+          placeholder={UNAVAILABLE}
+          onChange={(e) => setUsed(e.target.value)}
+        />
       </div>
       <div>
-        <Label className="text-xs">Margin limit</Label>
-        <Input type="number" value={limit} onChange={(e) => setLimit(+e.target.value)} />
+        <Label className="text-xs" htmlFor="account-limit">
+          Margin limit
+        </Label>
+        <Input
+          id="account-limit"
+          type="number"
+          value={limit}
+          placeholder={UNAVAILABLE}
+          onChange={(e) => setLimit(e.target.value)}
+        />
       </div>
       <div>
-        <Label className="text-xs">Buying power</Label>
-        <Input type="number" value={bp} onChange={(e) => setBp(+e.target.value)} />
+        <Label className="text-xs" htmlFor="account-bp">
+          Buying power
+        </Label>
+        <Input
+          id="account-bp"
+          type="number"
+          value={bp}
+          placeholder={UNAVAILABLE}
+          onChange={(e) => setBp(e.target.value)}
+        />
       </div>
       <div className="md:col-span-4">
         <Button
           size="sm"
           onClick={() =>
             onSave({
-              cash,
-              margin_used: used,
-              margin_limit: limit,
-              buying_power: bp,
-              last_synced_at: new Date().toISOString() as unknown as number,
+              cash: asValue(cash),
+              margin_used: asValue(used),
+              margin_limit: asValue(limit),
+              buying_power: asValue(bp),
+              last_synced_at: new Date().toISOString(),
             })
           }
         >

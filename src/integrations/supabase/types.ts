@@ -16,13 +16,13 @@ export type Database = {
         Row: {
           account_type: string;
           broker: string | null;
-          buying_power: number;
-          cash: number;
+          buying_power: number | null;
+          cash: number | null;
           created_at: string;
           id: string;
           last_synced_at: string | null;
-          margin_limit: number;
-          margin_used: number;
+          margin_limit: number | null;
+          margin_used: number | null;
           name: string;
           notes: string | null;
           starting_value: number;
@@ -34,13 +34,13 @@ export type Database = {
         Insert: {
           account_type?: string;
           broker?: string | null;
-          buying_power?: number;
-          cash?: number;
+          buying_power?: number | null;
+          cash?: number | null;
           created_at?: string;
           id?: string;
           last_synced_at?: string | null;
-          margin_limit?: number;
-          margin_used?: number;
+          margin_limit?: number | null;
+          margin_used?: number | null;
           name?: string;
           notes?: string | null;
           starting_value?: number;
@@ -52,13 +52,13 @@ export type Database = {
         Update: {
           account_type?: string;
           broker?: string | null;
-          buying_power?: number;
-          cash?: number;
+          buying_power?: number | null;
+          cash?: number | null;
           created_at?: string;
           id?: string;
           last_synced_at?: string | null;
-          margin_limit?: number;
-          margin_used?: number;
+          margin_limit?: number | null;
+          margin_used?: number | null;
           name?: string;
           notes?: string | null;
           starting_value?: number;

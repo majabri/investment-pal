@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
 import { MARGIN_POLICY_UNSET, type MarginPolicy } from "@/lib/marginCost";
+import { sumField } from "@/lib/accountAggregate";
 import { scopedRows, type AccountScope } from "@/lib/accountTotals";
 import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 import { localIsoDate } from "@/lib/localDate";
@@ -54,10 +55,15 @@ export type Account = {
   name: string;
   account_type: string;
   broker: string | null;
-  cash: number;
-  margin_used: number;
-  margin_limit: number;
-  buying_power: number;
+  /**
+   * NULL = not known. Nullable as of the Phase 1a migration: the columns were
+   * `NOT NULL DEFAULT 0`, so a never-populated account was indistinguishable
+   * from one holding no cash and owing nothing (rule 13).
+   */
+  cash: number | null;
+  margin_used: number | null;
+  margin_limit: number | null;
+  buying_power: number | null;
   starting_value: number;
   target_value: number | null;
   target_date: string | null;
@@ -249,16 +255,12 @@ export function useAccounts() {
  * the mutation now refuses anything but a single named account.
  */
 export type ScopedBalance = {
-  cash: number;
-  margin_used: number;
-  margin_limit: number;
-  buying_power: number;
+  cash: number | null;
+  margin_used: number | null;
+  margin_limit: number | null;
+  buying_power: number | null;
   last_synced_at: string | null;
 };
-
-/** Sum a field across accounts, tolerating nulls from the database. */
-const sumField = (accounts: Account[], key: keyof ScopedBalance): number =>
-  accounts.reduce((s, a) => s + Number((a[key as keyof Account] as number | null) || 0), 0);
 
 /** Latest non-null sync timestamp, or null when nothing has ever synced. */
 const latestSync = (accounts: Account[]): string | null =>

@@ -33,6 +33,7 @@ import {
   riskToVol,
   yearsBetween,
 } from "@/lib/finance";
+import { usdOrUnavailable } from "@/lib/unavailable";
 import { objectiveOf } from "@/lib/objective";
 
 export const Route = createFileRoute("/_authenticated/goals")({
@@ -101,7 +102,12 @@ function GoalsPage() {
       target_date: date || null,
       monthly_contribution: monthly,
     });
-    if (objective.kind !== "set") return null;
+    // The current value is as load-bearing as the objective: every figure below
+    // projects FROM it. `portfolioValue` is null when the account's cash or
+    // margin debit is unknown (Phase 1a), and the fallback below would then
+    // quietly substitute the objective's own starting value — projecting from
+    // the day the goal was written and reporting it as today's pace.
+    if (objective.kind !== "set" || portfolioValue === null) return null;
     const years = Math.max(yearsBetween(new Date(), new Date(date)), 0.01);
     const start = portfolioValue > 0 ? portfolioValue : objective.startingValue;
     const cagr = requiredCAGRWithContrib(
@@ -226,10 +232,10 @@ function GoalsPage() {
               knowing which account it is progress in. */}
           <StatCard
             label="Current value"
-            value={balance === null ? "—" : fmtUSD(portfolioValue)}
+            value={usdOrUnavailable(portfolioValue)}
             hint={
-              balance === null
-                ? scopeName
+              portfolioValue === null
+                ? `${scopeName} · cash or margin not known`
                 : `${scopeName} · progress ${metrics ? fmtPct(metrics.progress) : "—"}`
             }
           />

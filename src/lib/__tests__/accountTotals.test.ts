@@ -34,14 +34,14 @@ describe("reconciles to the Fidelity statement", () => {
     // $148,450.00 against a net $128,450.00 here.
     const t = accountTotals(positions, balance);
     expect(t.grossValue).toBeCloseTo(148_450, 2);
-    expect(t.grossValue - t.totalAccountValue).toBeCloseTo(20_000, 2);
+    expect(t.grossValue! - t.totalAccountValue!).toBeCloseTo(20_000, 2);
   });
 
   test("the debit is subtracted, not added", () => {
     // Sign errors on a debit are silent and enormous. Pin the direction.
     const withDebit = accountTotals(positions, balance).totalAccountValue;
     const noDebit = accountTotals(positions, { cash: 2_500, margin_used: 0 }).totalAccountValue;
-    expect(withDebit).toBeLessThan(noDebit);
+    expect(withDebit!).toBeLessThan(noDebit!);
   });
 
   test("equity percent matches the statement's 86.5% to the tenth", () => {
@@ -80,22 +80,62 @@ describe("unrealized P/L is scoped to the same positions as the value", () => {
 });
 
 describe("absent data reads as absent, never as zero", () => {
-  test("no positions and no balance gives zeroes but null ratios", () => {
+  // Both tests in this block used to assert the opposite, one of them by name
+  // ("null cash and margin are treated as zero"). That coercion is the rule-13
+  // defect Phase 1a repairs: it makes a never-populated account report a total
+  // account value short by the whole missing figure, in the same typeface as a
+  // figure the broker actually supplied.
+  test("no balance at all means the account value is unknown, not zero", () => {
     const t = accountTotals([], null);
-    expect(t.totalAccountValue).toBe(0);
+    expect(t.cash).toBeNull();
+    expect(t.marginDebit).toBeNull();
+    expect(t.grossValue).toBeNull();
+    expect(t.totalAccountValue).toBeNull();
     // A percentage with no denominator is not 0% — it is unknown. Showing 0%
     // would be a claim the data does not support.
     expect(t.equityPct).toBeNull();
     expect(t.unrealizedPLPct).toBeNull();
   });
 
-  test("null cash and margin are treated as zero, not NaN", () => {
+  test("null cash makes the value unknown even though the positions are known", () => {
     const t = accountTotals([{ quantity: 1, cost_basis: 1, current_price: 2 }], {
       cash: null,
       margin_used: undefined,
     });
+    // The positions are a separate dataset and stay known...
+    expect(t.positionsValue).toBe(2);
+    // ...but nothing that needs the balance may be stated.
+    expect(t.grossValue).toBeNull();
+    expect(t.totalAccountValue).toBeNull();
+    expect(t.equityPct).toBeNull();
+  });
+
+  test("unknown propagates one field at a time", () => {
+    const positions = [{ quantity: 1, cost_basis: 1, current_price: 2 }];
+    // Cash known, debit unknown: gross is computable, the account value is not.
+    const noDebit = accountTotals(positions, { cash: 10, margin_used: null });
+    expect(noDebit.grossValue).toBe(12);
+    expect(noDebit.totalAccountValue).toBeNull();
+    expect(noDebit.equityPct).toBeNull();
+
+    // Debit known, cash unknown: neither is computable.
+    const noCash = accountTotals(positions, { cash: null, margin_used: 5 });
+    expect(noCash.grossValue).toBeNull();
+    expect(noCash.totalAccountValue).toBeNull();
+  });
+
+  test("a real zero balance is still a real zero", () => {
+    // The point of the change is the DISTINCTION. If null and 0 both became
+    // unknown, the fix would have destroyed the other half of it.
+    const t = accountTotals([{ quantity: 1, cost_basis: 1, current_price: 2 }], {
+      cash: 0,
+      margin_used: 0,
+    });
+    expect(t.cash).toBe(0);
+    expect(t.marginDebit).toBe(0);
+    expect(t.grossValue).toBe(2);
     expect(t.totalAccountValue).toBe(2);
-    expect(Number.isNaN(t.totalAccountValue)).toBe(false);
+    expect(t.equityPct).toBe(1);
   });
 
   test("a non-finite price does not poison the total", () => {

@@ -140,7 +140,10 @@ export type InterestFigure =
    * "the import did not carry an accrued figure" are different facts, and
    * stating the wrong one is itself a claim the data does not support.
    */
-  | { kind: "unavailable"; reason: "no-import" | "import-omitted-accrued" };
+  | {
+      kind: "unavailable";
+      reason: "no-import" | "import-omitted-accrued" | "margin-loan-unknown";
+    };
 
 export function marginInterestFigure(args: {
   /** From the latest balance import. `null` = no import, or the paste omitted it. */
@@ -155,7 +158,14 @@ export function marginInterestFigure(args: {
    * claim no balance had ever been imported, which may be false.
    */
   hasImport?: boolean;
-  marginUsed: number;
+  /**
+   * The margin debit, or NULL when the account does not know it (Phase 1a).
+   *
+   * NULL is not 0. Treating it as 0 returns a confident "$0.00/day" estimate
+   * for an account that may be carrying a substantial loan — a cost of
+   * borrowing stated as nil, which is the direction that flatters a decision.
+   */
+  marginUsed: number | null;
   policy: MarginPolicy;
 }): InterestFigure {
   // Observed beats computed, unconditionally — including when the observation
@@ -163,6 +173,13 @@ export function marginInterestFigure(args: {
   // with an estimate of what it might charge would be inventing a broker state.
   if (args.accruedMtd != null && Number.isFinite(args.accruedMtd)) {
     return { kind: "actual", accruedMtd: args.accruedMtd, importedAt: args.importedAt ?? null };
+  }
+  // No observed figure, and no loan size to estimate from. Reported before the
+  // rate is consulted: an unset rate is a different, fixable problem, and
+  // naming that one would send the user to Settings to fix something that would
+  // not help.
+  if (args.marginUsed === null) {
+    return { kind: "unavailable", reason: "margin-loan-unknown" };
   }
   const daily = dailyMarginInterest(args.marginUsed, args.policy);
   if (daily == null) {
@@ -190,9 +207,14 @@ export function interestProvenance(figure: InterestFigure): string {
     case "estimate":
       return "estimated from your IPS margin rate — not the broker's figure";
     case "unavailable":
-      return figure.reason === "import-omitted-accrued"
-        ? "the last balance import did not include accrued interest, and no margin rate is set"
-        : "no balance imported and no margin rate set";
+      switch (figure.reason) {
+        case "margin-loan-unknown":
+          return "this account's margin loan is not known, so no interest figure can be given";
+        case "import-omitted-accrued":
+          return "the last balance import did not include accrued interest, and no margin rate is set";
+        case "no-import":
+          return "no balance imported and no margin rate set";
+      }
   }
 }
 
@@ -211,6 +233,13 @@ export function interestProvenanceShort(figure: InterestFigure): string {
     case "estimate":
       return "estimate";
     case "unavailable":
-      return figure.reason === "import-omitted-accrued" ? "not in last import" : "rate not set";
+      switch (figure.reason) {
+        case "margin-loan-unknown":
+          return "loan not known";
+        case "import-omitted-accrued":
+          return "not in last import";
+        case "no-import":
+          return "rate not set";
+      }
   }
 }

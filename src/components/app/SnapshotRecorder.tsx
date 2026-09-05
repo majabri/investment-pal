@@ -21,9 +21,13 @@ export function SnapshotRecorder({
   net,
   marginUsed,
 }: {
-  gross: number;
-  net: number;
-  marginUsed: number;
+  /** NULL when the account's cash or margin loan is not known (Phase 1a). A
+   *  snapshot is a permanent, append-only record of what the account was worth;
+   *  a row derived from an unknown balance is a wrong day in the series that
+   *  every later chart, day-change and reconciliation reads as fact. */
+  gross: number | null;
+  net: number | null;
+  marginUsed: number | null;
 }) {
   const scope = useAccountScope();
   const { data: snapshots = [], isLoading } = useSnapshots(scope);
@@ -33,6 +37,7 @@ export function SnapshotRecorder({
     if (scope.kind !== "account") return;
     // Nothing worth recording yet: a zero gross is the loading state, and a
     // row of zeroes would draw a day the account was worth nothing.
+    if (gross === null || net === null || marginUsed === null) return;
     if (!(gross > 0)) return;
     if (isLoading || record.isPending) return;
     const series = balanceSeries(snapshots);
