@@ -236,37 +236,6 @@ export function parseBalanceBlock(input: string): BalanceParse {
 }
 
 /**
- * How a pasted total compares with what the app computes from its own rows.
- *
- * This is the point of the whole import. The app's total is positions + cash −
- * debit over the rows it holds; the broker's total is the truth. If they differ
- * the app is missing a position, holding a stale price, or carrying a wrong
- * cash figure — and until now nothing in the app could tell.
- */
-export type Reconciliation =
-  | { kind: "no-pasted-total" }
-  | { kind: "matches"; delta: number; pasted: number; computed: number }
-  | { kind: "differs"; delta: number; pasted: number; computed: number };
-
-/**
- * Compare, to the cent.
- *
- * `toleranceUsd` exists for float noise in summing many positions, not for
- * "close enough" — one cent, and it is deliberately not configurable from the
- * UI. A real discrepancy of a dollar is a real discrepancy.
- */
-export function reconcile(
-  pastedTotal: number | null,
-  computedTotal: number,
-  toleranceUsd = 0.01,
-): Reconciliation {
-  if (pastedTotal === null) return { kind: "no-pasted-total" };
-  const delta = computedTotal - pastedTotal;
-  const kind = Math.abs(delta) <= toleranceUsd ? "matches" : "differs";
-  return { kind, delta, pasted: pastedTotal, computed: computedTotal };
-}
-
-/**
  * The row written to `account_balances`.
  *
  * One row per account per import, never an update in place: the history is the

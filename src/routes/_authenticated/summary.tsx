@@ -11,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/app/AppShell";
 import { AccountNotice } from "@/components/app/AccountNotice";
-import { ReconciliationBanner } from "@/components/app/ReconciliationBanner";
+import { ReconciliationPanel } from "@/components/app/ReconciliationPanel";
 import { SnapshotRecorder } from "@/components/app/SnapshotRecorder";
 import {
   AllocationPanel,
@@ -121,7 +121,7 @@ function SummaryPage() {
         net={totals?.totalAccountValue ?? null}
         marginUsed={totals?.marginDebit ?? null}
       />
-      <ReconciliationBanner computedTotal={totals?.totalAccountValue ?? null} />
+      <ReconciliationPanel totals={totals ?? null} />
 
       <SummaryHeader scope={scope} totals={totals} day={day} />
       <SummaryMetricRow scope={scope} totals={totals} interest={interest} policy={ipsLite} />

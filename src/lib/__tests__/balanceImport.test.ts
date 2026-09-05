@@ -14,7 +14,6 @@ import {
   isDateOrTime,
   parseAmount,
   parseBalanceBlock,
-  reconcile,
   toSnapshot,
   BALANCE_FIELD_ORDER,
 } from "../balanceImport";
@@ -241,39 +240,6 @@ describe("parseAmount", () => {
   test("text with no number is null, not zero", () => {
     expect(parseAmount("Total account value")).toBeNull();
     expect(parseAmount("")).toBeNull();
-  });
-});
-
-describe("reconciliation is the point of the import", () => {
-  const pasted = 128_450;
-
-  test("agreement to the cent is a match", () => {
-    const r = reconcile(pasted, 128_450);
-    expect(r.kind).toBe("matches");
-  });
-
-  test("a dollar out is a difference, not a rounding tolerance", () => {
-    const r = reconcile(pasted, 128_451);
-    expect(r.kind).toBe("differs");
-    expect(r.kind === "differs" && r.delta).toBeCloseTo(1, 2);
-  });
-
-  test("the delta says which way the app is wrong", () => {
-    // Positive delta = the app thinks it has more than the broker says. That
-    // usually means a stale price or a position that was sold.
-    const over = reconcile(pasted, pasted + 500);
-    expect(over.kind === "differs" && over.delta).toBeCloseTo(500, 2);
-    const under = reconcile(pasted, pasted - 500);
-    expect(under.kind === "differs" && under.delta).toBeCloseTo(-500, 2);
-  });
-
-  test("half a cent of float noise still matches", () => {
-    expect(reconcile(pasted, pasted + 0.005).kind).toBe("matches");
-  });
-
-  test("no pasted total is its own state, not a match and not a difference", () => {
-    // Reporting "matches" here would be an assertion made from no evidence.
-    expect(reconcile(null, 128_450).kind).toBe("no-pasted-total");
   });
 });
 

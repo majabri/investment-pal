@@ -23,7 +23,7 @@ import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
 import { accountCategory, CATEGORY_ORDER } from "@/lib/data/accountGroups";
 import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
 import { AccountNotice } from "@/components/app/AccountNotice";
-import { ReconciliationBanner } from "@/components/app/ReconciliationBanner";
+import { ReconciliationPanel } from "@/components/app/ReconciliationPanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { interestProvenanceShort, marginInterestFigure, rateStatus } from "@/lib/marginCost";
@@ -292,7 +292,7 @@ function Dashboard() {
       <AccountNotice status={accountStatus} />
       {/* Invisible: records at most one balance snapshot per account per day. */}
       <SnapshotRecorder gross={grossValue} net={portfolioValue} marginUsed={marginUsed} />
-      <ReconciliationBanner computedTotal={portfolioValue} />
+      <ReconciliationPanel totals={totals} />
       <div className="mb-4">
         <WorkflowButtons symbols={holdings.map((h) => h.symbol)} />
       </div>

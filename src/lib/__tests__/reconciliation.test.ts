@@ -4,6 +4,7 @@
 // several that all mean "we did not check" for different reasons and need
 // different fixes.
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import {
   DEFAULT_TOLERANCE,
@@ -266,5 +267,43 @@ describe("every state says something, and only three claim a check happened", ()
       expect(text).not.toContain("matches");
       expect(text).not.toContain("reconciled —");
     }
+  });
+});
+
+// The panel replaced a banner that ended "Treat the broker's figure as
+// correct." That line is why the panel exists: rules 5 and 6 say neither value
+// is assumed correct, and the broker's number can be stale, can predate a
+// transfer, and can itself be wrong.
+describe("the panel does not tell the user which number to believe", () => {
+  const panel = readFileSync("src/components/app/ReconciliationPanel.tsx", "utf8");
+  const live = panel.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  test("no copy instructs the user to trust one side", () => {
+    // Live code only — the comment explaining why the old line was wrong
+    // necessarily quotes it, and a guard that fires on the explanation
+    // pressures the next person to delete the explanation.
+    expect(live).not.toMatch(/treat the broker's figure as correct/i);
+    expect(live).not.toMatch(/the broker is right|trust the broker/i);
+  });
+
+  test("both figures are rendered, not just the disagreement", () => {
+    // Showing only the difference would leave the user unable to see which
+    // side moved.
+    expect(live).toContain("Broker reports");
+    expect(live).toContain("This app computes");
+  });
+
+  test("capacity figures are rendered apart from the components", () => {
+    // Rule 12: buying power is what could be borrowed, not money held, and the
+    // panel says so rather than relying on placement.
+    expect(live).toContain("never part of the account value");
+    expect(live).toContain("availableCapital");
+  });
+
+  test("the superseded two-state comparison is gone", () => {
+    // Two things deciding the same question is the defect this phase removes;
+    // leaving the old one behind is how they drift back apart.
+    const balanceImport = readFileSync("src/lib/balanceImport.ts", "utf8");
+    expect(balanceImport).not.toMatch(/export function reconcile\(/);
   });
 });
