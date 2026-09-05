@@ -6,12 +6,13 @@ import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
-import { FAMILY_POLICY, nextContributionDate } from "@/lib/data/familyPolicy";
+import { FAMILY_POLICY } from "@/lib/data/familyPolicy";
+import { nextContributionDate } from "@/lib/accountObjective";
 import { kidAccounts, holderLabel } from "@/lib/kidAccounts";
 import { useAccounts, useAllHoldings, useHouseholdMembers } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD } from "@/lib/finance";
-import { usdOrNotKnown } from "@/lib/unavailable";
+import { NOT_KNOWN, usdOrNotKnown } from "@/lib/unavailable";
 
 export const Route = createFileRoute("/_authenticated/kids-prompt-center")({ component: Page });
 
@@ -40,7 +41,33 @@ function Page() {
   });
 
   const prompt = useMemo(() => {
-    const next = nextContributionDate().toISOString().slice(0, 10);
+    // Earliest next contribution across the accounts that have a plan. This
+    // read `FAMILY_POLICY.contribution.anchorDate`, so it returned the same
+    // date for every user of the app (rule 20).
+    const nextTimes = kidsData
+      .map((k) => (k.objective.kind === "set" ? k.objective.contribution : null))
+      .filter((c): c is NonNullable<typeof c> => c !== null)
+      .map((c) => nextContributionDate(c).getTime());
+    const next =
+      nextTimes.length === 0
+        ? NOT_KNOWN
+        : new Date(Math.min(...nextTimes)).toISOString().slice(0, 10);
+
+    // Each account's OWN objective, stated per account. A single global
+    // "$200,000 by 2036" was one household's target asserted to the model as
+    // this user's, and the model then reasoned about being behind on it.
+    const objectives = kidsData
+      .map((k) => {
+        const o = k.objective;
+        if (o.kind === "unset") {
+          return `${holderLabel(k)}: target ${NOT_KNOWN} (missing ${o.missing.join(" and ")})`;
+        }
+        const plan = o.contribution
+          ? `${usdOrNotKnown(o.contribution.amountUsd)} every ${o.contribution.cadenceDays} days`
+          : `${NOT_KNOWN} — no contribution plan is recorded, so assume none`;
+        return `${holderLabel(k)}: target ${usdOrNotKnown(o.targetValue)} by ${o.targetDate}; contribution ${plan}`;
+      })
+      .join("\n");
     // Whoever actually holds the accounts, with their age where a birth date
     // has been entered. This read a compiled-in list of three children, so the
     // prompt asserted their names and ages to the model regardless of whose
@@ -71,10 +98,15 @@ function Page() {
     return `Family Investment Committee – Biweekly Capital Allocation Review
 
 Today is my biweekly investment review for my children's accounts (${kidsLine}).
-Each account receives $${FAMILY_POLICY.contribution.amountUsd} today.
+Each account's own objective and contribution plan, as recorded:
+${objectives}
+
+Where a target or a contribution plan is ${NOT_KNOWN}, treat it as NOT SET. Do not
+substitute a figure, do not infer one from the other accounts, and do not judge
+that account as ahead of or behind a target it does not have.
 
 Objective
-Maximize the probability of each account reaching $${FAMILY_POLICY.targetPerChild.toLocaleString("en-US")} by ${FAMILY_POLICY.targetDate} through disciplined long-term investing.
+Maximize the probability of each account reaching its own recorded target by its own recorded date, through disciplined long-term investing.
 These accounts are for:
 * College
 * First home
@@ -134,7 +166,7 @@ Review each child's portfolio:
 * Weaknesses
 * Sector allocation
 * Concentration risk
-* Progress toward the $${FAMILY_POLICY.targetPerChild.toLocaleString("en-US")} goal
+* Progress toward that account's own recorded target, where one is recorded
 * Required annual return from today to reach the target
 
 5. Contribution Decision
@@ -156,7 +188,7 @@ Challenge the recommendation by explaining:
 * Why the final recommendation still wins
 
 7. Next Contribution Plan
-If today's purchase is executed, identify the highest-priority purchase for the next $${FAMILY_POLICY.contribution.amountUsd} contribution in ${FAMILY_POLICY.contribution.cadenceDays} days.
+If today's purchase is executed, identify the highest-priority purchase for each account's next recorded contribution. Where no contribution plan is recorded, say so and skip that account rather than assuming one.
 
 8. Final Investment Committee Vote
 ${kidsData.map((k) => `For ${holderLabel(k)}: BUY / HOLD / SELL`).join("\n")}

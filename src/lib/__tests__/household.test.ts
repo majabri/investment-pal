@@ -18,7 +18,7 @@ import {
   memberOfAccount,
   membersOfAccounts,
 } from "../household";
-import { holderLabel, kidAccounts } from "../kidAccounts";
+import { holderLabel, kidAccounts, type KidAccount } from "../kidAccounts";
 
 const AT = new Date("2026-09-05T12:00:00");
 
@@ -133,6 +133,13 @@ describe("kidAccounts", () => {
     account_type: "custodial",
     cash: 10,
     owner_member_id: "m1",
+    // Set, so the fixture exercises the linked case. `accountObjective.test.ts`
+    // owns the unset cases.
+    target_value: 50_000,
+    target_date: "2036-07-01",
+    contribution_amount: null,
+    contribution_cadence_days: null,
+    contribution_anchor_date: null,
     ...over,
   });
   const holding = (over = {}) => ({
@@ -150,6 +157,18 @@ describe("kidAccounts", () => {
     expect(out[0].holder).toBe("Alex");
     expect(out[0].age).toBe(12);
     expect(out[0].holdings.map((h) => h.symbol)).toEqual(["MSFT"]);
+    // The account's OWN objective, not FAMILY_POLICY's (rule 20).
+    expect(out[0].objective).toEqual({
+      kind: "set",
+      targetValue: 50_000,
+      targetDate: "2036-07-01",
+      contribution: null,
+    });
+  });
+
+  test("an account with no target reads as unset, not as a default", () => {
+    const out = kidAccounts([account({ target_value: null })], [], [member()], AT);
+    expect(out[0].objective.kind).toBe("unset");
   });
 
   test("a non-custodial account is not a kid account whatever it is called", () => {
@@ -208,6 +227,7 @@ describe("holderLabel", () => {
     holder: "Alex" as string | null,
     age: 12 as number | null,
     cash: null,
+    objective: { kind: "unset", missing: ["target value"] } as KidAccount["objective"],
     holdings: [],
     ...over,
   });
@@ -255,7 +275,10 @@ describe("the compiled-in roster cannot come back", () => {
     // If `stripComments` returned "" the guard above would pass forever.
     const code = stripComments(readFileSync("src/lib/data/familyPolicy.ts", "utf8"));
     expect(code).toContain("FAMILY_POLICY");
-    expect(code).toContain("targetPerChild");
+    // Anchored on something this phase is not removing. It was
+    // `targetPerChild`, which the very next PR deleted — a control that has to
+    // be re-pointed every time the file changes is a control nobody trusts.
+    expect(code).toContain("approvedSymbols");
   });
 
   test("kidsSeed is gone and does not return", () => {

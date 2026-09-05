@@ -28,6 +28,9 @@ export type Database = {
           account_type: string | null;
           broker: string | null;
           buying_power: number | null;
+          contribution_amount: number | null;
+          contribution_cadence_days: number | null;
+          contribution_anchor_date: string | null;
           cash: number | null;
           created_at: string;
           id: string;
@@ -57,6 +60,9 @@ export type Database = {
           account_type?: string | null;
           broker?: string | null;
           buying_power?: number | null;
+          contribution_amount?: number | null;
+          contribution_cadence_days?: number | null;
+          contribution_anchor_date?: string | null;
           cash?: number | null;
           created_at?: string;
           id?: string;
@@ -86,6 +92,9 @@ export type Database = {
           account_type?: string | null;
           broker?: string | null;
           buying_power?: number | null;
+          contribution_amount?: number | null;
+          contribution_cadence_days?: number | null;
+          contribution_anchor_date?: string | null;
           cash?: number | null;
           created_at?: string;
           id?: string;

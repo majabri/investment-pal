@@ -157,8 +157,45 @@ function productionSources(dir = "src"): string[] {
 const stripComments = (src: string) =>
   src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 
-describe("the objective has exactly one home", () => {
-  const OBJECTIVE_FIELDS = ["target_value", "target_date", "starting_value"];
+describe("the objective has exactly one home per scope", () => {
+  // CHANGED IN PHASE 4, deliberately, and this note is the record of why.
+  //
+  // The P0 remediation forbade writing ANY objective field to `accounts`: the
+  // Settings form wrote `target_value` / `target_date` / `starting_value` onto
+  // the account, nothing read them, and the dashboard, the goal screen and the
+  // committee prompt all read the `goals` row. So the editor looked like
+  // setting a target and set nothing.
+  //
+  // Rule 20 associates a goal with "user / household / ACCOUNT / portfolio",
+  // and `/kids` now reads each account's own target and horizon — the figures
+  // that used to be `FAMILY_POLICY.targetPerChild` and `.targetDate` for every
+  // account of every user. So an account-level objective is real, and the two
+  // are different scopes rather than two copies of one thing: `goals` is the
+  // user's primary objective, `accounts.target_value` is that account's own.
+  //
+  // What has NOT changed: `starting_value` is still never written to an
+  // account, because nothing measures an account's progress from it — /kids
+  // measures from what the account is worth now.
+  const NEVER_ON_AN_ACCOUNT = ["starting_value"];
+  const ACCOUNT_SCOPED = ["target_value", "target_date"];
+  const OBJECTIVE_FIELDS = [...NEVER_ON_AN_ACCOUNT, ...ACCOUNT_SCOPED];
+
+  // Per file AND per field, never per file — the lesson from #136. The account
+  // editor may write an account's own target; it may not write a starting
+  // value, and no other file may write either.
+  const ACCOUNT_WRITERS: Record<string, string[]> = {
+    "src/routes/_authenticated/settings.tsx": ACCOUNT_SCOPED,
+  };
+
+  // Files that only DECLARE the row shape. `kidAccounts.ts` joined them in
+  // Phase 4: it names `target_value` and `target_date` in `KidAccountRow` so
+  // the reader knows what it may read, and the payload scanner sweeps them in
+  // because `account_type` sits three lines above. It writes nothing.
+  const SHAPE_ONLY = [
+    "src/integrations/supabase/types.ts",
+    "src/hooks/useAppData.ts",
+    "src/lib/kidAccounts.ts",
+  ];
 
   /**
    * Where a file writes to the `accounts` table.
@@ -202,21 +239,19 @@ describe("the objective has exactly one home", () => {
     const offenders: string[] = [];
     for (const file of productionSources()) {
       const path = file.replace(/\\/g, "/");
-      // The two files that DECLARE the row shape must still describe the
-      // deprecated columns — the data is still there, and a type that denied it
-      // would be lying about the database. Neither constructs a payload:
-      // `useAccounts().update` takes a `Partial<Account>` and passes it
-      // through, so every payload is built at a call site, which is what this
-      // scan covers.
-      if (
-        path.endsWith("src/integrations/supabase/types.ts") ||
-        path.endsWith("src/hooks/useAppData.ts")
-      ) {
-        continue;
-      }
+      // Files that DECLARE the row shape must describe these columns — the
+      // data is there, and a type that denied it would be lying about the
+      // database. None of them constructs a payload: `useAccounts().update`
+      // takes a `Partial<Account>` and passes it through, so every payload is
+      // built at a call site, which is what this scan covers. The test below
+      // pins that these files contain no write at all, so the exemption cannot
+      // quietly start covering one.
+      if (SHAPE_ONLY.includes(path)) continue;
       const code = stripComments(readFileSync(file, "utf8"));
+      const allowed = ACCOUNT_WRITERS[path] ?? [];
       for (const payload of accountPayloads(code)) {
         for (const field of OBJECTIVE_FIELDS) {
+          if (allowed.includes(field)) continue;
           if (new RegExp(`(^|[^.\\w])${field}\\s*:`, "m").test(payload)) {
             offenders.push(`${path} writes ${field} to an account`);
           }
@@ -226,6 +261,51 @@ describe("the objective has exactly one home", () => {
     // settings.tsx and goals.tsx write these through `useGoal().update` — the
     // goal row, not the accounts table — so nothing should appear here at all.
     expect([...new Set(offenders)]).toEqual([]);
+  });
+
+  test("in the shape-only exemptions, every objective field is a TYPE", () => {
+    // The exemption is argued as "these files declare the row shape, they do
+    // not build payloads". `useAppData.ts` plainly contains writes — it is the
+    // hooks module — so "contains no mutation" would be the wrong control and
+    // was: it failed on the first run. The claim that actually needs holding is
+    // narrower: in these files, an objective field only ever appears as a type
+    // declaration, never as a key assigned a value.
+    //
+    // `target_value: number | null;`             — a declaration, fine.
+    // `target_value: numberOrUnknown(form.x),`   — a payload, not fine.
+    const DECLARATION = /^\s*(string|number|boolean|Date)?(\s*\|\s*null)?\s*;?\s*$/;
+    const offenders: string[] = [];
+    for (const path of SHAPE_ONLY) {
+      const code = stripComments(readFileSync(path, "utf8"));
+      for (const field of OBJECTIVE_FIELDS) {
+        const re = new RegExp(`(^|[^.\\w])${field}\\??\\s*:([^;\n]*)`, "gm");
+        for (const m of code.matchAll(re)) {
+          if (!DECLARATION.test(m[2]!)) offenders.push(`${path}: ${field}:${m[2]}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("NEGATIVE CONTROL: that check tells a declaration from a payload", () => {
+    // Without this it would pass on a regex that matches everything.
+    const DECLARATION = /^\s*(string|number|boolean|Date)?(\s*\|\s*null)?\s*;?\s*$/;
+    expect(DECLARATION.test(" number | null;")).toBe(true);
+    expect(DECLARATION.test(" string | null;")).toBe(true);
+    expect(DECLARATION.test(" numberOrUnknown(form.target_value),")).toBe(false);
+    expect(DECLARATION.test(" 200_000,")).toBe(false);
+    expect(DECLARATION.test(' account.target_value ?? "",')).toBe(false);
+  });
+
+  test("NEGATIVE CONTROL: the writer allowlist is per field, not per file", () => {
+    // settings.tsx is allowed `target_value` and `target_date`. It must NOT be
+    // allowed `starting_value` — a per-file exemption would have granted it.
+    expect(ACCOUNT_WRITERS["src/routes/_authenticated/settings.tsx"]).not.toContain(
+      "starting_value",
+    );
+    for (const [, allowed] of Object.entries(ACCOUNT_WRITERS)) {
+      for (const field of allowed) expect(OBJECTIVE_FIELDS).toContain(field);
+    }
   });
 
   test("both objective editors reach the goal row through useGoal", () => {

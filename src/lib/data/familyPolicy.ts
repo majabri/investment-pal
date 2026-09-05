@@ -7,15 +7,18 @@
 // is now rows in `public.household_members`, provisioned empty — see
 // `src/lib/household.ts`.
 //
-// What remains is policy: targets, cadence and an approved universe. Those are
-// still one household's numbers rather than configuration, which the rest of
-// Phase 4 addresses; they are not personal data and they are not a person.
+// The OBJECTIVE is no longer here either. `targetPerChild` (200_000),
+// `familyTarget` (600_000), `targetDate` and the contribution plan were one
+// household's goal rendered as every user's progress bar, every user's
+// "Behind / On Track / Ahead" verdict, and — inside the committee prompt —
+// every user's stated goal to a model. They are now per-account columns that
+// the account holder fills in, and unset means unset (rules 15, 20).
+//
+// What remains is the approved universe and the scoring weights: still one
+// household's, still not configuration, and the subject of the next PR in this
+// phase (rules 16, 21).
 export const FAMILY_POLICY = {
   version: "1.0",
-  targetPerChild: 200_000,
-  targetDate: "2036-07-01",
-  familyTarget: 600_000,
-  contribution: { amountUsd: 100, cadenceDays: 14, anchorDate: "2026-07-30" },
   core: ["MSFT", "AMZN", "GOOGL", "V", "AVGO", "BLK", "ABT", "RY"],
   supporting: ["GLD", "SLV", "ARE", "FAMRX", "FFSFX"],
   preferredFuture: ["NVDA", "META", "COST", "LLY", "BRK.B", "CRWD", "PANW", "NFLX", "TSM", "NOW"],
@@ -36,13 +39,9 @@ export const approvedSymbols = () =>
     ...FAMILY_POLICY.speculative.symbols,
   ]);
 
-export function nextContributionDate(from = new Date()): Date {
-  const anchor = new Date(FAMILY_POLICY.contribution.anchorDate + "T12:00:00");
-  const ms = FAMILY_POLICY.contribution.cadenceDays * 864e5;
-  if (from <= anchor) return anchor;
-  const periods = Math.ceil((from.getTime() - anchor.getTime()) / ms);
-  return new Date(anchor.getTime() + periods * ms);
-}
+// `nextContributionDate` moved to `src/lib/accountObjective.ts` and now takes
+// the account's own plan. It read the anchor date from the constant above, so
+// it returned the same date for every user of the app.
 
 export function fvWithContributions(
   present: number,
