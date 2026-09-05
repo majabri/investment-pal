@@ -64,12 +64,11 @@ export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
 });
 
-
 // IPS-lite policy editor (ADR-APP-004). Position cap + margin cap govern the
 // committee prompt and the Constitution Check strip. Money-adjacent numbers were
 // signed off in ADR-APP-004; edits here re-set the policy going forward.
 function IpsLiteCard() {
-  const { data: ips, save } = useIpsLite();
+  const { data: ips, isLoading, save } = useIpsLite();
   const [posCap, setPosCap] = useState("");
   const [marginCap, setMarginCap] = useState("");
   const [mode, setMode] = useState("soft");
@@ -92,6 +91,33 @@ function IpsLiteCard() {
       },
     );
   };
+
+  // The form does not exist until the stored policy has arrived.
+  //
+  // `useIpsLite` returns `query.data ?? IPS_LITE_DEFAULTS`, and TanStack leaves
+  // `data` undefined until the first fetch resolves — so for the whole initial
+  // load window this card showed 30% / 25%, the ADR-APP-004 DEFAULTS, with Save
+  // enabled. Pressing it wrote those defaults over the user's stored caps.
+  //
+  // Phase 4c made that strictly worse. `useIpsLite.save` now stamps
+  // `caps_source: "user_set"` on any write that touches a cap, so a save in the
+  // load window does not merely overwrite the caps — it LAUNDERS THE APP'S OWN
+  // DEFAULT INTO A CONFIRMED USER PREFERENCE, which is exactly the masquerade
+  // rule 15 and #159 exist to prevent. The app would then report 30/25 as the
+  // user's deliberate choice, on screen and to the model in the committee
+  // prompt.
+  //
+  // Hidden rather than disabled: a disabled form still shows 30/25 as though
+  // they were the stored values, and a user reads figures before they read
+  // whether a button is greyed out.
+  if (isLoading) {
+    return (
+      <section className="mb-4 rounded-2xl border bg-card p-5">
+        <div className="mb-1 text-sm font-medium">Investment policy (IPS-lite)</div>
+        <p className="text-xs text-muted-foreground">Loading your stored policy…</p>
+      </section>
+    );
+  }
 
   return (
     <section className="mb-4 rounded-2xl border bg-card p-5">
@@ -181,7 +207,7 @@ function IpsLiteCard() {
  * per account, because nothing measures an account's progress from it.
  */
 function ObjectiveCard() {
-  const { data: goal, update } = useGoal();
+  const { data: goal, isLoading, update } = useGoal();
   const [target, setTarget] = useState("");
   const [date, setDate] = useState("");
   const [starting, setStarting] = useState("");
@@ -194,6 +220,19 @@ function ObjectiveCard() {
     setStarting(String(goal.starting_value ?? ""));
     setMonthly(String(goal.monthly_contribution ?? ""));
   }, [goal]);
+
+  if (isLoading) {
+    // Loading is not absence. This card told the user "No objective set yet"
+    // for the whole load window — asserting their objective did not exist
+    // while it was being fetched. Non-writing, but it is the same conflation
+    // rule 13 forbids everywhere else, on the screen that sets the objective.
+    return (
+      <section className="mb-4 rounded-2xl border bg-card p-5">
+        <div className="mb-1 text-sm font-medium">Objective</div>
+        <p className="text-xs text-muted-foreground">Loading your objective…</p>
+      </section>
+    );
+  }
 
   if (!goal) {
     // No goal row: say so rather than rendering a form whose save has nowhere
@@ -298,7 +337,7 @@ function ObjectiveCard() {
 // wrong over time. Unset is a valid, shipped state — the app suppresses the
 // cost figure rather than computing with a fallback.
 function MarginRateCard() {
-  const { data: ips, save } = useIpsLite();
+  const { data: ips, isLoading, save } = useIpsLite();
   const [rate, setRate] = useState("");
   const [asOf, setAsOf] = useState("");
   const [floating, setFloating] = useState("floating");
@@ -363,13 +402,30 @@ function MarginRateCard() {
     );
   };
 
+  // The worse half of the same defect (ADR-APP-007).
+  //
+  // During the load window `ips.margin_rate_annual_pct` is null — via
+  // `MARGIN_POLICY_UNSET` — so this form rendered BLANK even for a user with a
+  // rate stored. Blank is this form's "clear the rate" value, so pressing Save
+  // in that window UN-SET a correctly-set rate. ADR-APP-007 exists so a missing
+  // rate never computes as zero and makes leverage look free; this silently
+  // produced a missing rate.
+  if (isLoading) {
+    return (
+      <section className="mb-4 rounded-2xl border bg-card p-5">
+        <div className="mb-1 text-sm font-medium">Margin rate</div>
+        <p className="text-xs text-muted-foreground">Loading your stored rate…</p>
+      </section>
+    );
+  }
+
   return (
     <section className="mb-4 rounded-2xl border bg-card p-5">
       <div className="mb-1 text-sm font-medium">Margin rate</div>
       <p className="mb-3 text-xs text-muted-foreground">
-        Your current margin rate, from your broker. Nothing in the app supplies a default: while this is
-        blank, the dashboard shows no interest cost and the committee is told the rate is not set.
-        Brokers tier by debit balance and float with the base rate, so enter the tier that
+        Your current margin rate, from your broker. Nothing in the app supplies a default: while
+        this is blank, the dashboard shows no interest cost and the committee is told the rate is
+        not set. Brokers tier by debit balance and float with the base rate, so enter the tier that
         applies to your balance and re-check it periodically.
       </p>
       {status.kind === "stale" ? (
@@ -426,7 +482,6 @@ function MarginRateCard() {
   );
 }
 
-
 /**
  * Who the accounts belong to (Phase 4, rule 22).
  *
@@ -447,7 +502,8 @@ function HouseholdCard() {
     // Empty box = not known, stored as NULL. Never today's date, and never a
     // placeholder: an invented birth date drives an invented age, and age
     // drives the horizon on /kids (rule 13).
-    if (birth !== "" && !isRealCalendarDate(birth)) return toast.error("Birth date is not a real date");
+    if (birth !== "" && !isRealCalendarDate(birth))
+      return toast.error("Birth date is not a real date");
     create.mutate(
       { display_name: n, birth_date: birth || null, relationship: rel || null },
       {
@@ -536,7 +592,8 @@ function HouseholdCard() {
                   onClick={() => {
                     // Accounts survive: the FK is ON DELETE SET NULL, so they
                     // become "no member linked" rather than disappearing.
-                    if (!confirm(`Remove ${m.display_name}? Their accounts stay, unlinked.`)) return;
+                    if (!confirm(`Remove ${m.display_name}? Their accounts stay, unlinked.`))
+                      return;
                     remove.mutate(m.id);
                   }}
                 >
@@ -550,7 +607,6 @@ function HouseholdCard() {
     </section>
   );
 }
-
 
 /**
  * Strategy rules — the approved universe and the rules with it (Phase 4,
@@ -840,7 +896,9 @@ function SettingsPage() {
           {unconfirmed.length > 0 && (
             <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs">
               <span className="font-medium">
-                {unconfirmed.length === 1 ? "One account has" : `${unconfirmed.length} accounts have`}{" "}
+                {unconfirmed.length === 1
+                  ? "One account has"
+                  : `${unconfirmed.length} accounts have`}{" "}
                 a type nobody has confirmed
               </span>{" "}
               — {unconfirmed.map((a) => a.name).join(", ")}. The value was read off the account name
@@ -1147,19 +1205,20 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
                 account name, or inherited from a schema default nobody chose —
                 and it decides tax treatment and which screens the account
                 appears on. */}
-            {account.account_type !== null && !accountTypeIsConfirmed(account.account_type_source) && (
-              <Badge
-                variant="outline"
-                className="border-amber-500/50 text-[10px] uppercase text-amber-600 dark:text-amber-400"
-                title={
-                  account.account_type_source === "inferred_from_name"
-                    ? "Guessed from the account name — confirm or correct it"
-                    : "Never chosen: this is the old column default — confirm or correct it"
-                }
-              >
-                unconfirmed
-              </Badge>
-            )}
+            {account.account_type !== null &&
+              !accountTypeIsConfirmed(account.account_type_source) && (
+                <Badge
+                  variant="outline"
+                  className="border-amber-500/50 text-[10px] uppercase text-amber-600 dark:text-amber-400"
+                  title={
+                    account.account_type_source === "inferred_from_name"
+                      ? "Guessed from the account name — confirm or correct it"
+                      : "Never chosen: this is the old column default — confirm or correct it"
+                  }
+                >
+                  unconfirmed
+                </Badge>
+              )}
             {account.broker && (
               <span className="text-xs text-muted-foreground">{account.broker}</span>
             )}
@@ -1296,9 +1355,7 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
           <Field label="Belongs to">
             <Select
               value={form.owner_member_id === "" ? NO_MEMBER : form.owner_member_id}
-              onValueChange={(v) =>
-                setForm({ ...form, owner_member_id: v === NO_MEMBER ? "" : v })
-              }
+              onValueChange={(v) => setForm({ ...form, owner_member_id: v === NO_MEMBER ? "" : v })}
             >
               <SelectTrigger>
                 <SelectValue />
