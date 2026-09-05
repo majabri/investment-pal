@@ -512,9 +512,10 @@ Unchanged from 2026-09-03, plus two new items:
 - **NEW — `.github/dependabot.yml` still configures a `minor-and-patch` group.**
   #108 will keep coming back until that group is removed. The ban currently
   lives in an ADR and in triage; it should live in the config.
-  **RESOLVED 2026-09-05 by #127**, which removed the group and left a comment
-  in its place explaining why the absence is deliberate — so a future edit
-  re-adding it has to argue with the file rather than rediscover the reason.
+  **RESOLVED the same day by #127** (merged 2026-09-04T19:30Z), which removed
+  the group and left a comment in its place explaining why the absence is
+  deliberate — so a future edit re-adding it has to argue with the file rather
+  than rediscover the reason.
 - **NEW — CI does not run lint, and `eslint src` reports 1402 problems**
   (1354 errors, 48 warnings, 1340 auto-fixable — almost entirely prettier).
   Identical under eslint 9 and 10. Either add lint to CI and pay the backlog
@@ -527,11 +528,10 @@ Unchanged from 2026-09-03, plus two new items:
 Authority: the USER-AGNOSTIC FINANCIAL TRUTH & RECONCILIATION STANDARD (37
 rules). Phase 0 is the separate `P0-REMEDIATION-remove-personal-data` brief:
 real personal and financial data had been committed to a public repo and sat
-there for two days. Four PRs, all merged.
+there for two days. Three PRs, all merged.
 
 | PR | tier | what |
 |---|---|---|
-| #127 | — | the Dependabot `minor-and-patch` group removed, so ADR-APP-005 §3 lives in the config rather than in triage |
 | #136 | 1 + 4 + §4 | real names, balances and figures out of `src/` and `supabase/`; reintroduction guard added |
 | #137 | 3 | the office identity in the v5/v6 constitutions becomes configuration (rule 23) |
 | #138 | 2 | new users provisioned neutrally; an unset objective stays unset (rule 13) |
