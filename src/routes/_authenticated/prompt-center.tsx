@@ -35,6 +35,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 import { objectiveOf } from "@/lib/objective";
 import { accountTotals } from "@/lib/accountTotals";
+import { assertAiWritable } from "@/lib/aiBoundary";
 import { useReadiness } from "@/hooks/useReadiness";
 import { ReadinessPanel } from "@/components/app/ReadinessPanel";
 
@@ -398,6 +399,11 @@ function PromptCenter() {
         // graded at 1d/1w/1m later (null if the symbol has no live quote).
         price_at_rec: a.symbol ? (liveQuotes?.[a.symbol]?.price ?? null) : null,
       }));
+      // Rule 18: AI is downstream. Every row here is derived from the model's
+      // text, so it passes the boundary before it reaches the database. The
+      // check throws rather than filtering — silently dropping a field would
+      // leave this code believing it had been saved.
+      for (const row of rows) assertAiWritable("decisions", row);
       const { error } = await supabase.from("decisions" as never).insert(rows as never);
       if (error) throw error;
       toast.success(`Action Sheet extracted: ${actions.length} items logged as pending decisions`);
