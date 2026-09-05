@@ -272,7 +272,11 @@ export function useHouseholdMembers() {
     },
   });
   const create = useMutation({
-    mutationFn: async (patch: { display_name: string; birth_date?: string | null; relationship?: string | null }) => {
+    mutationFn: async (patch: {
+      display_name: string;
+      birth_date?: string | null;
+      relationship?: string | null;
+    }) => {
       const { data: userData } = await supabase.auth.getUser();
       const { data, error } = await supabase
         .from("household_members")
@@ -1070,7 +1074,9 @@ export function useIpsLite() {
           "position_cap_pct,position_cap_hard,margin_cap_pct,caps_source,margin_rate_annual_pct,margin_rate_as_of,margin_rate_is_floating,margin_rate_stale_days",
         )
         .limit(1);
-      const rows = (data ?? []) as unknown as (Partial<IpsLite> & { caps_source?: string | null })[];
+      const rows = (data ?? []) as unknown as (Partial<IpsLite> & {
+        caps_source?: string | null;
+      })[];
       if (error || rows.length === 0) return IPS_LITE_DEFAULTS;
       const row = rows[0]!;
       return {
@@ -1103,9 +1109,7 @@ export function useIpsLite() {
       // account editor records. Stamped here rather than at the call site so a
       // future editor cannot save a cap and forget to say who chose it.
       const touchesCaps =
-        "position_cap_pct" in patch ||
-        "position_cap_hard" in patch ||
-        "margin_cap_pct" in patch;
+        "position_cap_pct" in patch || "position_cap_hard" in patch || "margin_cap_pct" in patch;
       const stamped = touchesCaps ? { ...patch, caps_source: "user_set" } : patch;
       const { error } = await supabase
         .from("ips_lite" as never)
