@@ -51,7 +51,6 @@ export function brokeredPreviewStorage() {
     new Promise((resolve) => {
       const requestId = newId();
       let done = false;
-      let timer: ReturnType<typeof setTimeout>;
       const finish = (r: { ok: boolean; value?: string | null } | null) => {
         if (done) return;
         done = true;
@@ -69,7 +68,12 @@ export function brokeredPreviewStorage() {
       if (value !== undefined) msg["value"] = value;
       // targetOrigin per trusted editor origin, so a session token never reaches an arbitrary embedder.
       for (const origin of editorOrigins) window.parent.postMessage(msg, origin);
-      timer = setTimeout(() => finish(null), TIMEOUT);
+      // Declared here rather than above `finish`, which reads it: `finish` can only
+      // run from the message listener or this timeout, and both are asynchronous,
+      // so nothing can reach the read before this line executes. The listener is
+      // registered a few lines up, but the intervening code is synchronous — a
+      // message event cannot be delivered in the gap.
+      const timer = setTimeout(() => finish(null), TIMEOUT);
     });
 
   // The editor may not be listening yet at the first getItem, so retry once.
