@@ -19,7 +19,7 @@ import { balanceSeries } from "@/lib/portfolioSummary";
 const scope: AccountScope = {
   kind: "account",
   accountId: "acct-1",
-  accountName: "Amir — TOD",
+  accountName: "Individual — TOD",
 };
 
 const series = balanceSeries([
@@ -40,9 +40,9 @@ const series = balanceSeries([
   {
     created_at: "2026-09-03T10:00:00Z",
     snapshot_date: "2026-09-03",
-    gross: 60_602.68,
-    net: 53_938.35,
-    margin_used: 6_664.33,
+    gross: 148_450,
+    net: 128_450,
+    margin_used: 20_000,
   },
 ]);
 

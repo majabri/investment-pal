@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Amir Investment Companion — dark-first, Apple-desktop feel.
+ * Investment Companion — dark-first, Apple-desktop feel.
  * Deep neutral surfaces + a single restrained accent (electric teal).
  * Semantic tokens only; never hardcode colors in components.
  */

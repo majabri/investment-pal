@@ -6,12 +6,14 @@
 // into one number. `AccountContext` existed and the switcher rendered, but the
 // data layer never read from it.
 //
-// Verified against Fidelity, Amir — TOD, 2026-09-03:
+// Verified against a Fidelity balances page, using the synthetic block in
+// src/lib/__tests__/balanceImport.test.ts — the real capture this was derived
+// from was removed in the 2026-09-05 P0 remediation:
 //
-//   cash market value        $0.38
-//   margin market value  $60,602.30
-//   net debit            −$6,664.33
-//   total account value  $53,938.35
+//   cash market value      $2,500.00
+//   margin market value  $145,950.00
+//   net debit            −$20,000.00
+//   total account value  $128,450.00
 //
 // Pure, so the arithmetic is testable against that statement without a database.
 

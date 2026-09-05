@@ -12,6 +12,7 @@ import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { PRODUCT_NAME } from "@/lib/branding";
 
 function NotFoundComponent() {
   return (
@@ -67,13 +68,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Amir Investment Companion" },
+      { title: PRODUCT_NAME },
       {
         name: "description",
         content:
           "Personal investment command center — daily brief, ChatGPT prompt builder, and journal for disciplined decision making.",
       },
-      { property: "og:title", content: "Amir Investment Companion" },
+      { property: "og:title", content: PRODUCT_NAME },
       {
         property: "og:description",
         content:

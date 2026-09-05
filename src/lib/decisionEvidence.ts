@@ -5,7 +5,7 @@
 // render, and they are deliberately pure — no React, no Supabase — so the
 // parsing rules are unit-testable on their own.
 //
-// OD-008 is RESOLVED (Amir, 2026-09-03): the canonical contract is the 14-field
+// OD-008 is RESOLVED (owner decision, 2026-09-03): the canonical contract is the 14-field
 // `recommendation.schema.json` in `08 APIs/contracts/`, plus `objective_id`
 // carried over from the superseded 10-field version. `supporting_evidence` is
 // an array of `{source_id, claim}` objects — provenance is part of the

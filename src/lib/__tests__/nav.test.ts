@@ -1,4 +1,4 @@
-// Mobile reachability is an acceptance criterion, not a nicety: Amir approves
+// Mobile reachability is an acceptance criterion, not a nicety: the owner approves
 // from an iPhone, so a route the phone cannot reach blocks approvals.
 //
 // Stage 3 collapsed 18 flat entries into 7 sections with tabs. That is

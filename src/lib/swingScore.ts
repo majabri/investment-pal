@@ -1,7 +1,7 @@
 // Swing Score — advisory trim signal (ADR-APP-002). Pure, deterministic functions
 // over daily closes from price_history. Higher score = more extended.
 // ADVISORY ONLY: this never sizes or places an order; it annotates a holding and
-// informs the committee. The committee decides; Amir executes at Fidelity.
+// informs the committee. The committee decides; the owner executes at their broker.
 
 export type SwingBand = "none" | "trim-partial" | "trim-large" | "earnings-hold";
 

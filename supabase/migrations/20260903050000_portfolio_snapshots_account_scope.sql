@@ -1,6 +1,6 @@
 -- Snapshots belong to an account (Stage 5).
 --
--- `portfolio_snapshots` was written with `scope = 'amir'` — a hardcoded string,
+-- `portfolio_snapshots` was written with a hardcoded personal scope string,
 -- one series for the whole household. Stage 1 removed exactly this defect from
 -- every live figure in the app: the dashboard, portfolio, goal and prompt
 -- totals used to blend TOD with the IRA, the kids' accounts, the 529s and
@@ -36,7 +36,7 @@ COMMENT ON COLUMN public.portfolio_snapshots.account_id IS
 COMMENT ON COLUMN public.portfolio_snapshots.snapshot_date IS
   'Calendar day the snapshot represents, in the owner''s local timezone. Supplied by the app, not derived from created_at, because the UTC date rolls over hours early west of Greenwich.';
 COMMENT ON COLUMN public.portfolio_snapshots.scope IS
-  'DEPRECATED (2026-09-03, Stage 5). A hardcoded ''amir''/''family'' string that predates account scoping. Use account_id.';
+  'DEPRECATED (2026-09-03, Stage 5). A hardcoded personal/household scope string that predates account scoping. Use account_id.';
 
 -- Best available fact about the legacy rows: the day they were created. It does
 -- not make them attributable to an account — only dateable.

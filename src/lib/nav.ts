@@ -7,7 +7,7 @@
 //
 // The property this file exists to keep testable: every route in the app is
 // reachable at 390px. The bug it replaced was `flatMap(...).slice(0, 5)` in
-// AppShell, which left 13 of 18 routes unreachable on a phone — and Amir
+// AppShell, which left 13 of 18 routes unreachable on a phone — and the owner
 // approves from a phone, so an unreachable route blocked approvals.
 import {
   LayoutDashboard,

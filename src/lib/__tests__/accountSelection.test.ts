@@ -63,7 +63,7 @@ describe("accountCategory", () => {
 
   test("any ordinary brokerage name is the holder's primary account", () => {
     // The point of the change: renaming the account must not reclassify it.
-    expect(accountCategory("Amir - TOD")).toBe("Primary");
+    expect(accountCategory("Owner - TOD")).toBe("Primary");
     expect(accountCategory("Individual - TOD")).toBe("Primary");
     expect(accountCategory("Brokerage")).toBe("Primary");
   });

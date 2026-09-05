@@ -124,7 +124,9 @@ export function BalanceImport() {
           rows={8}
           value={raw}
           placeholder={
-            "Total account value $53,938.35\nDay change +$1,196.68\nEquity percentage 89.00%\nNet debit −$6,664.33\n…"
+            // Synthetic shape only. This placeholder is RENDERED IN THE BROWSER,
+            // so it must never carry real balances (P0 remediation, 2026-09-05).
+            "Total account value $128,450.00\nDay change +$1,234.56\nEquity percentage 86.50%\nNet debit −$20,000.00\n…"
           }
           onChange={(e) => {
             setRaw(e.target.value);

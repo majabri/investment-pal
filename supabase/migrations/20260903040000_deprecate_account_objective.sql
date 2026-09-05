@@ -16,7 +16,7 @@
 --
 -- The brief says to delete them. Dropping a column destroys whatever is in it,
 -- irreversibly, on a database that deploys live the moment this merges — and
--- these columns may hold a target Amir typed and still means. Marking them
+-- these columns may hold a target the owner typed and still means. Marking them
 -- deprecated is the reversible half and costs nothing; the drop is a one-way
 -- door and is his to open. Settings shows any surviving value as an "unused
 -- account target" rather than hiding it, so nothing disappears silently in the

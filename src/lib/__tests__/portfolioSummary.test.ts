@@ -96,22 +96,22 @@ describe("performance never reports 0% for a window it cannot measure", () => {
   const series = balanceSeries([
     snap("2026-08-05T10:00:00Z", 50_000),
     snap("2026-09-01T10:00:00Z", 52_000),
-    snap("2026-09-03T10:00:00Z", 53_938.35),
+    snap("2026-09-03T10:00:00Z", 128_450),
   ]);
 
   test("a measurable window reports the change and the dates behind it", () => {
     const week = performance(series).find((p) => p.label === "1 week")!;
-    expect(week.change).toBeCloseTo(1_938.35, 2);
+    expect(week.change).toBeCloseTo(76_450, 2);
     expect(week.from).toBe("2026-09-01");
     expect(week.to).toBe("2026-09-03");
   });
 
   test("a window longer than the history is flagged, not silently shortened", () => {
-    // "1 month: +$3,938" over 29 days of history is a number that means
+    // "1 month: +$78,450" over 29 days of history is a number that means
     // something quite different from what its label says.
     const m = performance(series).find((p) => p.label === "1 month")!;
     expect(m.truncated).toBe(true);
-    expect(m.change).toBeCloseTo(3_938.35, 2);
+    expect(m.change).toBeCloseTo(78_450, 2);
   });
 
   test("year to date anchors to 1 January, not to 365 days back", () => {
@@ -120,20 +120,20 @@ describe("performance never reports 0% for a window it cannot measure", () => {
     const spanning = balanceSeries([
       snap("2025-11-01T10:00:00Z", 40_000),
       snap("2026-01-02T10:00:00Z", 50_000),
-      snap("2026-09-03T10:00:00Z", 53_938.35),
+      snap("2026-09-03T10:00:00Z", 128_450),
     ]);
     const ytd = performance(spanning).find((p) => p.label === "Year to date")!;
     expect(ytd.from).toBe("2026-01-02");
-    expect(ytd.change).toBeCloseTo(3_938.35, 2);
+    expect(ytd.change).toBeCloseTo(78_450, 2);
     // All time reaches back into the previous year, and is larger.
     const all = performance(spanning).find((p) => p.label === "All time")!;
-    expect(all.change).toBeCloseTo(13_938.35, 2);
+    expect(all.change).toBeCloseTo(88_450, 2);
   });
 
   test("year to date is truncated when the history starts mid-year", () => {
     const midYear = balanceSeries([
       snap("2026-08-05T10:00:00Z", 50_000),
-      snap("2026-09-03T10:00:00Z", 53_938.35),
+      snap("2026-09-03T10:00:00Z", 128_450),
     ]);
     expect(performance(midYear).find((p) => p.label === "Year to date")!.truncated).toBe(true);
   });
@@ -143,7 +143,7 @@ describe("performance never reports 0% for a window it cannot measure", () => {
   });
 
   test("with a single point, every window is unknown rather than flat", () => {
-    const one = balanceSeries([snap("2026-09-03T10:00:00Z", 53_938.35)]);
+    const one = balanceSeries([snap("2026-09-03T10:00:00Z", 128_450)]);
     for (const entry of performance(one)) {
       expect(entry.change).toBeNull();
       expect(entry.changePct).toBeNull();
@@ -169,11 +169,11 @@ describe("performance never reports 0% for a window it cannot measure", () => {
 
   test("a loss is reported as a loss", () => {
     const down = balanceSeries([
-      snap("2026-09-01T10:00:00Z", 60_000),
-      snap("2026-09-03T10:00:00Z", 53_938.35),
+      snap("2026-09-01T10:00:00Z", 135_000),
+      snap("2026-09-03T10:00:00Z", 128_450),
     ]);
     const all = performance(down).find((p) => p.label === "All time")!;
-    expect(all.change).toBeCloseTo(-6_061.65, 2);
+    expect(all.change).toBeCloseTo(-6_550, 2);
     expect(all.changePct!).toBeLessThan(0);
   });
 
@@ -281,16 +281,16 @@ describe("event sources say what they cannot show", () => {
 
 describe("the metric row", () => {
   test("reads straight off accountTotals and reconciles to the statement", () => {
-    const totals = accountTotals([{ quantity: 100, cost_basis: 500, current_price: 606.023 }], {
-      cash: 0.38,
-      margin_used: 6_664.33,
+    const totals = accountTotals([{ quantity: 100, cost_basis: 500, current_price: 1_459.5 }], {
+      cash: 2_500,
+      margin_used: 20_000,
     });
     const metrics = summaryMetrics(totals);
     const value = (label: string) => metrics.find((m) => m.label === label)!.value;
-    expect(value("Total account value")!).toBeCloseTo(53_938.35, 2);
-    expect(value("Investments")!).toBeCloseTo(60_602.3, 2);
-    expect(value("Margin debit")!).toBeCloseTo(6_664.33, 2);
-    expect(value("Equity")!).toBeCloseTo(0.89, 3);
+    expect(value("Total account value")!).toBeCloseTo(128_450, 2);
+    expect(value("Investments")!).toBeCloseTo(145_950, 2);
+    expect(value("Margin debit")!).toBeCloseTo(20_000, 2);
+    expect(value("Equity")!).toBeCloseTo(0.8653, 3);
   });
 
   test("no totals means every metric is unknown, not zero", () => {
@@ -311,7 +311,7 @@ describe("chart ranges", () => {
     snap("2025-09-03T10:00:00Z", 30_000),
     snap("2026-03-03T10:00:00Z", 45_000),
     snap("2026-08-20T10:00:00Z", 52_000),
-    snap("2026-09-03T10:00:00Z", 53_938.35),
+    snap("2026-09-03T10:00:00Z", 128_450),
   ]);
 
   test("a range keeps only the points inside it", () => {

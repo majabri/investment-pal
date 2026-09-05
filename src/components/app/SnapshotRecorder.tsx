@@ -6,7 +6,7 @@
 // how a series acquires duplicate days that then disagree.
 //
 // Scoped, like everything else after Stage 1. The old writer stamped every row
-// `scope = 'amir'`: one series for the whole household, so the chart kept
+// a single hardcoded scope string: one series for the whole household, so the chart kept
 // blending TOD with the IRA, the kids' accounts, the 529s and crypto long after
 // the live figures stopped.
 import { useEffect } from "react";
