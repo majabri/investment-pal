@@ -516,3 +516,93 @@ Unchanged from 2026-09-03, plus two new items:
   (1354 errors, 48 warnings, 1340 auto-fixable — almost entirely prettier).
   Identical under eslint 9 and 10. Either add lint to CI and pay the backlog
   down, or accept the config is advisory; right now it is neither.
+
+---
+
+## 2026-09-05 — Master Brief (user-agnostic rebuild), Phase 0: P0 personal-data remediation
+
+Authority: the USER-AGNOSTIC FINANCIAL TRUTH & RECONCILIATION STANDARD (37
+rules). Phase 0 is the separate `P0-REMEDIATION-remove-personal-data` brief:
+real personal and financial data had been committed to a public repo and sat
+there for two days. Four PRs, all merged.
+
+| PR | tier | what |
+|---|---|---|
+| #136 | 1 + 4 + §4 | real names, balances and figures out of `src/` and `supabase/`; reintroduction guard added |
+| #137 | 3 | the office identity in the v5/v6 constitutions becomes configuration (rule 23) |
+| #138 | 2 | new users provisioned neutrally; an unset objective stays unset (rule 13) |
+
+### The briefs were repeatedly incomplete, and sweeping beat reading
+
+Every tier found more than the brief listed. Tier 1's file list missed four
+files. Tier 3 named four prompt sites; there are **six** — the brief missed
+the v6 title line and the v6 body line, both inside template
+strings. Tier 2's instruction ("provision no goals row") would have made the
+app unusable: there is no create-a-goal path in the UI, so a user with no row
+could never set an objective. Trusted `main` over the brief and said so, per the
+brief's own closing line.
+
+**Method that worked:** grep the whole tree for the class of defect, then read
+the brief to check nothing in it was missed — not the other way round.
+
+### Rule 13 is a schema property, not a display rule
+
+`goals.starting_value / target_value / target_date` were `NOT NULL` with one
+person's numbers as defaults. Nullable columns alone are not the fix; five
+consumers silently treated `0` as real. `src/lib/objective.ts` now decides
+**once** whether an objective is usable, and a *partially* filled objective is
+`unset` — computing a required CAGR from two real fields and a default for the
+third is exactly the fabrication the nullability exists to prevent.
+
+The progress bar is the clearest case: it used to render at 0%. A bar at zero
+claims *no progress*, which is a different statement from *unknown*. It now
+renders no bar.
+
+### Fixing half a defect looks exactly like fixing it
+
+The lesson of the session. The unset objective reached the model in two places:
+the data block's `Goal:` line, and the **mandate** — seventeen sites across the
+v5/v6 constitutions. Fixing the first left the committee reading
+
+> *"maximize the probability of growing the X portfolio from approximately **$0**
+> to **$0** by **—**."*
+
+...which is the stronger claim of the two, since it is the mandate rather than a
+data field. Copilot found it. The data-block fix had made the PR *look* done.
+
+The repair changed the shape, not just the values: `PromptContext` carries the
+`Objective` discriminated union instead of three loose fields. Nullable fields
+would have fixed the instance and left the cause — three independently-supplied
+values, each with an obvious wrong default to hand.
+
+### Negative controls, again, and the recurring failure mode
+
+Four times now a control has been **coarser than the fault it claims to
+disprove**, and each time the test was passing for the wrong reason:
+
+- #134: the row fixture was already canonical, so deleting the normaliser
+  changed nothing.
+- #136: the guard's allowlist was per-*file*, hiding a real figure in a file
+  exempted for a different needle. Now per file **and** per needle.
+- #138: `expect(out).toContain("NOT SET")` passes regardless — the margin-rate
+  line already says it. Anchored to the goal line, the control then bit.
+
+**The rule this settles into:** a control must inject the *precise* fault. A
+coarser one (breaking matching outright rather than removing normalisation)
+proves only that the test runs.
+
+### Found outside the brief, higher severity than what it targets
+
+Not touched, and reported to Amir for decision:
+
+- **Children's names are load-bearing in application logic** —
+  `accountGroups.ts` classifies accounts by matching a hardcoded list of first
+  names, and the same names are interpolated into prompts. Phase 1b removes
+  this as a side effect of classifying on metadata rather than names.
+- **Three minors' birth dates** in `familyPolicy.ts`, money-adjacent via
+  age-based allocation.
+- **Account-number-shaped strings** in `kidsSeed.ts`.
+- **Git history** still contains everything removed. §5's `git filter-repo` and
+  force-push is explicitly Amir's decision and was not attempted.
+- One **applied** migration's comment still names him; not edited in place
+  (checksum risk), so it needs a forward migration or acceptance.

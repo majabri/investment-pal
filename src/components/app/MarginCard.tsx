@@ -26,10 +26,9 @@ export function MarginCard({
    * The margin debit, or NULL when the account does not know it (Phase 1a).
    *
    * NULL and 0 read differently and are fixed differently: NULL means nobody
-   * has recorded a loan, 0 means the broker reported none. This card used to
-   * show "Not set — click \u270e" for both, so an account the broker confirmed
-   * carries no margin was indistinguishable from one whose loan has never been
-   * entered.
+   * has recorded a loan, 0 means the broker reported none. This card showed
+   * "Not set" for both, so an account the broker confirmed carries no margin
+   * was indistinguishable from one whose loan has never been entered.
    */
   marginUsed: number | null;
 }) {
