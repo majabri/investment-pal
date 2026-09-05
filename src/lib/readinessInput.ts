@@ -9,11 +9,15 @@ import { DEFAULT_TOLERANCE, reconcileAccount } from "./reconciliation";
 import { reconciliationInputFor, type ProvenancedAccount } from "./reconciliationInput";
 import { runChecks, type ReadinessCheck, type ReadinessInput } from "./readiness";
 import type { PolicySource } from "./policy";
+import { openOrdersKnown } from "./orders";
 
 export type ReadinessAccount = ProvenancedAccount & {
   cash: number | null;
   margin_enabled: boolean | null;
   margin_used: number | null;
+  /** Phase 6: when the app was last told about this account's orders. */
+  orders_as_of?: string | null;
+  orders_source?: string | null;
 };
 
 export function readinessInputFor({
@@ -74,10 +78,21 @@ export function readinessInputFor({
     cash: account?.cash ?? null,
     marginEnabled: account?.margin_enabled ?? null,
     marginUsed: account?.margin_used ?? null,
-    // There is no order model yet — Phase 6. `false` is the honest value, and
-    // rule 30 requires the app to say "unavailable" rather than let a
-    // recommendation assume nothing is committed to an open order.
-    openOrdersKnown: false,
+    // Phase 6 gave this an answer other than a hardcoded `false`. It is still
+    // `false` for every account nobody has told the app about, which is the
+    // shipped state and the honest one — and it becomes true only when the
+    // orders were reported recently enough to decide from. An account with a
+    // timestamp and no order rows IS known: the source was read and reported
+    // nothing working (rule 30).
+    openOrdersKnown: openOrdersKnown(
+      account === null
+        ? null
+        : {
+            orders_as_of: account.orders_as_of ?? null,
+            orders_source: account.orders_source ?? null,
+          },
+      now,
+    ),
     policySource,
   };
 }
