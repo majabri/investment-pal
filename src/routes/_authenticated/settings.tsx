@@ -144,9 +144,12 @@ function IpsLiteCard() {
  * which NOTHING read. Setting a target there looked like setting a target and
  * set nothing.
  *
- * The account-level fields are no longer written (see AccountCard). This card
- * edits the row the app actually uses, so Settings and the goal screen are two
- * views of one objective rather than two objectives.
+ * As of Phase 4 the per-account fields ARE written and read — `/kids` and the
+ * committee prompt take each account's own target and horizon, where they used
+ * to take FAMILY_POLICY's constants (rule 20). That is a different scope, not
+ * a second copy: this card edits the user's PRIMARY objective, and the account
+ * editor below edits one account's own. `starting_value` is still not written
+ * per account, because nothing measures an account's progress from it.
  */
 function ObjectiveCard() {
   const { data: goal, update } = useGoal();
