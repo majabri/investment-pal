@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { fmtUSD, fmtPct, yearsBetween } from "@/lib/finance";
+import { UNAVAILABLE, usdOrUnavailable } from "@/lib/unavailable";
 import {
   FAMILY_POLICY,
   ageOf,
@@ -33,7 +34,7 @@ function KidsPage() {
         key: a.name.toLowerCase(),
         name: a.name,
         accountNumber: "",
-        cash: Number(a.cash ?? 0),
+        cash: a.cash === null || a.cash === undefined ? null : Number(a.cash),
         holdings: allHoldings
           .filter((h) => h.account_id === a.id)
           .map((h) => ({
@@ -102,10 +103,14 @@ function KidsPage() {
     day: "numeric",
   });
   const approved = approvedSymbols();
-  const familyTotal = liveKids.reduce(
-    (s, k) => s + k.cash + k.holdings.reduce((x, h) => x + h.shares * h.price, 0),
-    0,
-  );
+  // All-or-nothing: a family total that quietly omits one child's cash is not
+  // the family's total (Phase 1a).
+  const familyTotal = liveKids.some((k) => k.cash === null)
+    ? null
+    : liveKids.reduce(
+        (s, k) => s + (k.cash as number) + k.holdings.reduce((x, h) => x + h.shares * h.price, 0),
+        0,
+      );
 
   return (
     <AppShell
@@ -116,17 +121,24 @@ function KidsPage() {
         <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 pt-6 text-sm">
           <span>
             <span className="text-muted-foreground">Family value</span>{" "}
-            <strong className="tabular-nums">{fmtUSD(familyTotal)}</strong>
+            <strong className="tabular-nums">{usdOrUnavailable(familyTotal)}</strong>
           </span>
           <span>
             <span className="text-muted-foreground">Family target (2036)</span>{" "}
             <strong className="tabular-nums">{fmtUSD(FAMILY_POLICY.familyTarget)}</strong>
           </span>
-          <span className="min-w-40 flex-1">
-            <Progress value={(familyTotal / FAMILY_POLICY.familyTarget) * 100} />
-          </span>
+          {/* No bar when the total is unknown. A bar at 0% claims no progress,
+              which is a different statement from "we cannot say" — the same
+              call made for the goal progress bar in the P0 remediation. */}
+          {familyTotal !== null && (
+            <span className="min-w-40 flex-1">
+              <Progress value={(familyTotal / FAMILY_POLICY.familyTarget) * 100} />
+            </span>
+          )}
           <span className="tabular-nums text-muted-foreground">
-            {fmtPct(familyTotal / FAMILY_POLICY.familyTarget)}
+            {familyTotal === null
+              ? UNAVAILABLE
+              : fmtPct(familyTotal / FAMILY_POLICY.familyTarget)}
           </span>
           <RefreshPricesButton symbols={allSymbols} />
         </CardContent>
@@ -135,14 +147,23 @@ function KidsPage() {
       <div className="grid gap-6 xl:grid-cols-3">
         {liveKids.map((kid) => {
           const mv = kid.holdings.reduce((s, h) => s + h.shares * h.price, 0);
-          const total = mv + kid.cash;
-          const req = requiredCagrWithContributions(
-            total,
-            FAMILY_POLICY.targetPerChild,
-            years,
-            FAMILY_POLICY.contribution.amountUsd,
-          );
-          const at10 = fvWithContributions(total, 0.1, years, FAMILY_POLICY.contribution.amountUsd);
+          const total = kid.cash === null ? null : mv + kid.cash;
+          // Every projection below starts FROM the account value. Without it
+          // they are not conservative or approximate, they are arbitrary — and
+          // "Behind"/"On Track" is a verdict, which is worse than a wrong number.
+          const req =
+            total === null
+              ? null
+              : requiredCagrWithContributions(
+                  total,
+                  FAMILY_POLICY.targetPerChild,
+                  years,
+                  FAMILY_POLICY.contribution.amountUsd,
+                );
+          const at10 =
+            total === null
+              ? null
+              : fvWithContributions(total, 0.1, years, FAMILY_POLICY.contribution.amountUsd);
           const approvedShare =
             kid.holdings
               .filter((h) => approved.has(h.symbol))
@@ -151,7 +172,7 @@ function KidsPage() {
             (a, b) => b.shares * b.price - a.shares * a.price,
           )[0];
           const empty = kid.holdings.length === 0;
-          const status = req <= 0.08 ? "Ahead" : req <= 0.12 ? "On Track" : "Behind";
+          const status = req === null ? null : req <= 0.08 ? "Ahead" : req <= 0.12 ? "On Track" : "Behind";
           const child = FAMILY_POLICY.children.find((c) => c.key === kid.key);
           const age = child ? ageOf(child.birthDate) : undefined;
           return (
@@ -160,21 +181,27 @@ function KidsPage() {
                 <CardTitle className="text-base">
                   {kid.name} ({age})
                 </CardTitle>
-                <span className="tabular-nums text-sm font-semibold">{fmtUSD(total)}</span>
+                <span className="tabular-nums text-sm font-semibold">
+                  {usdOrUnavailable(total)}
+                </span>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div>
                   <div className="mb-1 flex justify-between text-xs text-muted-foreground">
                     <span>Progress toward {fmtUSD(FAMILY_POLICY.targetPerChild)}</span>
                     <span className="tabular-nums">
-                      {fmtPct(total / FAMILY_POLICY.targetPerChild)}
+                      {total === null
+                        ? UNAVAILABLE
+                        : fmtPct(total / FAMILY_POLICY.targetPerChild)}
                     </span>
                   </div>
-                  <Progress value={(total / FAMILY_POLICY.targetPerChild) * 100} />
+                  {total !== null && (
+                    <Progress value={(total / FAMILY_POLICY.targetPerChild) * 100} />
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                   <span className="text-muted-foreground">Required CAGR</span>
-                  <span className="tabular-nums">{fmtPct(req)}</span>
+                  <span className="tabular-nums">{req === null ? UNAVAILABLE : fmtPct(req)}</span>
                   <span className="text-muted-foreground">Status</span>
                   <span
                     className={
@@ -185,10 +212,10 @@ function KidsPage() {
                           : "text-amber-500"
                     }
                   >
-                    {status}
+                    {status ?? UNAVAILABLE}
                   </span>
                   <span className="text-muted-foreground">Projected @10%</span>
-                  <span className="tabular-nums">{fmtUSD(at10)}</span>
+                  <span className="tabular-nums">{usdOrUnavailable(at10)}</span>
                   <span className="text-muted-foreground">In approved names</span>
                   <span className="tabular-nums">{fmtPct(approvedShare)}</span>
                   <span className="text-muted-foreground">Largest position</span>
@@ -198,7 +225,9 @@ function KidsPage() {
                       : "—"}
                   </span>
                   <span className="text-muted-foreground">Cash</span>
-                  <span className="tabular-nums">{fmtUSD(kid.cash, 2)}</span>
+                  <span className="tabular-nums">
+                    {kid.cash === null ? UNAVAILABLE : fmtUSD(kid.cash, 2)}
+                  </span>
                   {(() => {
                     const cost = kid.holdings.reduce((c, h) => c + h.shares * h.avgCost, 0);
                     const gl = mv - cost;

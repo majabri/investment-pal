@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD, fmtPct } from "@/lib/finance";
+import { usdOrUnavailable } from "@/lib/unavailable";
 import { cn } from "@/lib/utils";
 
 const KID_ORDER = ["Karim", "Zain", "Jude"];
@@ -65,16 +66,25 @@ export function KidsCategoryDashboard({
 
   const rows = kidAccounts.map(({ a, kid }) => {
     const hs = allHoldings.filter((h) => h.account_id === a.id);
-    const value = hs.reduce((s, h) => s + h.quantity * px(h), 0) + Number(a.cash ?? 0);
+    // `Number(a.cash ?? 0)` used to make a never-populated account report its
+    // positions as its whole value — right-looking, and short by the cash
+    // (Phase 1a, rule 13). The positions are still known; the account VALUE is
+    // not, and only it goes unavailable.
+    const mv = hs.reduce((s, h) => s + h.quantity * px(h), 0);
+    const cash = a.cash === null || a.cash === undefined ? null : Number(a.cash);
+    const value = cash === null ? null : mv + cash;
     const cost = hs.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
-    const mv = value - Number(a.cash ?? 0);
     const day = hs.reduce((s, h) => {
       const q = quotes?.[h.symbol];
       return q && q.prevClose > 0 ? s + h.quantity * (q.price - q.prevClose) : s;
     }, 0);
     return { a, kid, hs, value, cost, mv, day };
   });
-  const total = rows.reduce((s, r) => s + r.value, 0);
+  // All-or-nothing, like every other blend after Phase 1a: a group total that
+  // silently omits one child's account is not the group's total.
+  const total = rows.some((r) => r.value === null)
+    ? null
+    : rows.reduce((s, r) => s + (r.value as number), 0);
   const totalDay = rows.reduce((s, r) => s + r.day, 0);
 
   const sortVal = (
@@ -98,7 +108,7 @@ export function KidsCategoryDashboard({
   return (
     <AppShell title={title} subtitle={subtitle}>
       <div className="mb-4 rounded-xl border bg-card/60 px-4 py-2 text-sm">
-        <span className="font-semibold">{fmtUSD(total)}</span>
+        <span className="font-semibold">{usdOrUnavailable(total)}</span>
         <span
           className={cn("ml-2 tabular-nums", totalDay >= 0 ? "text-emerald-500" : "text-red-500")}
         >
@@ -106,7 +116,7 @@ export function KidsCategoryDashboard({
           {fmtUSD(totalDay)} today
         </span>
         <span className="ml-3 text-muted-foreground">
-          {rows.map((r) => `${r.kid} ${fmtUSD(r.value)}`).join(" · ")}
+          {rows.map((r) => `${r.kid} ${usdOrUnavailable(r.value)}`).join(" · ")}
         </span>
       </div>
       {rows.length === 0 && (
@@ -134,7 +144,9 @@ export function KidsCategoryDashboard({
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="mb-1 text-lg font-semibold tabular-nums">{fmtUSD(value)}</div>
+                <div className="mb-1 text-lg font-semibold tabular-nums">
+                  {usdOrUnavailable(value)}
+                </div>
                 <div className="mb-2 text-xs text-muted-foreground">
                   {gl != null && (
                     <span className={cn(gl >= 0 ? "text-emerald-500" : "text-red-500")}>
@@ -142,9 +154,11 @@ export function KidsCategoryDashboard({
                       {fmtPct(gl)} total
                     </span>
                   )}
-                  {Number(a.cash ?? 0) > 0 && (
-                    <span className="ml-2">cash {fmtUSD(Number(a.cash ?? 0), 2)}</span>
-                  )}
+                  {a.cash === null || a.cash === undefined ? (
+                    <span className="ml-2">cash not known</span>
+                  ) : Number(a.cash) > 0 ? (
+                    <span className="ml-2">cash {fmtUSD(Number(a.cash), 2)}</span>
+                  ) : null}
                 </div>
                 {hs.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No positions.</p>

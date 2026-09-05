@@ -6,6 +6,7 @@
 // constraint is only half the fix — the other half is that nothing downstream
 // may quietly turn the resulting NULL back into a number.
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import { sumField, type BalanceFields } from "../accountAggregate";
 import {
@@ -15,11 +16,23 @@ import {
   type MarginPolicy,
 } from "../marginCost";
 import {
+  NOT_KNOWN,
   UNAVAILABLE,
   numberOrUnknown,
+  usdOrNotKnown,
   usdOrUnavailable,
   pctOrUnavailable,
 } from "../unavailable";
+import {
+  buildV5Prompt,
+  buildV6Prompt,
+  buildUniversalPrompt,
+  buildMorningPrompt,
+  buildEODPrompt,
+  buildWeeklyPrompt,
+  buildMiddayPrompt,
+  type PromptContext,
+} from "../prompts";
 
 const account = (over: Partial<BalanceFields>): BalanceFields => ({
   cash: 100,
@@ -141,5 +154,130 @@ describe("what a number box means when the figure may be unknown", () => {
   test("ordinary figures survive, negatives included", () => {
     expect(numberOrUnknown("23119.31")).toBe(23_119.31);
     expect(numberOrUnknown("-12.5")).toBe(-12.5);
+  });
+});
+
+// The committee prompt is the highest-stakes renderer of an unknown balance.
+// The figures below sit inside a block headed "MY VERIFIED DATA — GROUND EVERY
+// RECOMMENDATION ONLY IN THIS", so a fabricated $0.00 is not a display defect:
+// it is a false premise the model is instructed to reason from, and position
+// sizing is expressed as a percentage of exactly these numbers.
+describe("an unknown balance reaches the committee as unknown", () => {
+  const base: PromptContext = {
+    accountName: "Growth Brokerage",
+    portfolioValue: null,
+    grossValue: null,
+    cash: null,
+    marginUsed: null,
+    buyingPower: null,
+    todaysPL: 120,
+    todaysPLPct: null,
+    objective: { kind: "unset", missing: [] },
+    requiredCagr: null,
+    probability: null,
+    holdings: [{ symbol: "ABC", quantity: 10, costBasis: 5, currentPrice: 8 }],
+    priorities: [],
+    userNotes: "",
+  };
+
+  const builders: Array<[string, (c: PromptContext) => string]> = [
+    ["v6", (c) => buildV6Prompt({ ...c, meeting: "Morning" })],
+    ["v5", (c) => buildV5Prompt({ ...c, meeting: "Morning" })],
+    ["universal", (c) => buildUniversalPrompt({ ...c, meeting: "Morning" })],
+    ["morning", buildMorningPrompt],
+    ["eod", (c) => buildEODPrompt({ ...c, tradesToday: "(none)" })],
+    ["weekly", buildWeeklyPrompt],
+    ["midday", buildMiddayPrompt],
+  ];
+
+  for (const [name, build] of builders) {
+    test(`${name}: says NOT KNOWN rather than $0.00`, () => {
+      const out = build(base);
+      expect(out).toContain("Cash: NOT KNOWN | Margin used: NOT KNOWN | Buying power: NOT KNOWN");
+      expect(out).toContain("Account value (NET, investments + cash − margin): NOT KNOWN");
+      expect(out).not.toContain("Cash: $0.00");
+      expect(out).not.toContain("Margin used: $0.00");
+    });
+
+    test(`${name}: states no concentration it cannot compute`, () => {
+      // Every position read "0.0% of acct", which tells the committee that
+      // nothing breaches the position cap — a governance conclusion drawn from
+      // an account value nobody supplied.
+      const out = build(base);
+      expect(out).toContain("(NOT KNOWN of acct)");
+      expect(out).not.toContain("(0.0% of acct)");
+    });
+
+    test(`${name}: known balances still render as figures`, () => {
+      // The unknown path must not swallow the normal one.
+      const out = build({
+        ...base,
+        portfolioValue: 80_000,
+        grossValue: 100_000,
+        cash: 2_500,
+        marginUsed: 20_000,
+        buyingPower: 5_000,
+        todaysPLPct: 0.0015,
+      });
+      expect(out).toContain("Cash: $2,500.00 | Margin used: $20,000.00 | Buying power: $5,000.00");
+      expect(out).not.toContain("NOT KNOWN of acct");
+      expect(out).toContain("Account equity: 80.0%");
+    });
+
+    test(`${name}: a real zero balance still renders as zero`, () => {
+      // The distinction is the point. If 0 also became NOT KNOWN, the fix would
+      // have destroyed the other half of it.
+      const out = build({
+        ...base,
+        portfolioValue: 100_000,
+        grossValue: 100_000,
+        cash: 0,
+        marginUsed: 0,
+        buyingPower: 0,
+      });
+      expect(out).toContain("Cash: $0.00 | Margin used: $0.00 | Buying power: $0.00");
+    });
+  }
+});
+
+describe("the two registers stay one decision", () => {
+  test("the UI word and the prompt word are different", () => {
+    // Two audiences, two registers. A stat card reading "NOT KNOWN" shouts; a
+    // prompt reading "Unavailable" is a phrase a model may read as a value.
+    expect(UNAVAILABLE).not.toBe(NOT_KNOWN);
+  });
+
+  test("neither is the dash reserved for no-scope", () => {
+    expect(UNAVAILABLE).not.toBe("—");
+    expect(NOT_KNOWN).not.toBe("—");
+  });
+
+  test("the prompt helper agrees with the prompt builders' vocabulary", () => {
+    // Every prompt surface must route through this, not through the UI helper —
+    // two of them did not, and rendered "Unavailable" into prompt text
+    // (Copilot, #141).
+    expect(usdOrNotKnown(null)).toBe(NOT_KNOWN);
+    expect(usdOrNotKnown(undefined)).toBe(NOT_KNOWN);
+    expect(usdOrNotKnown(Number.NaN)).toBe(NOT_KNOWN);
+  });
+
+  test("a real zero still renders as a figure in prompt text", () => {
+    expect(usdOrNotKnown(0)).toBe("$0.00");
+    expect(usdOrNotKnown(0, 2)).toBe("$0.00");
+  });
+
+  test("no prompt surface leaks the UI wording", () => {
+    // The IRA and kids prompt builders are not in the seven above — they build
+    // their own text — so this asserts the rule where those two live.
+    for (const file of [
+      "src/routes/_authenticated/ira.tsx",
+      "src/routes/_authenticated/kids-prompt-center.tsx",
+    ]) {
+      const code = readFileSync(file, "utf8");
+      const promptLines = code
+        .split("\n")
+        .filter((l) => l.includes("usdOrUnavailable") && l.includes("`"));
+      expect(promptLines).toEqual([]);
+    }
   });
 });

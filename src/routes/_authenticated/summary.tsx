@@ -91,7 +91,9 @@ function SummaryPage() {
     accruedMtd: latestBalance?.margin_interest_accrued_mtd ?? null,
     importedAt: latestBalance?.imported_at ?? null,
     hasImport: Boolean(latestBalance),
-    marginUsed: totals?.marginDebit ?? 0,
+    // `?? 0` would estimate the cost of borrowing as nil for an account whose
+    // loan is unknown (Phase 1a).
+    marginUsed: totals?.marginDebit ?? null,
     policy: ipsLite,
   });
 
@@ -111,12 +113,15 @@ function SummaryPage() {
       {/* One writer for the series, shared with the Morning Brief. Two writers
           with slightly different "already recorded today?" checks is how a
           series acquires duplicate days that then disagree. */}
+      {/* Nulls, not zeroes. A snapshot is a permanent append-only row, and one
+          derived from an unknown balance is a wrong day in the series that
+          every later chart and reconciliation reads as fact. */}
       <SnapshotRecorder
-        gross={totals?.grossValue ?? 0}
-        net={totals?.totalAccountValue ?? 0}
-        marginUsed={totals?.marginDebit ?? 0}
+        gross={totals?.grossValue ?? null}
+        net={totals?.totalAccountValue ?? null}
+        marginUsed={totals?.marginDebit ?? null}
       />
-      <ReconciliationBanner computedTotal={totals?.totalAccountValue ?? 0} />
+      <ReconciliationBanner computedTotal={totals?.totalAccountValue ?? null} />
 
       <SummaryHeader scope={scope} totals={totals} day={day} />
       <SummaryMetricRow scope={scope} totals={totals} interest={interest} policy={ipsLite} />

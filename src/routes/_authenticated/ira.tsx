@@ -11,6 +11,7 @@ import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { accountCategory } from "@/lib/data/accountGroups";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD, fmtPct } from "@/lib/finance";
+import { usdOrNotKnown, usdOrUnavailable } from "@/lib/unavailable";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/ira")({ component: Page });
@@ -45,22 +46,31 @@ function Page() {
 
   const rows = iraAccounts.map((a) => {
     const hs = allHoldings.filter((h) => h.account_id === a.id);
-    const value = hs.reduce((s, h) => s + h.quantity * px(h), 0) + Number(a.cash ?? 0);
+    // Positions stay known; the account VALUE is unknown without the cash
+    // (Phase 1a, rule 13). `?? 0` made an unpopulated account report its
+    // positions as its whole value — short by the cash, and stated as fact.
+    const positions = hs.reduce((s, h) => s + h.quantity * px(h), 0);
+    const cash = a.cash === null || a.cash === undefined ? null : Number(a.cash);
+    const value = cash === null ? null : positions + cash;
     const cost = hs.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
     const day = hs.reduce((s, h) => {
       const q = quotes?.[h.symbol];
       return q && q.prevClose > 0 ? s + h.quantity * (q.price - q.prevClose) : s;
     }, 0);
-    return { a, hs, value, cost, day };
+    return { a, hs, value, cost, day, cash };
   });
-  const total = rows.reduce((s, r) => s + r.value, 0);
+  const total = rows.some((r) => r.value === null)
+    ? null
+    : rows.reduce((s, r) => s + (r.value as number), 0);
   const totalDay = rows.reduce((s, r) => s + r.day, 0);
 
   const prompt = useMemo(() => {
     const data = rows
       .map(
         (r) =>
-          `${r.a.name}: ${fmtUSD(r.value)} (cash ${fmtUSD(Number(r.a.cash ?? 0), 2)})` +
+          // Into a prompt: an unknown balance rendered as "$0.00" reaches the
+          // model as a fact about the account, which it then reasons from.
+          `${r.a.name}: ${usdOrNotKnown(r.value)} (cash ${usdOrNotKnown(r.cash, 2)})` +
           (r.hs.length
             ? " — " +
               r.hs
@@ -96,7 +106,7 @@ End with a one-page Retirement Action Sheet.
 
 MY VERIFIED DATA (live prices as of ${new Date().toLocaleString("en-US")})
 ${data || "(no IRA accounts found — import from Fidelity or add in Settings)"}
-IRA total: ${fmtUSD(total)}`;
+IRA total: ${usdOrNotKnown(total)}`;
   }, [rows, total]);
 
   return (
@@ -106,7 +116,7 @@ IRA total: ${fmtUSD(total)}`;
     >
       <div className="mb-4 flex items-center gap-3">
         <div className="text-sm">
-          <span className="font-semibold">{fmtUSD(total)}</span>
+          <span className="font-semibold">{usdOrUnavailable(total)}</span>
           <span
             className={cn("ml-2 tabular-nums", totalDay >= 0 ? "text-emerald-500" : "text-red-500")}
           >
@@ -146,10 +156,15 @@ IRA total: ${fmtUSD(total)}`;
               </span>
             </CardHeader>
             <CardContent>
-              <div className="mb-2 text-lg font-semibold tabular-nums">{fmtUSD(value)}</div>
+              <div className="mb-2 text-lg font-semibold tabular-nums">
+                {usdOrUnavailable(value)}
+              </div>
               {hs.length === 0 && (
                 <p className="text-sm text-muted-foreground">
-                  No positions — cash {fmtUSD(Number(a.cash ?? 0), 2)}
+                  No positions — cash{" "}
+                  {a.cash === null || a.cash === undefined
+                    ? "not known"
+                    : fmtUSD(Number(a.cash), 2)}
                 </p>
               )}
               {hs.map((h) => {

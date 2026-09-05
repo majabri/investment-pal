@@ -11,6 +11,7 @@ import { KIDS_SEED, type KidAccount } from "@/lib/data/kidsSeed";
 import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD } from "@/lib/finance";
+import { usdOrNotKnown } from "@/lib/unavailable";
 
 export const Route = createFileRoute("/_authenticated/kids-prompt-center")({ component: Page });
 
@@ -25,7 +26,7 @@ function Page() {
         key: a.name.toLowerCase(),
         name: a.name,
         accountNumber: "",
-        cash: Number(a.cash ?? 0),
+        cash: a.cash === null || a.cash === undefined ? null : Number(a.cash),
         holdings: allHoldings
           .filter((h) => h.account_id === a.id)
           .map((h) => ({
@@ -59,7 +60,12 @@ function Page() {
         );
         const mv = live.reduce((s, h) => s + h.shares * h.price, 0);
         return (
-          `${k.name}: ${fmtUSD(mv + k.cash)} (cash ${fmtUSD(k.cash, 2)}) — ` +
+          // Into a prompt: "$0.00" for an unknown balance reaches the model as
+          // a fact about the account, which it then reasons from (Phase 1a).
+          `${k.name}: ${usdOrNotKnown(k.cash === null ? null : mv + k.cash)} (cash ${usdOrNotKnown(
+            k.cash,
+            2,
+          )}) — ` +
           live
             .map(
               (h) =>

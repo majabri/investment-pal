@@ -196,10 +196,15 @@ function PromptCenter() {
     const positionsValue = holdings.reduce((s, h) => s + h.quantity * h.current_price, 0);
     const cost = holdings.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
     const pl = positionsValue - cost;
-    const cash = Number(balance?.cash ?? 0);
-    const marginUsed = Number(balance?.margin_used ?? 0);
-    const grossValue = positionsValue + cash;
-    const portfolioValue = grossValue - marginUsed; // NET — Fidelity's Total account value
+    // NULL, never 0. These go into the block headed "MY VERIFIED DATA —
+    // GROUND EVERY RECOMMENDATION ONLY IN THIS", so a fabricated $0.00 is a
+    // false premise the committee is instructed to reason from (Phase 1a).
+    const cash = balance?.cash ?? null;
+    const marginUsed = balance?.margin_used ?? null;
+    const grossValue = cash === null ? null : positionsValue + cash;
+    // NET — Fidelity's Total account value.
+    const portfolioValue =
+      grossValue === null || marginUsed === null ? null : grossValue - marginUsed;
     const dayPL = holdings.reduce((sum, h) => {
       const q = liveQuotes?.[h.symbol];
       return q && q.prevClose > 0 ? sum + h.quantity * (q.price - q.prevClose) : sum;
@@ -212,14 +217,24 @@ function PromptCenter() {
       objective.kind === "set"
         ? Math.max(yearsBetween(new Date(), new Date(objective.targetDate)), 0.01)
         : null;
+    // `portfolioValue || objective.startingValue` fell back to the objective's
+    // own starting value when the account value was unknown — reporting the
+    // pace required the day the goal was written as though it were today's.
     const cagr =
-      objective.kind === "set" && years !== null
-        ? requiredCAGR(portfolioValue || objective.startingValue, objective.targetValue, years)
+      objective.kind === "set" && years !== null && portfolioValue !== null
+        ? requiredCAGR(
+            // `||` treats a real 0 as missing and silently projects from the
+            // objective's own starting value instead. `> 0` matches the pattern
+            // the dashboard and the goal screen already use (Copilot, #141).
+            portfolioValue > 0 ? portfolioValue : objective.startingValue,
+            objective.targetValue,
+            years,
+          )
         : null;
     const prob =
-      objective.kind === "set" && years !== null && goal
+      objective.kind === "set" && years !== null && goal && portfolioValue !== null
         ? probabilityOfReachingTarget(
-            portfolioValue || objective.startingValue,
+            portfolioValue > 0 ? portfolioValue : objective.startingValue,
             objective.targetValue,
             years,
             riskToExpectedReturn(goal.risk_preference),
@@ -231,9 +246,15 @@ function PromptCenter() {
       grossValue,
       cash,
       marginUsed,
-      buyingPower: Number(selectedAccount?.buying_power ?? 0),
+      buyingPower:
+        selectedAccount?.buying_power === null || selectedAccount?.buying_power === undefined
+          ? null
+          : Number(selectedAccount.buying_power),
       todaysPL: dayPL,
-      todaysPLPct: portfolioValue - dayPL > 0 ? dayPL / (portfolioValue - dayPL) : 0,
+      todaysPLPct:
+        portfolioValue !== null && portfolioValue - dayPL > 0
+          ? dayPL / (portfolioValue - dayPL)
+          : null,
       accountName: goal?.name?.trim() || selectedAccount?.name || "this portfolio",
       // `objectiveOf`'s answer, carried whole. This used to be three fields
       // filled with `?? 0` and `?? "—"`, which the mandate then handed to the
