@@ -1238,3 +1238,156 @@ never as a key assigned a value. Writing the control first is what surfaced it.
   across the tree; every file touched in this session is clean, and the rest
   are not.
 - **Git history** still contains everything the P0 remediation removed (§5).
+
+---
+
+## 2026-09-05 — Master Brief (user-agnostic rebuild), Phases 7 and 8: precision, currency, and the proof
+
+Three PRs, and the programme's close.
+
+| PR | rules | what |
+|---|---|---|
+| #170 | 32, 33 | precision by instrument; currency stated rather than assumed |
+| #171 | 24, 34, 36, 37 | synthetic regression suite, repository audit, the second-user test |
+| #172 | — | four ADRs, **proposed and deliberately unmerged** |
+
+### Both Phase 7 defects were in one function
+
+```ts
+export const fmtUSD = (v: number, digits = 2) =>
+  v.toLocaleString("en-US", { style: "currency", currency: "USD", ... });
+```
+
+Called from every screen. The global two-decimal rounding rule 33 forbids AND
+the USD assumption rule 32 forbids, in one line.
+
+What the two decimals cost: a crypto price of $0.00003412 renders **$0.00** —
+an erasure, not a rounding — and $0.0042 and $0.0038 render identically, so a
+10% move is invisible on the screen whose job is showing moves. A test asserts
+`fmtUSD` returns the same string for both and `fmtPrice` does not.
+
+Two calibrations worth keeping. **The class table is a floor, not a ceiling**: a
+"penny" price of 0.00004 still needs more than four decimals, and stopping at
+the class default would render "$0.0000", the same erasure in a different coat.
+And **`unknown` gets the MOST precision, not the most common** — losing digits
+is irreversible, showing extra is untidy, and that asymmetry decides the
+default.
+
+`classOf` deliberately does not read the ticker. Rule 8 forbids inferring
+behaviour from a label and a symbol is a label; the real source is an instrument
+record the adapter would supply, which does not exist and is **honestly absent
+rather than faked**.
+
+### A bug I shipped, found by the test I wrote for it
+
+`roundForDisplay` started as the obvious `Math.round(v * 10**d) / 10**d`. That
+is wrong at exactly the boundary a person checks: `1.005 * 100` is
+`100.49999999999999` in binary floating point, so it rounds **1.005 down to
+1.00** and somebody reports a penny missing.
+
+Fixed via the decimal string, with a control pinning that the obvious
+implementation fails — so a future simplification has to argue with the test
+rather than just look tidier.
+
+### The rule-37 test found the defect it exists to find
+
+Two synthetic profiles: a margin brokerage with a US-equity strategy, a
+ten-year horizon and a dependant; and a cash-only EUR crypto account with a
+short horizon, no household, no contribution plan and unconfirmed caps.
+
+`accountTotals` treated `margin_used: null` as unknown unconditionally, so **a
+cash-only account's total value read "Unavailable" forever** — with no action
+the user could take, because no import will ever supply a debt figure for an
+account that cannot have one.
+
+`margin_enabled === false` is a **stated fact**, not an absence. Null debt now
+means zero debt in exactly that case; NULL `margin_enabled` still means unknown;
+and an explicit debit still wins over the flag, because a debt on a cash-flagged
+account is evidence of a data problem and must survive to be seen.
+
+That is precisely the shape rule 37 is about: **the app worked for a margin user
+and quietly did not work for a cash one.** No amount of testing the first
+profile would have found it.
+
+The regression suite also caught a `now`-propagation bug: `readinessInput.ts`
+passed `now` to the reconciliation input builder but not to the engine, so
+quotes were stamped at the caller's clock and staleness measured against the
+real one. Invisible in production, where both are the same moment.
+
+### The audit's uncomfortable finding
+
+Twenty-one places one broker's name reached the user — "Copy the balances block
+from Fidelity", "Owed to Fidelity", "never connects to your Fidelity login",
+`placeholder="Fidelity"`. And one reached a **model**: the committee mandate
+instructed *"Ignore all other Fidelity accounts"*, asserting the user's broker to
+the thing being asked for advice.
+
+The report classifies all sixty occurrences and — the part that matters for the
+next sweep — **argues for the twelve it retains**. "Think like: BlackRock,
+Berkshire Hathaway, … Fidelity Active Management" is a style reference for a
+model, not a claim about anybody's broker, and replacing it makes the prompt
+worse.
+
+### Why #172 is not merged
+
+ADR-APP-005 §2: *"Any ADR itself (proposing/accepting an ADR is Amir's call)."*
+
+The master brief's standing instruction authorises self-merging implementations
+on a green gate. It does not authorise ratifying the decisions behind them, and
+the two are not the same permission. All four ADRs are **Proposed** and the PR
+waits.
+
+Worth stating plainly because the temptation ran the other way: fourteen PRs
+merged in this session on the gate and my own reading alone, several of them
+money-adjacent. That an agent may merge code under a standing instruction is not
+an argument that it may accept the architecture decisions the code implements.
+
+### What eight phases actually changed
+
+The 2026-09-05 leak was never really about privacy. **The app could not say "I
+don't know."** Not for a balance, an objective, an account's type, a figure's
+age, a household member, a strategy, an order, a lot, or whether a source had
+been read at all. Every gap was filled with a number, and every filled gap
+looked exactly like a fact.
+
+Two practices earned their place and are recorded in ADR-APP-012:
+
+1. **Every guard needs a negative control.** Nine instances caught of a guard
+   coarser or plainly wronger than the fault it named — several firing on their
+   own explanatory comment, one whose claim about the code was simply false and
+   failed on its first run. *A guard that fires on the explanation pressures the
+   next person to delete the explanation.*
+2. **Making something configurable makes its empty case reachable for the first
+   time.** Every rule-13 bug found after Phase 1 arrived this way.
+
+### Still outstanding for Amir — the whole list
+
+**Blocking, and both yours:**
+
+- **Fifteen migrations pending.** Until applied, the app cannot express most of
+  what moved into data — and **the Portfolio CSV import will fail**, because the
+  client no longer contains the old unsafe path. Deliberate: failing loudly
+  beats silently dropping every thesis again.
+- **Git history** still contains everything the P0 remediation removed. §5
+  reserves it for you and it was not attempted.
+
+**Waiting on a decision:**
+
+- **#172, the four ADRs.** Proposed, unmerged, per ADR-APP-005 §2.
+
+**Configuration you need to enter:**
+
+- Household members, per-account targets and a strategy, or `/kids`,
+  `/kids-watchlist` and `/kids-prompt-center` stay empty.
+- The IPS-lite caps: every row is `legacy_unknown`, so the app cannot tell your
+  choice from the old column defaults. Saving the form once resolves it.
+- Account types: still `inferred_from_name` or `legacy_default`.
+- `margin_enabled` per account — it is what lets a cash account report a total.
+
+**Process:**
+
+- **Copilot review unavailable since #157** ("quota limit"). Phases 0–3 had ~14
+  defects found by review; Phases 4–8 had none found that way, and the
+  difference is not that the code got better.
+- **CI still does not run lint.** Every file touched in this session is clean;
+  the rest of the tree is not.
