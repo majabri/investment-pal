@@ -202,8 +202,8 @@ export function interestProvenance(figure: InterestFigure): string {
   switch (figure.kind) {
     case "actual":
       return figure.importedAt
-        ? `accrued this month, per Fidelity (imported ${figure.importedAt.slice(0, 10)})`
-        : "accrued this month, per Fidelity";
+        ? `accrued this month, per your broker (imported ${figure.importedAt.slice(0, 10)})`
+        : "accrued this month, per your broker";
     case "estimate":
       return "estimated from your IPS margin rate — not the broker's figure";
     case "unavailable":
@@ -229,7 +229,7 @@ export function interestProvenance(figure: InterestFigure): string {
 export function interestProvenanceShort(figure: InterestFigure): string {
   switch (figure.kind) {
     case "actual":
-      return "per Fidelity";
+      return "per your broker";
     case "estimate":
       return "estimate";
     case "unavailable":

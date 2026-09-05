@@ -73,6 +73,14 @@ export function readinessInputFor({
             now,
           }),
           DEFAULT_TOLERANCE,
+          // `now` reaches the input builder AND the engine. It used to reach
+          // only the builder, so the quotes timestamp was stamped at the
+          // caller's `now` while staleness was measured against the real
+          // clock. Invisible in production, where both are the same moment —
+          // and it made the reconciliation check report STALE for any caller
+          // that supplied a `now`, which is every test. Found by the Phase 8
+          // regression suite.
+          now,
         ).status;
 
   return {

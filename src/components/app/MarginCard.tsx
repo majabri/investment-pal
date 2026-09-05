@@ -118,9 +118,9 @@ export function MarginCard({
           </div>
           <div className="text-[11px] text-muted-foreground">
             {marginUsed === null
-              ? "From Fidelity → Balances → Cash & Credits (as a positive number)"
+              ? "From your broker's balances page — the credit balance, as a positive number"
               : marginUsed > 0
-                ? `Owed to Fidelity — ${marginRateLabel(ipsLite)}`
+                ? `Owed to your broker — ${marginRateLabel(ipsLite)}`
                 : "Recorded as zero — the broker reported no loan on this account"}
           </div>
         </>

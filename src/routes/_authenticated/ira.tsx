@@ -106,7 +106,7 @@ Analyze in order:
 End with a one-page Retirement Action Sheet.
 
 MY VERIFIED DATA (live prices as of ${new Date().toLocaleString("en-US")})
-${data || "(no IRA accounts found — import from Fidelity or add in Settings)"}
+${data || "(no IRA accounts found — import from your broker or add in Settings)"}
 IRA total: ${usdOrNotKnown(total)}`;
   }, [rows, total]);
 
@@ -132,7 +132,7 @@ IRA total: ${usdOrNotKnown(total)}`;
           <CardContent className="pt-6 text-sm text-muted-foreground">
             <p className="mb-1 font-medium text-foreground">No IRA accounts yet.</p>
             <p>
-              They appear here automatically after your next Fidelity import with
+              They appear here automatically after your next import with
               <span className="font-medium"> "Create accounts for everything in the file" </span>
               switched on (Settings → Portfolio CSV Import) — your ROTH IRA and ROLLOVER IRA will be
               created and grouped here with live prices. You can also add one manually in Settings →

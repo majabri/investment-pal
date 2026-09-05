@@ -291,7 +291,7 @@ function PortfolioPage() {
           </div>
           {holdings.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No holdings yet. Click "Add position" or import from Fidelity in Settings.
+              No holdings yet. Click "Add position" or import from your broker in Settings.
             </p>
           ) : (
             <>

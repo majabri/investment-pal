@@ -36,7 +36,7 @@ function destinationsFor(accountNames: string[]): Destination[] {
   const unique = [...new Set(accountNames)];
   return [
     ...unique.map((name) => ({ value: name, label: name })),
-    { value: CREATE, label: "Create this account (keep its Fidelity name)" },
+    { value: CREATE, label: "Create this account (keep the name from the file)" },
     { value: SKIP, label: "Skip this account" },
   ];
 }
@@ -104,7 +104,7 @@ export function PortfolioCsvImport() {
   function preview() {
     const res = parsePositionsCsv(raw);
     if (!res.rows.length) {
-      toast.error("No positions recognized — paste Fidelity's Positions CSV export.");
+      toast.error("No positions recognized — paste your broker's Positions CSV export.");
       return;
     }
     setParsed(res.rows);
@@ -149,7 +149,7 @@ export function PortfolioCsvImport() {
         const key = h.accountName ?? "Unlabeled account";
         const destRaw = mapping[key] ?? defaultDestination(h.accountName, createAll, accountNames);
         if (destRaw === SKIP) continue;
-        const dest = destRaw === CREATE ? key : destRaw; // create keeps the Fidelity name
+        const dest = destRaw === CREATE ? key : destRaw; // create keeps the name the file used
         if (!groups.has(dest)) groups.set(dest, []);
         groups.get(dest)!.push(h);
       }
@@ -274,7 +274,7 @@ export function PortfolioCsvImport() {
       <CardHeader>
         <CardTitle className="text-base">Portfolio CSV Import</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Read-only. Upload the brokerage Positions CSV (Fidelity → Positions → Download) or paste
+          Read-only. Upload your broker's Positions CSV export, or paste
           its text, then choose where each account imports to.
         </p>
       </CardHeader>
@@ -402,7 +402,7 @@ export function PortfolioCsvImport() {
           </div>
         )}
         <p className="text-xs text-muted-foreground">
-          This app never connects to your Fidelity login and never places trades. Import is the only
+          This app never connects to your broker and never places trades. Import is the only
           data path.
         </p>
       </CardContent>
