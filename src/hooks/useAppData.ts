@@ -74,6 +74,12 @@ export type Account = {
   margin_enabled: boolean | null;
   household_id: string | null;
   account_status: string | null;
+  /** Provenance for the four money columns (Phase 1d, rule 14). Per BLOCK, not
+   *  per field — the canonical model in Phase 2 is where that gets fixed. */
+  balances_source_type: string | null;
+  balances_source: string | null;
+  /** When the figures were TRUE, not when the row was written. */
+  balances_as_of: string | null;
   /** The institution. This is the standard's "provider" field, already here. */
   broker: string | null;
   /**
@@ -406,7 +412,10 @@ export function useRecordBalanceImport() {
       patch,
     }: {
       snapshot: BalanceSnapshotInsert;
-      patch: Record<string, number>;
+      /** Money figures AND their provenance, written together — see
+       *  `accountPatch`. Values are numbers for the figures and ISO strings for
+       *  the as-of stamp, so this is not `Record<string, number>` any more. */
+      patch: Record<string, number | string>;
     }) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Not signed in");

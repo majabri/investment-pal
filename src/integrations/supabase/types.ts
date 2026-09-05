@@ -14,6 +14,9 @@ export type Database = {
     Tables: {
       accounts: {
         Row: {
+          balances_as_of: string | null;
+          balances_source: string | null;
+          balances_source_type: string | null;
           account_status: string | null;
           account_type_source: string | null;
           broker_account_id: string | null;
@@ -39,6 +42,9 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          balances_as_of?: string | null;
+          balances_source?: string | null;
+          balances_source_type?: string | null;
           account_status?: string | null;
           account_type_source?: string | null;
           broker_account_id?: string | null;
@@ -64,6 +70,9 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          balances_as_of?: string | null;
+          balances_source?: string | null;
+          balances_source_type?: string | null;
           account_status?: string | null;
           account_type_source?: string | null;
           broker_account_id?: string | null;
