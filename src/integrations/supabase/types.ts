@@ -14,7 +14,14 @@ export type Database = {
     Tables: {
       accounts: {
         Row: {
-          account_type: string;
+          account_status: string | null;
+          account_type_source: string | null;
+          broker_account_id: string | null;
+          currency: string | null;
+          household_id: string | null;
+          margin_enabled: boolean | null;
+          tax_treatment: string | null;
+          account_type: string | null;
           broker: string | null;
           buying_power: number | null;
           cash: number | null;
@@ -32,7 +39,14 @@ export type Database = {
           user_id: string;
         };
         Insert: {
-          account_type?: string;
+          account_status?: string | null;
+          account_type_source?: string | null;
+          broker_account_id?: string | null;
+          currency?: string | null;
+          household_id?: string | null;
+          margin_enabled?: boolean | null;
+          tax_treatment?: string | null;
+          account_type?: string | null;
           broker?: string | null;
           buying_power?: number | null;
           cash?: number | null;
@@ -50,7 +64,14 @@ export type Database = {
           user_id: string;
         };
         Update: {
-          account_type?: string;
+          account_status?: string | null;
+          account_type_source?: string | null;
+          broker_account_id?: string | null;
+          currency?: string | null;
+          household_id?: string | null;
+          margin_enabled?: boolean | null;
+          tax_treatment?: string | null;
+          account_type?: string | null;
           broker?: string | null;
           buying_power?: number | null;
           cash?: number | null;

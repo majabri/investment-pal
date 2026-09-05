@@ -52,8 +52,29 @@ export type Holding = {
 export type Account = {
   id: string;
   user_id: string;
+  /** Display name. Presentation only as of Phase 1b — nothing derives
+   *  behaviour from it; that is what the metadata below is for (rule 4). */
   name: string;
-  account_type: string;
+  /**
+   * What the account IS. NULL = not known, never assumed.
+   *
+   * Behaviour used to be read off `name` by string-matching, so renaming an
+   * account silently changed its tax treatment and which screens it appeared
+   * on, and one household's names were compiled into the classifier.
+   */
+  account_type: string | null;
+  /** Where `account_type` came from: inferred_from_name | user_set | imported.
+   *  A row still marked inferred has not been confirmed by anyone. */
+  account_type_source: string | null;
+  tax_treatment: string | null;
+  broker_account_id: string | null;
+  /** ISO 4217. NULL = not known; there is no USD default (rule 32). */
+  currency: string | null;
+  /** NULL = not known, which is not FALSE. */
+  margin_enabled: boolean | null;
+  household_id: string | null;
+  account_status: string | null;
+  /** The institution. This is the standard's "provider" field, already here. */
   broker: string | null;
   /**
    * NULL = not known. Nullable as of the Phase 1a migration: the columns were

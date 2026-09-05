@@ -32,6 +32,8 @@ import {
 } from "@/hooks/useAppData";
 import { useQueryClient } from "@tanstack/react-query";
 import { fmtUSD } from "@/lib/finance";
+import { UNAVAILABLE, numberOrUnknown } from "@/lib/unavailable";
+import { ACCOUNT_TYPES } from "@/lib/accountMetadata";
 import { rateStatus } from "@/lib/marginCost";
 import { isFutureLocalDate } from "@/lib/localDate";
 
@@ -45,17 +47,6 @@ export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
 });
 
-const ACCOUNT_TYPES = [
-  "brokerage",
-  "ira",
-  "roth_ira",
-  "401k",
-  "hsa",
-  "custodial",
-  "trust",
-  "cash",
-  "other",
-] as const;
 
 // IPS-lite policy editor (ADR-APP-004). Position cap + margin cap govern the
 // committee prompt and the Constitution Check strip. Money-adjacent numbers were
@@ -643,6 +634,9 @@ function SettingsPage() {
   );
 }
 
+/** A money field as text: empty means the figure is not known, never 0. */
+const asText = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
+
 function AccountCard({ account, onSynced }: { account: Account; onSynced: () => void }) {
   const qc = useQueryClient();
   const { update, remove } = useAccounts();
@@ -652,10 +646,14 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
     name: account.name,
     account_type: account.account_type,
     broker: account.broker ?? "",
-    cash: account.cash ?? 0,
-    margin_used: account.margin_used ?? 0,
-    margin_limit: account.margin_limit ?? 0,
-    buying_power: account.buying_power ?? 0,
+    // Text, not `?? 0`. An unknown balance shown as 0 in the box is written to
+    // the database as a real 0 by the first Save — turning "not known" into
+    // "no cash" with no deliberate act (Phase 1a, rule 13). This editor was
+    // missed when the Portfolio one was fixed.
+    cash: asText(account.cash),
+    margin_used: asText(account.margin_used),
+    margin_limit: asText(account.margin_limit),
+    buying_power: asText(account.buying_power),
     notes: account.notes ?? "",
   });
 
@@ -671,10 +669,11 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
         // the dashboard, the goal screen and the committee prompt all read the
         // `goals` row. Editing them here looked like setting a target and set
         // nothing. See the Objective card above.
-        cash: Number(form.cash) || 0,
-        margin_used: Number(form.margin_used) || 0,
-        margin_limit: Number(form.margin_limit) || 0,
-        buying_power: Number(form.buying_power) || 0,
+        // An emptied or half-typed box clears the figure back to unknown.
+        cash: numberOrUnknown(form.cash),
+        margin_used: numberOrUnknown(form.margin_used),
+        margin_limit: numberOrUnknown(form.margin_limit),
+        buying_power: numberOrUnknown(form.buying_power),
         notes: form.notes || null,
       },
       {
@@ -694,7 +693,9 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">{account.name}</span>
             <Badge variant="outline" className="text-[10px] uppercase">
-              {account.account_type.replace("_", " ")}
+              {account.account_type === null
+                ? "TYPE NOT SET"
+                : account.account_type.replace("_", " ")}
             </Badge>
             {account.broker && (
               <span className="text-xs text-muted-foreground">{account.broker}</span>
@@ -761,7 +762,7 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
           </Field>
           <Field label="Type">
             <Select
-              value={form.account_type}
+              value={form.account_type ?? ""}
               onValueChange={(v) => setForm({ ...form, account_type: v })}
             >
               <SelectTrigger>
@@ -787,28 +788,32 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
             <Input
               type="number"
               value={form.cash}
-              onChange={(e) => setForm({ ...form, cash: +e.target.value })}
+              placeholder={UNAVAILABLE}
+              onChange={(e) => setForm({ ...form, cash: e.target.value })}
             />
           </Field>
           <Field label="Buying power ($)">
             <Input
               type="number"
               value={form.buying_power}
-              onChange={(e) => setForm({ ...form, buying_power: +e.target.value })}
+              placeholder={UNAVAILABLE}
+              onChange={(e) => setForm({ ...form, buying_power: e.target.value })}
             />
           </Field>
           <Field label="Margin used ($)">
             <Input
               type="number"
               value={form.margin_used}
-              onChange={(e) => setForm({ ...form, margin_used: +e.target.value })}
+              placeholder={UNAVAILABLE}
+              onChange={(e) => setForm({ ...form, margin_used: e.target.value })}
             />
           </Field>
           <Field label="Margin limit ($)">
             <Input
               type="number"
               value={form.margin_limit}
-              onChange={(e) => setForm({ ...form, margin_limit: +e.target.value })}
+              placeholder={UNAVAILABLE}
+              onChange={(e) => setForm({ ...form, margin_limit: e.target.value })}
             />
           </Field>
           <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
