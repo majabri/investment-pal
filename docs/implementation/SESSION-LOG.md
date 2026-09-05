@@ -528,6 +528,7 @@ there for two days. Four PRs, all merged.
 
 | PR | tier | what |
 |---|---|---|
+| #127 | — | the Dependabot `minor-and-patch` group removed, so ADR-APP-005 §3 lives in the config rather than in triage |
 | #136 | 1 + 4 + §4 | real names, balances and figures out of `src/` and `supabase/`; reintroduction guard added |
 | #137 | 3 | the office identity in the v5/v6 constitutions becomes configuration (rule 23) |
 | #138 | 2 | new users provisioned neutrally; an unset objective stays unset (rule 13) |
