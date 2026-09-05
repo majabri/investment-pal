@@ -254,8 +254,12 @@ const money = usdOrNotKnown;
  * Written as an instruction rather than a note, because a note gets summarised
  * away. Naming the specific checks matters for the same reason it does in the
  * UI: "some data is missing" invites the model to guess which, and it will.
+ *
+ * Exported because the kids committee brief is built by hand rather than by
+ * `buildV6Prompt`, and two versions of this wording would drift — one of them
+ * quietly losing the instruction not to substitute a figure.
  */
-function readinessBlock(checks: ReadinessCheck[]): string {
+export function readinessBlock(checks: ReadinessCheck[]): string {
   const g = gate("committee_recommendation", checks);
   if (g.allowed) {
     return "DATA READINESS: every input this brief depends on was verified.";

@@ -317,3 +317,65 @@ export function blockedReason(g: Gate): string | null {
   if (g.allowed) return null;
   return g.because.map((c) => `${c.label}: ${c.detail}`).join(" ");
 }
+
+/**
+ * Combine one account's checks into a set covering several accounts
+ * (Phase 5b, rule 17).
+ *
+ * The worst state wins, per check: `fail` beats `unknown` beats `pass`. That
+ * is the only combination that does not lie. A brief that covers three
+ * custodial accounts and reports "cash: ok" because two of them have a balance
+ * is telling the model the portfolio is fully known when a third of it is not,
+ * and the model will size positions across all three.
+ *
+ * The detail names the accounts, because "cash balance not known" over three
+ * accounts leaves the user opening each one to find out which.
+ */
+export function combineChecks(
+  perAccount: { label: string; checks: readonly ReadinessCheck[] }[],
+): ReadinessCheck[] {
+  // No accounts is not a clean bill of health. There is nothing to check, so
+  // nothing was checked, and every check says so — the same call
+  // `combinedTarget` makes for an empty list of targets.
+  if (perAccount.length === 0) {
+    return CHECK_IDS.map((id) => ({
+      id,
+      label: CHECK_LABEL[id],
+      state: "unknown" as const,
+      detail: "There are no accounts in scope, so nothing was checked.",
+    }));
+  }
+
+  const RANK: Record<CheckState, number> = { pass: 0, unknown: 1, fail: 2 };
+
+  return CHECK_IDS.map((id) => {
+    const rows = perAccount
+      .map((a) => ({ label: a.label, check: a.checks.find((c) => c.id === id) }))
+      .filter((r): r is { label: string; check: ReadinessCheck } => r.check !== undefined);
+
+    // A check absent from every account cannot be reported as passing.
+    if (rows.length === 0) {
+      return {
+        id,
+        label: CHECK_LABEL[id],
+        state: "unknown" as const,
+        detail: "This check did not run.",
+      };
+    }
+
+    const worst = rows.reduce((w, r) => (RANK[r.check.state] > RANK[w.check.state] ? r : w));
+    if (worst.check.state === "pass") {
+      return { id, label: CHECK_LABEL[id], state: "pass" as const, detail: "" };
+    }
+
+    const affected = rows
+      .filter((r) => r.check.state === worst.check.state)
+      .map((r) => r.label);
+    return {
+      id,
+      label: CHECK_LABEL[id],
+      state: worst.check.state,
+      detail: `${affected.join(", ")}: ${worst.check.detail}`,
+    };
+  });
+}

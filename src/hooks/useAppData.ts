@@ -537,6 +537,39 @@ export function useLatestBalance(scope: AccountScope) {
 }
 
 /** Every balance import for a scope, newest first. The history, for the chart. */
+/**
+ * The most recent imported balance for each of several accounts (Phase 5b).
+ *
+ * `useLatestBalance` is per-account and hooks cannot be called in a loop over
+ * a list whose length changes, so a screen covering several accounts — the
+ * kids committee brief — needs one query rather than N.
+ *
+ * Ordered newest first and reduced client-side, so the first row seen for an
+ * account is its latest. An account with no snapshot is simply absent from the
+ * map, which is what the readiness gate reads as "nothing to reconcile
+ * against" rather than as a zero.
+ */
+export function useLatestBalances(accountIds: string[]) {
+  const key = [...accountIds].sort().join(",");
+  return useQuery({
+    queryKey: ["account_balances", "latest-many", key],
+    enabled: accountIds.length > 0,
+    queryFn: async (): Promise<Record<string, AccountBalanceRow>> => {
+      const { data, error } = await supabase
+        .from("account_balances" as never)
+        .select("*")
+        .in("account_id", accountIds)
+        .order("imported_at", { ascending: false });
+      if (error) throw error;
+      const out: Record<string, AccountBalanceRow> = {};
+      for (const row of (data ?? []) as unknown as AccountBalanceRow[]) {
+        if (!(row.account_id in out)) out[row.account_id] = row;
+      }
+      return out;
+    },
+  });
+}
+
 export function useBalanceHistory(scope: AccountScope, limit = 90) {
   const accountId = scope.kind === "account" ? scope.accountId : null;
   return useQuery({

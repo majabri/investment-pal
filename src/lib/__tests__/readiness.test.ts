@@ -8,12 +8,13 @@
 // directions: a gate that blocks nothing is the app that shipped, and a gate
 // that blocks everything is one people route around.
 import { describe, expect, test } from "bun:test";
-import { buildV6Prompt, type PromptContext } from "../prompts";
+import { buildV6Prompt, readinessBlock, type PromptContext } from "../prompts";
 import {
   CAPABILITY_DEPENDENCIES,
   CHECK_IDS,
   CHECK_LABEL,
   blockedReason,
+  combineChecks,
   gate,
   runChecks,
   type Capability,
@@ -268,8 +269,7 @@ describe("the dependency table is the rule", () => {
 // The gate has to reach the model, not just the screen. A banner the user sees
 // while the prompt below it still asks for position sizes against unverified
 // data is not a gate — rule 17 is about what gets PRODUCED.
-describe("the brief carries the gate's verdict", () => {
-  const ctx = (checks: ReadinessCheck[]): PromptContext => ({
+const ctxFor = (checks: ReadinessCheck[]): PromptContext => ({
     accountName: "Growth Brokerage",
     portfolioValue: 72_500,
     cash: 2_500,
@@ -291,10 +291,13 @@ describe("the brief carries the gate's verdict", () => {
     },
     requiredCagr: 0.2,
     probability: 0.4,
-    holdings: [],
-    priorities: [],
-    userNotes: "",
-  });
+  holdings: [],
+  priorities: [],
+  userNotes: "",
+});
+
+describe("the brief carries the gate's verdict", () => {
+  const ctx = ctxFor;
 
   test("a ready account says so, once", () => {
     const out = buildV6Prompt({ ...ctx(checksFor()), meeting: "Morning" });
@@ -323,5 +326,93 @@ describe("the brief carries the gate's verdict", () => {
     const bad = buildV6Prompt({ ...ctx(checksFor({ cash: null })), meeting: "Morning" });
     expect(ok).not.toBe(bad);
     expect(ok).not.toContain("could NOT be verified");
+  });
+});
+
+// Phase 5b: several accounts in one brief.
+describe("combineChecks", () => {
+  const acct = (label: string, over: Partial<ReadinessInput> = {}) => ({
+    label,
+    checks: checksFor(over),
+  });
+
+  test("all ready is all pass", () => {
+    const out = combineChecks([acct("A"), acct("B")]);
+    expect(out.every((c) => c.state === "pass")).toBe(true);
+    expect(out.map((c) => c.id)).toEqual([...CHECK_IDS]);
+  });
+
+  test("the worst state wins, per check", () => {
+    // A brief covering three accounts that reports "cash: ok" because two of
+    // them have a balance tells the model the portfolio is fully known when a
+    // third of it is not — and the model sizes positions across all three.
+    const out = combineChecks([acct("A"), acct("B", { cash: null })]);
+    expect(out.find((c) => c.id === "cash")!.state).toBe("unknown");
+    expect(out.find((c) => c.id === "quotes")!.state).toBe("pass");
+  });
+
+  test("fail outranks unknown", () => {
+    const out = combineChecks([
+      acct("A", { quotes: "UNAVAILABLE" }),
+      acct("B", { quotes: "STALE" }),
+    ]);
+    expect(out.find((c) => c.id === "quotes")!.state).toBe("fail");
+  });
+
+  test("the detail names which accounts, not how many", () => {
+    // "cash balance not known" over three accounts leaves the user opening
+    // each one to find out which.
+    const out = combineChecks([
+      acct("Alex UTMA", { cash: null }),
+      acct("Sam UTMA"),
+      acct("Robin UTMA", { cash: null }),
+    ]);
+    const cash = out.find((c) => c.id === "cash")!;
+    expect(cash.detail).toContain("Alex UTMA");
+    expect(cash.detail).toContain("Robin UTMA");
+    expect(cash.detail).not.toContain("Sam UTMA");
+  });
+
+  test("no accounts is not a clean bill of health", () => {
+    // Nothing to check means nothing WAS checked. The same call
+    // `combinedTarget` makes for an empty list of targets.
+    const out = combineChecks([]);
+    expect(out).toHaveLength(CHECK_IDS.length);
+    expect(out.every((c) => c.state === "unknown")).toBe(true);
+    expect(gate("committee_recommendation", out).allowed).toBe(false);
+  });
+
+  test("a check missing from every account is unknown, not passed", () => {
+    const out = combineChecks([{ label: "A", checks: [] }]);
+    expect(out.every((c) => c.state === "unknown")).toBe(true);
+  });
+
+  test("NEGATIVE CONTROL: one ready account alone still passes", () => {
+    // Without this, a `combineChecks` that returned "unknown" for everything
+    // would satisfy most of the assertions above.
+    expect(combineChecks([acct("A")]).every((c) => c.state === "pass")).toBe(true);
+  });
+
+  test("a passing combined check carries no leftover detail", () => {
+    // A pass whose detail still names an account reads as a warning.
+    const out = combineChecks([acct("A"), acct("B", { cash: null })]);
+    expect(out.find((c) => c.id === "quotes")!.detail).toBe("");
+  });
+});
+
+// The kids brief is built by hand rather than by `buildV6Prompt`, so the
+// wording is shared rather than duplicated — two versions would drift, one of
+// them quietly losing the instruction not to substitute a figure.
+describe("the readiness block is shared, not duplicated", () => {
+  test("the block reads the same wherever it is used", () => {
+    const checks = checksFor({ cash: null });
+    const block = readinessBlock(checks);
+    const inBrief = buildV6Prompt({ ...ctxFor(checks), meeting: "Morning" });
+    expect(inBrief).toContain(block);
+  });
+
+  test("NEGATIVE CONTROL: the block is not empty and does change", () => {
+    expect(readinessBlock(checksFor()).length).toBeGreaterThan(20);
+    expect(readinessBlock(checksFor())).not.toBe(readinessBlock(checksFor({ cash: null })));
   });
 });

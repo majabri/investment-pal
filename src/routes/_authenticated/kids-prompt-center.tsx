@@ -16,6 +16,10 @@ import {
   useStrategySymbols,
 } from "@/hooks/useAppData";
 import { BUCKET_LABEL, byBucket } from "@/lib/strategy";
+import { accountTotals } from "@/lib/accountTotals";
+import { useMultiReadiness } from "@/hooks/useReadiness";
+import { ReadinessPanel } from "@/components/app/ReadinessPanel";
+import { readinessBlock } from "@/lib/prompts";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD } from "@/lib/finance";
 import { NOT_KNOWN, usdOrNotKnown } from "@/lib/unavailable";
@@ -40,6 +44,28 @@ function Page() {
     () => kidAccounts(accounts, allHoldings, members),
     [accounts, allHoldings, members],
   );
+  // The readiness gate across every custodial account in the brief
+  // (Phase 5b, rule 17). A single-account gate applied here would report the
+  // wrong account's readiness, which is worse than none — so the checks are
+  // combined worst-first across all of them.
+  const readinessAccounts = useMemo(
+    () =>
+      kidsData.map((k) => ({
+        id: k.id,
+        name: k.name,
+        totals: accountTotals(
+          allHoldings.filter((h) => h.account_id === k.id),
+          // A custodial account has no margin by construction, and the app
+          // has never been told a buying-power figure for one. `null` is the
+          // honest value for both, and the gate reports margin as unknown
+          // rather than assuming none (rule 13).
+          { cash: k.cash, margin_used: null, buying_power: null },
+        ),
+      })),
+    [kidsData, allHoldings],
+  );
+  const readiness = useMultiReadiness(readinessAccounts);
+
   const symbols = useMemo(
     () => [...new Set(kidsData.flatMap((k) => k.holdings.map((h) => h.symbol)))],
     [kidsData],
@@ -96,6 +122,12 @@ function Page() {
           (strategy!.speculative_max_pct == null
             ? `; speculative cap ${NOT_KNOWN}`
             : `; speculative cap ${strategy!.speculative_max_pct}%`);
+
+    // Rule 17: the brief says what could not be verified, in the same words
+    // the single-account brief uses — `readinessBlock` is shared so the two
+    // cannot drift, with one of them quietly losing the instruction not to
+    // substitute a figure.
+    const readinessText = readinessBlock(readiness);
 
     const data = kidsData
       .map((k) => {
@@ -221,9 +253,11 @@ End with a one-page Family Action Sheet containing only the final actions.
 
 MY VERIFIED DATA (live prices as of ${new Date().toLocaleString("en-US")})
 Next contribution date: ${next}
+${readinessText}
+
 ${universeLine}
 ${data}`;
-  }, [kidsData, quotes, mySymbols, strategy]);
+  }, [kidsData, quotes, mySymbols, strategy, readiness]);
 
   // No custodial accounts: there is no prompt to build. Rendering the template
   // anyway would send a model a first-person brief about "my children's
@@ -257,6 +291,11 @@ ${data}`;
       title="Kids Prompt Center"
       subtitle="Biweekly Family Investment Committee — live-priced data, chat in-app or copy to ChatGPT"
     >
+      <ReadinessPanel
+        checks={readiness}
+        capability="committee_recommendation"
+        what="a committee brief for these accounts"
+      />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
