@@ -121,7 +121,7 @@ function KidsPage() {
         <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 pt-6 text-sm">
           <span>
             <span className="text-muted-foreground">Family value</span>{" "}
-            <strong className="tabular-nums">{fmtUSD(familyTotal)}</strong>
+            <strong className="tabular-nums">{usdOrUnavailable(familyTotal)}</strong>
           </span>
           <span>
             <span className="text-muted-foreground">Family target (2036)</span>{" "}

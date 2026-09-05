@@ -11,7 +11,7 @@ import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { accountCategory } from "@/lib/data/accountGroups";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD, fmtPct } from "@/lib/finance";
-import { usdOrUnavailable } from "@/lib/unavailable";
+import { usdOrNotKnown, usdOrUnavailable } from "@/lib/unavailable";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/ira")({ component: Page });
@@ -70,9 +70,7 @@ function Page() {
         (r) =>
           // Into a prompt: an unknown balance rendered as "$0.00" reaches the
           // model as a fact about the account, which it then reasons from.
-          `${r.a.name}: ${usdOrUnavailable(r.value)} (cash ${
-            r.cash === null ? "NOT KNOWN" : fmtUSD(r.cash, 2)
-          })` +
+          `${r.a.name}: ${usdOrNotKnown(r.value)} (cash ${usdOrNotKnown(r.cash, 2)})` +
           (r.hs.length
             ? " — " +
               r.hs
@@ -108,7 +106,7 @@ End with a one-page Retirement Action Sheet.
 
 MY VERIFIED DATA (live prices as of ${new Date().toLocaleString("en-US")})
 ${data || "(no IRA accounts found — import from Fidelity or add in Settings)"}
-IRA total: ${usdOrUnavailable(total)}`;
+IRA total: ${usdOrNotKnown(total)}`;
   }, [rows, total]);
 
   return (

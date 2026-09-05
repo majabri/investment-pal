@@ -47,3 +47,20 @@ export function numberOrUnknown(text: string): number | null {
   const n = Number(text);
   return Number.isFinite(n) ? n : null;
 }
+
+// --- the same absence, for a different reader --------------------------------
+//
+// Prompt text is read by a language model, not scanned by a person. "—" there
+// is guessed at and "$0.00" is believed, so an unknown figure has to say so in
+// words the model cannot mistake for a value.
+//
+// Deliberately a different constant from UNAVAILABLE rather than a reuse: the
+// UI's wording is chosen to sit in a stat card, and upper case there would
+// shout. Two audiences, two registers, one rule.
+
+export const NOT_KNOWN = "NOT KNOWN";
+
+/** A dollar figure for prompt text, or an explicit statement that it is unknown. */
+export function usdOrNotKnown(v: number | null | undefined, decimals?: number): string {
+  return v === null || v === undefined || !Number.isFinite(v) ? NOT_KNOWN : fmtUSD(v, decimals);
+}
