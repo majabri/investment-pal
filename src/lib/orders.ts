@@ -76,6 +76,13 @@ export type Order = {
   average_fill_price: number | null;
   parent_order_id: string | null;
   oco_group: string | null;
+  /**
+   * The tranche this order is attached to (Phase 6b). NULL = the whole
+   * position. `exitScope` in `lots.ts` is where that distinction is read; it
+   * is the difference between a stop covering one lot and covering the whole
+   * holding, which is a money-losing error in both directions.
+   */
+  lot_id: string | null;
   placed_at: string | null;
   status_as_of: string | null;
   execution_source: string;
