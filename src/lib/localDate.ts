@@ -28,3 +28,24 @@ export function localIsoDate(now: Date = new Date()): string {
 export function isFutureLocalDate(iso: string, now: Date = new Date()): boolean {
   return iso > localIsoDate(now);
 }
+
+/**
+ * Whether an ISO date names a day that actually exists.
+ *
+ * `new Date("2026-02-31T00:00:00Z")` does NOT return Invalid Date — it
+ * overflows to 3 March. So a "is this a real date" check written as a NaN test
+ * silently accepts 31 February and stores a day the user never chose. That
+ * matters for the margin rate's `as_of`, which is a claim about when a rate was
+ * verified: an overflowed date is provenance the data does not support, and
+ * Postgres rejects the same string outright, so the client-side check is the
+ * only place the user learns what is wrong.
+ *
+ * Checked by round-trip rather than by parsing: the parsed date must format
+ * back to the same calendar day it came from.
+ */
+export function isRealCalendarDate(iso: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const parsed = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return parsed.toISOString().slice(0, 10) === iso;
+}

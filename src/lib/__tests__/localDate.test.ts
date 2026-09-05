@@ -1,7 +1,7 @@
 // The UTC date is not the user's date. Everything here is about that one gap.
 import { describe, expect, test } from "bun:test";
 
-import { isFutureLocalDate, localIsoDate } from "../localDate";
+import { isFutureLocalDate, isRealCalendarDate, localIsoDate } from "../localDate";
 
 describe("localIsoDate", () => {
   test("is the local calendar date, not the UTC one", () => {
@@ -50,5 +50,28 @@ describe("isFutureLocalDate", () => {
     const nye = new Date(2026, 11, 31, 23, 0);
     expect(isFutureLocalDate("2027-01-01", nye)).toBe(true);
     expect(isFutureLocalDate("2026-12-31", nye)).toBe(false);
+  });
+});
+
+describe("isRealCalendarDate", () => {
+  test("accepts days that exist", () => {
+    for (const d of ["2026-09-03", "2024-02-29", "2026-01-01", "2026-12-31"]) {
+      expect(isRealCalendarDate(d)).toBe(true);
+    }
+  });
+
+  test("rejects days that do not exist, which Date silently overflows", () => {
+    // Each of these parses to a REAL but DIFFERENT day, so a NaN check passes
+    // them: 2026-02-31 -> 3 March, 2026-02-29 -> 1 March, 2026-04-31 -> 1 May.
+    for (const d of ["2026-02-31", "2026-02-29", "2026-04-31", "2026-06-31"]) {
+      expect(new Date(`${d}T00:00:00Z`).getTime()).not.toBeNaN();
+      expect(isRealCalendarDate(d)).toBe(false);
+    }
+  });
+
+  test("rejects anything that is not a plain ISO day", () => {
+    for (const d of ["", "not-a-date", "2026-13-01", "2026-9-3", "2026-09-03T10:00:00Z"]) {
+      expect(isRealCalendarDate(d)).toBe(false);
+    }
   });
 });
