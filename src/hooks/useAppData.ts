@@ -100,8 +100,17 @@ export type Account = {
   margin_limit: number | null;
   buying_power: number | null;
   starting_value: number;
+  /**
+   * The objective for this account. NULL = not set, never a default (rule 20).
+   * Nothing wrote or read these until Phase 4; `/kids` and the committee prompt
+   * used `FAMILY_POLICY`'s constants, so every user saw one household's target.
+   */
   target_value: number | null;
   target_date: string | null;
+  /** NULL = no contribution plan stated, which is not a plan of $0. */
+  contribution_amount: number | null;
+  contribution_cadence_days: number | null;
+  contribution_anchor_date: string | null;
   notes: string | null;
   last_synced_at: string | null;
   created_at: string;

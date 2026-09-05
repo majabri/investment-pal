@@ -815,6 +815,13 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
     // the database as a real 0 by the first Save — turning "not known" into
     // "no cash" with no deliberate act (Phase 1a, rule 13). This editor was
     // missed when the Portfolio one was fixed.
+    // The account's own objective (Phase 4, rule 20). These columns existed and
+    // nothing wrote them — see the note in `save` below, which this replaces.
+    target_value: asText(account.target_value),
+    target_date: account.target_date ?? "",
+    contribution_amount: asText(account.contribution_amount),
+    contribution_cadence_days: asText(account.contribution_cadence_days),
+    contribution_anchor_date: account.contribution_anchor_date ?? "",
     cash: asText(account.cash),
     margin_used: asText(account.margin_used),
     margin_limit: asText(account.margin_limit),
@@ -823,6 +830,23 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
   });
 
   const save = () => {
+    // Validate at the boundary, not only at the column. A CHECK violation
+    // reaches the user as a Postgres error string; these say what is wrong.
+    if (form.target_date !== "" && !isRealCalendarDate(form.target_date)) {
+      return toast.error("Target date is not a real calendar date");
+    }
+    if (
+      form.contribution_anchor_date !== "" &&
+      !isRealCalendarDate(form.contribution_anchor_date)
+    ) {
+      return toast.error("Contribution anchor date is not a real calendar date");
+    }
+    const cadence = numberOrUnknown(form.contribution_cadence_days);
+    // 0 never advances the schedule and a negative one walks backwards. The
+    // column rejects both; this is the same rule where the user can see it.
+    if (cadence !== null && (!Number.isInteger(cadence) || cadence <= 0)) {
+      return toast.error("Contribution cadence must be a whole number of days above zero");
+    }
     update.mutate(
       {
         id: account.id,
@@ -840,11 +864,20 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
         account_status: form.account_status || null,
         owner_member_id: form.owner_member_id || null,
         broker: form.broker || null,
-        // starting_value / target_value / target_date are deliberately NOT
-        // written. They are a second objective that nothing in the app reads —
-        // the dashboard, the goal screen and the committee prompt all read the
-        // `goals` row. Editing them here looked like setting a target and set
-        // nothing. See the Objective card above.
+        // target_value / target_date / the contribution plan ARE written as of
+        // Phase 4. They used to be skipped because nothing read them — /kids
+        // and the committee prompt used FAMILY_POLICY's constants, so every
+        // user saw one household's $200,000-by-2036 target. Both now read this
+        // account's own figures, and an empty box means NOT SET rather than a
+        // default (rules 15, 20).
+        //
+        // `starting_value` is still not written: it is a `goals` concept and
+        // nothing measures an account's progress from it.
+        target_value: numberOrUnknown(form.target_value),
+        target_date: form.target_date || null,
+        contribution_amount: numberOrUnknown(form.contribution_amount),
+        contribution_cadence_days: numberOrUnknown(form.contribution_cadence_days),
+        contribution_anchor_date: form.contribution_anchor_date || null,
         // An emptied or half-typed box clears the figure back to unknown.
         cash: numberOrUnknown(form.cash),
         // Provenance travels with the figures (Phase 1d). Typed is a weaker
@@ -1080,6 +1113,46 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
               value={form.broker}
               onChange={(e) => setForm({ ...form, broker: e.target.value })}
               placeholder="Fidelity"
+            />
+          </Field>
+          {/* THE ACCOUNT'S OBJECTIVE. All optional, and all unset by default —
+              a target nobody entered is exactly what Phase 4 removed. */}
+          <Field label="Target value ($)">
+            <Input
+              type="number"
+              value={form.target_value}
+              placeholder="Not set"
+              onChange={(e) => setForm({ ...form, target_value: e.target.value })}
+            />
+          </Field>
+          <Field label="Target date">
+            <Input
+              type="date"
+              value={form.target_date}
+              onChange={(e) => setForm({ ...form, target_date: e.target.value })}
+            />
+          </Field>
+          <Field label="Contribution ($)">
+            <Input
+              type="number"
+              value={form.contribution_amount}
+              placeholder="No plan"
+              onChange={(e) => setForm({ ...form, contribution_amount: e.target.value })}
+            />
+          </Field>
+          <Field label="Every (days)">
+            <Input
+              type="number"
+              value={form.contribution_cadence_days}
+              placeholder="No plan"
+              onChange={(e) => setForm({ ...form, contribution_cadence_days: e.target.value })}
+            />
+          </Field>
+          <Field label="Contributions anchored on">
+            <Input
+              type="date"
+              value={form.contribution_anchor_date}
+              onChange={(e) => setForm({ ...form, contribution_anchor_date: e.target.value })}
             />
           </Field>
           <Field label="Cash ($)">

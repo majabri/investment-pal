@@ -7,10 +7,10 @@ import { UNAVAILABLE, usdOrUnavailable } from "@/lib/unavailable";
 import {
   FAMILY_POLICY,
   approvedSymbols,
-  nextContributionDate,
   requiredCagrWithContributions,
   fvWithContributions,
 } from "@/lib/data/familyPolicy";
+import { combinedTarget, nextContributionDate } from "@/lib/accountObjective";
 import { kidAccounts } from "@/lib/kidAccounts";
 import { useAccounts, useAllHoldings, useHouseholdMembers } from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
@@ -88,11 +88,28 @@ function KidsPage() {
               : -Infinity;
   const arrow = (k: SortKey) => (sortKey === k ? (sortDir === 1 ? " ▲" : " ▼") : "");
 
-  const years = yearsBetween(new Date(), new Date(FAMILY_POLICY.targetDate));
-  const next = nextContributionDate().toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+  // Targets and horizons are per ACCOUNT now (rule 20). They were
+  // `FAMILY_POLICY.targetPerChild` / `.targetDate` / `.familyTarget` — one
+  // household's objective, compiled in, rendered as every user's progress bar
+  // and every user's "Behind / On Track / Ahead" verdict.
+  //
+  // The family target is all-or-nothing for the same reason the family value
+  // is: the sum of the accounts that happen to have a target is not the
+  // household's target, and nothing on screen would say so.
+  const familyTarget = combinedTarget(kidsData.map((k) => k.objective));
+  // Earliest next contribution across the accounts that have a plan. Null when
+  // none does — not today's date, and not a $100/14-day schedule nobody set.
+  const nextDates = kidsData
+    .map((k) => (k.objective.kind === "set" ? k.objective.contribution : null))
+    .filter((c): c is NonNullable<typeof c> => c !== null)
+    .map((c) => nextContributionDate(c).getTime());
+  const next =
+    nextDates.length === 0
+      ? null
+      : new Date(Math.min(...nextDates)).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        });
   const approved = approvedSymbols();
   // All-or-nothing: a family total that quietly omits one child's cash is not
   // the family's total (Phase 1a).
@@ -146,7 +163,13 @@ function KidsPage() {
   return (
     <AppShell
       title="Kids Trading Dashboard"
-      subtitle={`Family Investment OS v${FAMILY_POLICY.version} · $${FAMILY_POLICY.contribution.amountUsd}/child every other Thursday · next ${next}`}
+      subtitle={
+        // The cadence was "every other Thursday" in the copy and 14 days in the
+        // code, and both were one household's. Said only when a plan exists.
+        next === null
+          ? `Family Investment OS v${FAMILY_POLICY.version} · no contribution plan set`
+          : `Family Investment OS v${FAMILY_POLICY.version} · next contribution ${next}`
+      }
     >
       <Card className="mb-6">
         <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 pt-6 text-sm">
@@ -155,46 +178,60 @@ function KidsPage() {
             <strong className="tabular-nums">{usdOrUnavailable(familyTotal)}</strong>
           </span>
           <span>
-            <span className="text-muted-foreground">Family target (2036)</span>{" "}
-            <strong className="tabular-nums">{fmtUSD(FAMILY_POLICY.familyTarget)}</strong>
+            <span className="text-muted-foreground">Family target</span>{" "}
+            <strong className="tabular-nums">{usdOrUnavailable(familyTarget)}</strong>
           </span>
           {/* No bar when the total is unknown. A bar at 0% claims no progress,
               which is a different statement from "we cannot say" — the same
-              call made for the goal progress bar in the P0 remediation. */}
-          {familyTotal !== null && (
+              call made for the goal progress bar in the P0 remediation. And no
+              bar when the TARGET is unknown either: progress needs both ends,
+              and 100% of an unset target is not 100% of anything. */}
+          {familyTotal !== null && familyTarget !== null && familyTarget > 0 && (
             <span className="min-w-40 flex-1">
-              <Progress value={(familyTotal / FAMILY_POLICY.familyTarget) * 100} />
+              <Progress value={(familyTotal / familyTarget) * 100} />
             </span>
           )}
           <span className="tabular-nums text-muted-foreground">
-            {familyTotal === null
+            {familyTotal === null || familyTarget === null || familyTarget <= 0
               ? UNAVAILABLE
-              : fmtPct(familyTotal / FAMILY_POLICY.familyTarget)}
+              : fmtPct(familyTotal / familyTarget)}
           </span>
           <RefreshPricesButton symbols={allSymbols} />
         </CardContent>
       </Card>
+      {familyTarget === null && (
+        <p className="-mt-3 mb-6 text-xs text-muted-foreground">
+          Family target is unavailable because at least one of these accounts has no target and
+          horizon set. Set them per account in Settings — nothing is assumed on your behalf.
+        </p>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-3">
         {liveKids.map((kid) => {
           const mv = kid.holdings.reduce((s, h) => s + h.shares * h.price, 0);
           const total = kid.cash === null ? null : mv + kid.cash;
-          // Every projection below starts FROM the account value. Without it
-          // they are not conservative or approximate, they are arbitrary — and
-          // "Behind"/"On Track" is a verdict, which is worse than a wrong number.
+          // This account's own target and horizon (rule 20). It was
+          // FAMILY_POLICY's $200,000 by 2036-07-01 for every account of every
+          // user, which is what made the verdict below somebody else's verdict.
+          const obj = kid.objective.kind === "set" ? kid.objective : null;
+          const target = obj?.targetValue ?? null;
+          const years = obj === null ? null : yearsBetween(new Date(), new Date(obj.targetDate));
+          // No plan stated is NOT a plan of $0 — but a projection has to use a
+          // number, so the honest reading is "project what is here, with no
+          // contributions assumed", and the card says the plan is unset.
+          const perPeriod = obj?.contribution?.amountUsd ?? 0;
+          // Every projection below starts FROM the account value AND from a
+          // target the holder set. Without either they are not conservative or
+          // approximate, they are arbitrary — and "Behind"/"On Track" is a
+          // verdict, which is worse than a wrong number.
           const req =
-            total === null
+            total === null || target === null || years === null
               ? null
-              : requiredCagrWithContributions(
-                  total,
-                  FAMILY_POLICY.targetPerChild,
-                  years,
-                  FAMILY_POLICY.contribution.amountUsd,
-                );
+              : requiredCagrWithContributions(total, target, years, perPeriod);
           const at10 =
-            total === null
+            total === null || years === null
               ? null
-              : fvWithContributions(total, 0.1, years, FAMILY_POLICY.contribution.amountUsd);
+              : fvWithContributions(total, 0.1, years, perPeriod);
           const approvedShare =
             kid.holdings
               .filter((h) => approved.has(h.symbol))
@@ -228,15 +265,27 @@ function KidsPage() {
               <CardContent className="space-y-3 text-sm">
                 <div>
                   <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                    <span>Progress toward {fmtUSD(FAMILY_POLICY.targetPerChild)}</span>
+                    <span>
+                      {target === null
+                        ? "No target set for this account"
+                        : `Progress toward ${fmtUSD(target)} by ${obj!.targetDate}`}
+                    </span>
                     <span className="tabular-nums">
-                      {total === null
+                      {total === null || target === null || target <= 0
                         ? UNAVAILABLE
-                        : fmtPct(total / FAMILY_POLICY.targetPerChild)}
+                        : fmtPct(total / target)}
                     </span>
                   </div>
-                  {total !== null && (
-                    <Progress value={(total / FAMILY_POLICY.targetPerChild) * 100} />
+                  {total !== null && target !== null && target > 0 && (
+                    <Progress value={(total / target) * 100} />
+                  )}
+                  {kid.objective.kind === "unset" && (
+                    // Named, not counted. "Set a target" leaves the user
+                    // hunting for which half is missing.
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Missing: {kid.objective.missing.join(" and ")} — set them on this account in
+                      Settings. Progress, required CAGR and the status verdict all need both.
+                    </p>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">

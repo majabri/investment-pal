@@ -10,6 +10,7 @@
 // Pure: no React, no Supabase client, so the rules are unit-testable.
 import { accountCategory } from "./data/accountGroups";
 import { ageOf, memberOfAccount, type MemberLike } from "./household";
+import { accountObjectiveOf, type AccountObjective } from "./accountObjective";
 
 export type KidHolding = { symbol: string; shares: number; price: number; avgCost: number };
 
@@ -23,6 +24,12 @@ export type KidAccount = {
   age: number | null;
   /** NULL = not known. Never 0 for an account that has never been imported. */
   cash: number | null;
+  /**
+   * The account's own target and horizon, or `unset` with the missing fields
+   * named. Never `FAMILY_POLICY`'s $200,000 by 2036 — that was one household's
+   * objective rendered as every user's progress bar (rule 20).
+   */
+  objective: AccountObjective;
   holdings: KidHolding[];
 };
 
@@ -32,6 +39,11 @@ export type KidAccountRow = {
   account_type: string | null;
   cash: number | null;
   owner_member_id: string | null;
+  target_value: number | null;
+  target_date: string | null;
+  contribution_amount?: number | null;
+  contribution_cadence_days?: number | null;
+  contribution_anchor_date?: string | null;
 };
 
 export type KidHoldingRow = {
@@ -70,6 +82,7 @@ export function kidAccounts(
         holder: member?.display_name ?? null,
         age: member ? ageOf(member.birth_date, at) : null,
         cash: a.cash === null || a.cash === undefined ? null : Number(a.cash),
+        objective: accountObjectiveOf(a),
         holdings: holdings
           .filter((h) => h.account_id === a.id)
           .map((h) => ({
