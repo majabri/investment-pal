@@ -23,6 +23,7 @@ import {
   type MarginPolicy,
 } from "../marginCost";
 import { buildV6Prompt, mandateOf, type PromptContext } from "../prompts";
+import type { Objective } from "../objective";
 
 const SET: MarginPolicy = {
   margin_rate_annual_pct: 10,
@@ -139,6 +140,20 @@ describe("what the committee is told", () => {
   });
 });
 
+/** A complete objective, as `objectiveOf()` would return one. */
+function setObjective(
+  overrides: Partial<Extract<Objective, { kind: "set" }>> = {},
+): Objective {
+  return {
+    kind: "set",
+    startingValue: 60_000,
+    targetValue: 250_000,
+    targetDate: "2030-06-30",
+    monthlyContribution: 0,
+    ...overrides,
+  };
+}
+
 function ctx(overrides: Partial<PromptContext> = {}): PromptContext {
   return {
     accountName: "Growth Brokerage",
@@ -148,9 +163,7 @@ function ctx(overrides: Partial<PromptContext> = {}): PromptContext {
     buyingPower: 5_000,
     todaysPL: 0,
     todaysPLPct: 0,
-    goalStartingValue: 60_000,
-    goalTarget: 250_000,
-    goalDate: "2030-06-30",
+    objective: setObjective(),
     requiredCagr: 0.2,
     probability: 0.4,
     holdings: [],

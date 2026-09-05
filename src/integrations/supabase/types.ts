@@ -1,3 +1,7 @@
+// NOTE: goals.starting_value / target_value / target_date are hand-widened to
+// `| null` here to match supabase/migrations/20260905190000_neutral_user_provisioning.sql.
+// This file is normally generated; regenerating it against the project after
+// that migration is applied will produce the same shape.
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
@@ -74,9 +78,9 @@ export type Database = {
           monthly_contribution: number;
           name: string;
           risk_preference: string;
-          starting_value: number;
-          target_date: string;
-          target_value: number;
+          starting_value: number | null;
+          target_date: string | null;
+          target_value: number | null;
           updated_at: string;
           user_id: string;
         };
@@ -88,9 +92,9 @@ export type Database = {
           monthly_contribution?: number;
           name?: string;
           risk_preference?: string;
-          starting_value?: number;
-          target_date?: string;
-          target_value?: number;
+          starting_value?: number | null;
+          target_date?: string | null;
+          target_value?: number | null;
           updated_at?: string;
           user_id: string;
         };
@@ -102,9 +106,9 @@ export type Database = {
           monthly_contribution?: number;
           name?: string;
           risk_preference?: string;
-          starting_value?: number;
-          target_date?: string;
-          target_value?: number;
+          starting_value?: number | null;
+          target_date?: string | null;
+          target_value?: number | null;
           updated_at?: string;
           user_id?: string;
         };

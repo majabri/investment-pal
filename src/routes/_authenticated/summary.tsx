@@ -36,6 +36,7 @@ import { getEarningsCalendarFn } from "@/lib/calendarServer";
 import { getQuotesFn } from "@/lib/marketServer";
 import { marginInterestFigure } from "@/lib/marginCost";
 import { balanceSeries, dayChange } from "@/lib/portfolioSummary";
+import { objectiveOf } from "@/lib/objective";
 
 export const Route = createFileRoute("/_authenticated/summary")({
   head: () => ({
@@ -68,6 +69,7 @@ function SummaryPage() {
   const { data: latestBalance } = useLatestBalance(scope);
   const { data: ipsLite } = useIpsLite();
   const { data: goal } = useGoal();
+  const objective = useMemo(() => objectiveOf(goal), [goal]);
 
   const symbols = useMemo(() => [...new Set(holdings.map((h) => h.symbol))], [holdings]);
   const { data: quotes } = useQuery({
@@ -132,11 +134,11 @@ function SummaryPage() {
           series={series}
           totals={totals}
           objective={
-            goal
+            objective.kind === "set"
               ? {
-                  starting_value: Number(goal.starting_value),
-                  target_value: Number(goal.target_value),
-                  target_date: goal.target_date,
+                  starting_value: objective.startingValue,
+                  target_value: objective.targetValue,
+                  target_date: objective.targetDate,
                 }
               : null
           }

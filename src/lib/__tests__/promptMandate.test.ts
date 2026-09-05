@@ -17,6 +17,21 @@ import {
   DEFAULT_OFFICE_NAME,
   type PromptContext,
 } from "../prompts";
+import type { Objective } from "../objective";
+
+/** A complete objective, as `objectiveOf()` would return one. */
+function setObjective(
+  overrides: Partial<Extract<Objective, { kind: "set" }>> = {},
+): Objective {
+  return {
+    kind: "set",
+    startingValue: 60_000,
+    targetValue: 250_000,
+    targetDate: "2030-06-30",
+    monthlyContribution: 0,
+    ...overrides,
+  };
+}
 
 function ctx(overrides: Partial<PromptContext> = {}): PromptContext {
   return {
@@ -27,9 +42,7 @@ function ctx(overrides: Partial<PromptContext> = {}): PromptContext {
     buyingPower: 5_000,
     todaysPL: 0,
     todaysPLPct: 0,
-    goalStartingValue: 60_000,
-    goalTarget: 250_000,
-    goalDate: "2030-06-30",
+    objective: setObjective(),
     requiredCagr: 0.2,
     probability: 0.4,
     holdings: [],
@@ -51,15 +64,26 @@ describe("mandateOf", () => {
   test("formats the target date in UTC", () => {
     // A bare YYYY-MM-DD parses to UTC midnight. Formatting in local time would
     // render this as March 30 for any negative-offset timezone.
-    expect(mandateOf(ctx({ goalDate: "2027-03-31" })).date).toBe("March 31, 2027");
+    expect(mandateOf(ctx({ objective: setObjective({ targetDate: "2027-03-31" }) })).date).toBe("March 31, 2027");
   });
 
   test("falls back to neutral wording rather than a name when unset", () => {
     expect(mandateOf(ctx({ accountName: "   " })).account).toBe("this portfolio");
   });
 
-  test("passes a non-date through untouched instead of rendering Invalid Date", () => {
-    expect(mandateOf(ctx({ goalDate: "—" })).date).toBe("—");
+  test("says an unusable date is unset rather than rendering Invalid Date", () => {
+    // This used to pass "—" through untouched, which was better than "Invalid
+    // Date" and still wrong: a dash in "by —" reads as a formatting glitch in
+    // an otherwise complete mandate, not as "nobody set a horizon".
+    // Constructed by hand: `objectiveOf()` would never return this. The point
+    // is that the mandate degrades WHOLE rather than rendering a real target
+    // beside a dash, which reads as a formatting glitch, not a missing horizon.
+    for (const bad of ["—", "2027-02-31", ""]) {
+      const m = mandateOf(ctx({ objective: setObjective({ targetDate: bad }) }));
+      expect(m.date).toBe("an UNSET date");
+      expect(m.target).toBe("an UNSET target");
+      expect(m.objective).toContain("NOT BEEN SET");
+    }
   });
 });
 
@@ -101,7 +125,7 @@ describe("committee prompts are data-driven", () => {
 
     test(`${name}: a changed goal changes the prompt`, () => {
       const before = build(ctx());
-      const after = build(ctx({ goalTarget: 999_000, goalDate: "2031-01-15" }));
+      const after = build(ctx({ objective: setObjective({ targetValue: 999_000, targetDate: "2031-01-15" }) }));
       expect(before).not.toBe(after);
       expect(after).toContain("$999,000");
       expect(after).toContain("January 15, 2031");
@@ -226,15 +250,105 @@ describe("the objective has exactly one home", () => {
     expect(code).not.toContain("useAccounts");
   });
 
+  // The union makes the ACCIDENTAL fabrication unrepresentable: there is no
+  // longer a loose `goalTarget` for `?? 0` to attach to. It cannot stop a
+  // deliberate one — writing `{ kind: "set", targetValue: 0 }` by hand
+  // typechecks — so the one remaining rule is stated as a rule: `objectiveOf`
+  // is the only producer, and no screen builds an objective of its own.
+  test("no screen constructs an objective; they all come from objectiveOf", () => {
+    const offenders: string[] = [];
+    const walk = (dir: string): string[] =>
+      readdirSync(dir).flatMap((e) => {
+        const full = join(dir, e);
+        return statSync(full).isDirectory() ? walk(full) : [full];
+      });
+    for (const file of walk("src/routes")) {
+      const code = stripComments(readFileSync(file, "utf8"));
+      if (/kind:\s*["']set["']/.test(code)) offenders.push(file);
+    }
+    expect(offenders).toEqual([]);
+  });
+
   test("the mandate the committee reads comes from the goal, not an account", () => {
     // Restated as behaviour rather than as source-shape: change the objective
     // and the prompt changes with it.
     const before = mandateOf(ctx());
-    const after = mandateOf(ctx({ goalTarget: 400_000, goalDate: "2032-01-31" }));
+    const after = mandateOf(ctx({ objective: setObjective({ targetValue: 400_000, targetDate: "2032-01-31" }) }));
     expect(before.target).not.toBe(after.target);
     expect(after.target).toBe("$400,000");
     expect(after.date).toBe("January 31, 2032");
   });
+});
+
+// What the committee is told when there is no objective. This is the
+// money-adjacent half of Tier 2: an unset objective used to reach the model as
+// "Goal: $0.00 by  | Required CAGR: 0.0% | Model probability: 0.0%" — four
+// fabricated facts in one line, each of which reads as a real finding.
+describe("an unset objective reaches the model as unset, not as zero", () => {
+  // NULL throughout, which is what the goals row now actually holds. The
+  // `kind: "unset"`, which is now the only way to say it: the three loose
+  // fields this replaced could each be given a plausible-looking default, and
+  // the earlier version of this helper duly passed `goalTarget: 0` and
+  // `goalDate: ""` — testing the fabrication rather than its absence.
+  const unset = () =>
+    ctx({ requiredCagr: null, probability: null, objective: { kind: "unset", missing: [] } });
+  const all: Array<[string, (c: PromptContext) => string]> = [
+    ["v6", (c) => buildV6Prompt({ ...c, meeting: "Morning" })],
+    ["v5", (c) => buildV5Prompt({ ...c, meeting: "Morning" })],
+    ["universal", (c) => buildUniversalPrompt({ ...c, meeting: "Morning" })],
+    ["morning", buildMorningPrompt],
+    ["eod", (c) => buildEODPrompt({ ...c, tradesToday: "(none)" })],
+    ["weekly", buildWeeklyPrompt],
+    ["midday", buildMiddayPrompt],
+  ];
+
+  for (const [name, build] of all) {
+    test(`${name}: says the objective is not set`, () => {
+      const out = build(unset());
+      // Anchored to "Goal:" on purpose. A bare "NOT SET" is already in every
+      // prompt via the margin-rate line, so asserting that alone passes
+      // whether or not the objective line was fixed — my first version of this
+      // test did exactly that and a negative control caught it.
+      expect(out).toContain("Goal: NOT SET. No target, date or probability is available");
+      expect(out).not.toContain("Required CAGR: 0.0%");
+      expect(out).not.toContain("Model probability: 0.0%");
+    });
+
+    test(`${name}: emits no required pace it cannot compute`, () => {
+      const out = build(unset());
+      expect(out).toContain("not available while the objective is unset");
+      expect(out).not.toMatch(/Required pace: 0\.0%\/week/);
+    });
+
+    test(`${name}: a set objective still reports its figures`, () => {
+      // The unset path must not swallow the normal one.
+      const out = build(ctx());
+      expect(out).toContain("Required CAGR:");
+      expect(out).not.toContain("NOT SET. No target");
+    });
+
+    // The data block was only half of it. The MANDATE names the objective too,
+    // at seventeen sites across the constitutions, and it read
+    // "growing the X portfolio from approximately $0 to $0 by —" — a target of
+    // zero dollars given to the committee as its instruction, which is a
+    // stronger claim than anything in the data block (Copilot, #138).
+    test(`${name}: the mandate names no target it does not have`, () => {
+      const out = build(unset());
+      expect(out).toContain("an UNSET target");
+      expect(out).not.toMatch(/from approximately \$0 to \$0/);
+      expect(out).not.toMatch(/to \$0 by/);
+      expect(out).not.toMatch(/reaching \$0/);
+      expect(out).not.toMatch(/ by —/);
+    });
+
+    test(`${name}: a set objective still states the mandate in full`, () => {
+      const out = build(ctx());
+      expect(out).toContain("$250,000");
+      expect(out).not.toContain("UNSET target");
+      expect(out).not.toContain("UNSET date");
+      expect(out).not.toContain("NOT BEEN SET");
+    });
+  }
 });
 
 // Only the v5 and v6 constitutions carry an office identity; the other builders

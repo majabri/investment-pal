@@ -1,6 +1,8 @@
 // Prompt templates for ChatGPT morning + end-of-day reviews.
 import { fmtPct, fmtUSD } from "./finance";
 import { marginRatePromptLine, MARGIN_POLICY_UNSET, type MarginPolicy } from "./marginCost";
+import { isRealCalendarDate } from "./localDate";
+import type { Objective } from "./objective";
 
 export type PromptContext = {
   /** Name of the portfolio the mandate is written about (the goal's name). */
@@ -17,11 +19,30 @@ export type PromptContext = {
   buyingPower: number;
   todaysPL: number;
   todaysPLPct: number;
-  goalStartingValue: number;
-  goalTarget: number;
-  goalDate: string;
-  requiredCagr: number;
-  probability: number;
+  /**
+   * The objective, exactly as `objectiveOf()` decided it.
+   *
+   * This was three loose fields — `goalStartingValue`, `goalTarget`,
+   * `goalDate` — and the only caller filled them with `?? 0` and `?? "—"` for a
+   * goal nobody had set. The mandate then instructed the committee to grow the
+   * portfolio "from approximately $0 to $0 by —": a target of zero dollars,
+   * stated as the mandate itself (Copilot raised this on #138).
+   *
+   * Making them nullable would have fixed that instance and left the shape that
+   * caused it — three independently-supplied values, each with an obvious
+   * wrong default to hand. Carrying the discriminated union instead means a
+   * partially-known objective cannot be expressed here at all: a caller either
+   * has all three or says `kind: "unset"`.
+   */
+  objective: Objective;
+  /**
+   * NULL when the objective is unset. Rendered as "not set", never as 0% —
+   * "Required CAGR: 0.0%" tells the committee no growth is required, which is
+   * a claim made from missing data (rule 13, P0 Tier 2).
+   */
+  requiredCagr: number | null;
+  /** NULL when the objective is unset. Never 0% — that reads as no chance. */
+  probability: number | null;
   ipsPositionCapPct?: number;
   ipsPositionCapHard?: boolean;
   ipsMarginCapPct?: number;
@@ -75,6 +96,15 @@ export type Mandate = {
    */
   officeName: string;
   account: string;
+  /**
+   * The whole objective clause, rendered once so the templates never assemble
+   * one from three separately-unknown parts: either "from approximately
+   * $50,000 to $150,000 by March 31, 2027", or an explicit statement that no
+   * objective is set, carrying the instruction not to invent one.
+   */
+  objective: string;
+  /** The parts, for the sites that name only one of them. Each says so in
+   *  words when unset — never $0, and never a bare dash. */
   start: string;
   target: string;
   date: string;
@@ -99,16 +129,73 @@ function formatGoalDate(iso: string): string {
   });
 }
 
+/**
+ * The goal line, or an explicit statement that there is no objective.
+ *
+ * Never emits a number it does not have: an unset objective used to reach the
+ * model as "Goal: $0.00 by  | Required CAGR: 0.0% | Model probability: 0.0%",
+ * which is four fabricated facts in one line.
+ */
+function objectiveLine(ctx: PromptContext): string {
+  if (!usable(ctx.objective) || ctx.requiredCagr === null || ctx.probability === null) {
+    return "NOT SET. No target, date or probability is available — do not assume one, and say so if a recommendation would depend on it.";
+  }
+  const o = ctx.objective as Extract<Objective, { kind: "set" }>;
+  return `${fmtUSD(o.targetValue)} by ${o.targetDate} | Required CAGR: ${fmtPct(ctx.requiredCagr)} | Model probability: ${fmtPct(ctx.probability)}`;
+}
+
+function paceLine(cagr: number | null): string {
+  if (cagr === null) return "not available while the objective is unset.";
+  return `${fmtPct(Math.pow(1 + cagr, 1 / 52) - 1)}/week | ${fmtPct(Math.pow(1 + cagr, 1 / 12) - 1)}/month`;
+}
+
 /** Generic default. A deployment that sets no office name gets no person's name. */
 export const DEFAULT_OFFICE_NAME = "Investment Office";
 
+/**
+ * Whether the context carries a usable objective.
+ *
+ * All-or-nothing, and the same rule as `objectiveOf()` in `lib/objective.ts`:
+ * a mandate assembled from a real target and an unknown date would read as a
+ * complete instruction while resting on a value nobody supplied.
+ */
+/**
+ * A last check that a "set" objective really is usable.
+ *
+ * `objectiveOf()` is the only producer and it validates, so this is the union's
+ * guarantee holding at the boundary rather than a path the app reaches today.
+ * It is here because the failure it prevents is silent: an unreal date renders
+ * through `formatGoalDate` as the raw string, so a mandate would read
+ * "by \u2014" \u2014 which looks like a formatting glitch in an otherwise complete
+ * instruction, not like a missing horizon. All-or-nothing, for the same reason
+ * `objectiveOf` is: a real target with an unusable date is not two thirds of a
+ * mandate.
+ */
+function usable(o: Objective): o is Extract<Objective, { kind: "set" }> {
+  return (
+    o.kind === "set" &&
+    Number.isFinite(o.startingValue) &&
+    Number.isFinite(o.targetValue) &&
+    isRealCalendarDate(o.targetDate)
+  );
+}
+
 export function mandateOf(ctx: PromptContext): Mandate {
+  const o = usable(ctx.objective) ? ctx.objective : ({ kind: "unset", missing: [] } as Objective);
+  const start = o.kind === "set" ? fmtUSD(o.startingValue, 0) : "an UNSET starting value";
+  const target = o.kind === "set" ? fmtUSD(o.targetValue, 0) : "an UNSET target";
+  const date = o.kind === "set" ? formatGoalDate(o.targetDate) : "an UNSET date";
+
   return {
     officeName: ctx.officeName?.trim() || DEFAULT_OFFICE_NAME,
     account: ctx.accountName.trim() || "this portfolio",
-    start: fmtUSD(ctx.goalStartingValue, 0),
-    target: fmtUSD(ctx.goalTarget, 0),
-    date: formatGoalDate(ctx.goalDate),
+    objective:
+      o.kind === "set"
+        ? `from approximately ${start} to ${target} by ${date}`
+        : "toward an objective that has NOT BEEN SET — no starting value, target or date is available, so do not assume one, and say so if a recommendation would depend on it",
+    start,
+    target,
+    date,
     marginRate: marginRatePromptLine(ctx.marginPolicy ?? MARGIN_POLICY_UNSET),
   };
 }
@@ -142,8 +229,8 @@ Account value (NET, investments + cash − margin): ${fmtUSD(ctx.portfolioValue)
 Gross investments: ${fmtUSD(ctx.grossValue ?? ctx.portfolioValue)} | Account equity: ${ctx.grossValue && ctx.grossValue > 0 ? fmtPct(ctx.portfolioValue / ctx.grossValue) : "—"}
 Today's P/L (vs prior close, live-quoted positions): ${fmtUSD(ctx.todaysPL)} (${fmtPct(ctx.todaysPLPct)})
 Cash: ${fmtUSD(ctx.cash)} | Margin used: ${fmtUSD(ctx.marginUsed)} | Buying power: ${fmtUSD(ctx.buyingPower)}
-Goal: ${fmtUSD(ctx.goalTarget)} by ${ctx.goalDate} | Required CAGR: ${fmtPct(ctx.requiredCagr)} | Model probability: ${fmtPct(ctx.probability)}
-Required pace: ${fmtPct(Math.pow(1 + ctx.requiredCagr, 1 / 52) - 1)}/week | ${fmtPct(Math.pow(1 + ctx.requiredCagr, 1 / 12) - 1)}/month
+Goal: ${objectiveLine(ctx)}
+Required pace: ${paceLine(ctx.requiredCagr)}
 
 INVESTMENT POLICY (IPS-lite) — HARD GOVERNANCE
 Max single position: ${ctx.ipsPositionCapPct ?? 30}% of gross${ctx.ipsPositionCapHard ? " (HARD — do not exceed)" : " (soft — flag any breach; explicit justification required)"}.
@@ -190,7 +277,7 @@ const MORNING_TEMPLATE = (
 ) => String.raw`You are the Chief Investment Officer (CIO) and Investment Committee for my ${m.account} portfolio.
 
 MISSION
-Your sole mandate is to maximize the probability of growing the ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date}.
+Your sole mandate is to maximize the probability of growing the ${m.account} portfolio ${m.objective}.
 Every recommendation must improve the probability of reaching that objective while managing downside risk, margin cost, concentration risk, and taxes.
 Do not optimize for today's return alone.
 
@@ -379,7 +466,7 @@ const EOD_TEMPLATE = (
 Your job is NOT to tell me whether my portfolio went up or down today.
 Your job is to determine whether today's information changes my investment strategy or improves/reduces the probability of reaching my goal.
 Primary Objective:
-Grow my ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date}.
+Grow my ${m.account} portfolio ${m.objective}.
 Assumptions:
 - ${m.marginRate}
 - I execute all trades myself.
@@ -467,7 +554,7 @@ const WEEKLY_TEMPLATE = (
 ) => String.raw`You are my Investment Committee, Chief Investment Officer (CIO), Chief Risk Officer (CRO), and Devil's Advocate.
 Your responsibility is to evaluate my portfolio exactly as an institutional investment committee would.
 Your mission is NOT to maximize next week's return.
-Your mission is to maximize the probability of growing my ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date}, while managing downside risk and using leverage intelligently.
+Your mission is to maximize the probability of growing my ${m.account} portfolio ${m.objective}, while managing downside risk and using leverage intelligently.
 Assumptions
 • Target Portfolio Value: ${m.target} by ${m.date}
 • ${m.marginRate}
@@ -705,7 +792,7 @@ End with a single-page summary containing only:
 • Upcoming Catalysts
 • Priority Actions for the Week
 • Overall Confidence Score
-Do not recommend trades simply to be active. If the best decision is to make no changes, state that clearly and explain why. Focus on maximizing the probability of reaching the ${m.date} goal through disciplined, high-conviction decisions rather than frequent trading.`;
+Do not recommend trades simply to be active. If the best decision is to make no changes, state that clearly and explain why. Focus on maximizing the probability of reaching the goal by ${m.date} through disciplined, high-conviction decisions rather than frequent trading.`;
 
 export function buildWeeklyPrompt(ctx: PromptContext): string {
   return [WEEKLY_TEMPLATE(mandateOf(ctx)), "", dataBlock(ctx), "", CONTINUITY].join("\n");
@@ -739,7 +826,7 @@ export type MeetingType = "Morning" | "Mid-Day" | "Evening" | "Weekly" | "Monthl
 const UNIVERSAL_TEMPLATE = (
   m: Mandate,
 ) => String.raw`You are my Chief Investment Officer (CIO) and Investment Committee.
-Your primary mandate is to maximize the probability of growing my ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date} while recognizing this is an aggressive objective.
+Your primary mandate is to maximize the probability of growing my ${m.account} portfolio ${m.objective} while recognizing this is an aggressive objective.
 Every recommendation should increase the probability of reaching that objective—not simply maximize today's return.
 Assumptions
 • ${m.marginRate}
@@ -931,7 +1018,7 @@ Its purpose is to maximize the probability of achieving the portfolio objective�
 
 PRIMARY OBJECTIVE
 The application exists for one reason:
-Grow the ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date}.
+Grow the ${m.account} portfolio ${m.objective}.
 Every recommendation must improve the probability of achieving that objective.
 The application should optimize for probability of success—not today's return.
 
@@ -1075,7 +1162,7 @@ Before presenting the final recommendation, the Investment OS must perform a sel
 2. Identify the recommendation with the greatest uncertainty and explain why.
 3. List the evidence that would cause today's recommendations to change.
 4. Compare today's recommendations to the previous review and explain every material change.
-5. Assess whether the recommendations prioritize improving the probability of reaching the ${m.target} objective rather than simply chasing returns.
+5. Assess whether the recommendations prioritize improving the probability of reaching the objective of ${m.target} rather than simply chasing returns.
 6. If the portfolio has underperformed since adopting the current strategy, explicitly evaluate whether the strategy itself should change. Recommend adjustments if they are expected to improve the probability of success.
 7. End every review with a CIO Confidence Statement summarizing:
     * Current market regime
@@ -1121,7 +1208,7 @@ Your responsibility is to maximize the probability of achieving the investment o
 
 PRIMARY OBJECTIVE
 Your only objective is:
-Grow the ${m.account} Portfolio from approximately ${m.start} to ${m.target} by ${m.date}.
+Grow the ${m.account} Portfolio ${m.objective}.
 Every recommendation must improve the probability of achieving this objective.
 Never optimize for today's gain.
 Optimize for probability of success.
@@ -1334,7 +1421,7 @@ Summarize:
 * Selected Investment Playbook
 * Probability Trend (Improving / Stable / Declining)
 * Highest-impact action today
-* Biggest risk to achieving the ${m.target} objective`;
+* Biggest risk to achieving the objective of ${m.target}`;
 
 export function buildV6Prompt(
   ctx: PromptContext & { meeting: MeetingType; tradesToday?: string },

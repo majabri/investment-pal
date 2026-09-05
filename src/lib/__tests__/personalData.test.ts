@@ -83,15 +83,25 @@ const ALLOWED: Record<string, { why: string; needles: string[] }> = {
     why: "applied migration; comment edit deferred to the owner (see PR)",
     needles: ["the owner's first name"],
   },
-  // PENDING TIER 2 — the new-user trigger and column defaults still seed one
-  // person's account name, target and date. Removing them needs a forward
-  // migration, which is the next PR. These entries come out with it.
+  // A data migration cannot re-label rows without naming the value it is
+  // replacing. This is the migration that REMOVES the personal scope default,
+  // and its single WHERE clause is the only place the name survives; the
+  // explanatory comments above it were reworded when this guard caught them.
+  "supabase/migrations/20260905190000_neutral_user_provisioning.sql": {
+    why: "the UPDATE that re-labels legacy rows must match the old value",
+    needles: ["the owner's first name"],
+  },
+  // Tier 2 is DONE, but these two are APPLIED migrations and their text is
+  // history: 20260905190000 supersedes both defaults with a forward migration.
+  // Editing an applied migration in place risks a checksum mismatch on the next
+  // `supabase db push`, and rewriting history to hide what the schema used to
+  // do would be worse than leaving it visible.
   "supabase/migrations/20260723211412_0ebbafa7-74cc-4c83-aa77-8201625a9dfb.sql": {
-    why: "pending Tier 2: personal defaults in the new-user trigger",
+    why: "applied migration, superseded by 20260905190000; text kept as history",
     needles: ["the owner's first name"],
   },
   "supabase/migrations/20260725025027_portfolio_snapshots.sql": {
-    why: "pending Tier 2: personal default on portfolio_snapshots.scope",
+    why: "applied migration, superseded by 20260905190000; text kept as history",
     needles: ["the owner's first name"],
   },
   // Tier 3 is DONE: the templates carry a configurable office name and no

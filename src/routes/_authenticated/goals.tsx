@@ -33,6 +33,7 @@ import {
   riskToVol,
   yearsBetween,
 } from "@/lib/finance";
+import { objectiveOf } from "@/lib/objective";
 
 export const Route = createFileRoute("/_authenticated/goals")({
   head: () => ({
@@ -48,20 +49,22 @@ function GoalsPage() {
   const { data: goal, update } = useGoal();
 
   const [name, setName] = useState("");
-  const [starting, setStarting] = useState(0);
-  const [target, setTarget] = useState(0);
+  const [starting, setStarting] = useState<number | null>(null);
+  const [target, setTarget] = useState<number | null>(null);
   const [date, setDate] = useState("");
-  const [monthly, setMonthly] = useState(0);
+  const [monthly, setMonthly] = useState<number | null>(null);
   const [risk, setRisk] = useState("moderate");
   const [margin, setMargin] = useState("conservative");
 
   useEffect(() => {
     if (goal) {
       setName(goal.name);
-      setStarting(Number(goal.starting_value));
-      setTarget(Number(goal.target_value));
-      setDate(goal.target_date);
-      setMonthly(Number(goal.monthly_contribution));
+      // NULL stays null. `Number(null)` is 0, which would show an unset
+      // objective as a $0 target and compute against it (rule 13).
+      setStarting(goal.starting_value === null ? null : Number(goal.starting_value));
+      setTarget(goal.target_value === null ? null : Number(goal.target_value));
+      setDate(goal.target_date ?? "");
+      setMonthly(goal.monthly_contribution === null ? null : Number(goal.monthly_contribution));
       setRisk(goal.risk_preference);
       setMargin(goal.margin_preference);
     }
@@ -90,29 +93,41 @@ function GoalsPage() {
   );
 
   const metrics = useMemo(() => {
-    if (!date) return null;
+    // Every figure below needs all three. Computing from two and a default for
+    // the third is the fabrication the objective module exists to prevent.
+    const objective = objectiveOf({
+      starting_value: starting,
+      target_value: target,
+      target_date: date || null,
+      monthly_contribution: monthly,
+    });
+    if (objective.kind !== "set") return null;
     const years = Math.max(yearsBetween(new Date(), new Date(date)), 0.01);
-    const start = portfolioValue > 0 ? portfolioValue : starting;
-    const cagr = requiredCAGRWithContrib(start, target, years, monthly);
-    const weekly = periodicGrowth(start, target, years, 52);
-    const monthlyGrowth = periodicGrowth(start, target, years, 12);
+    const start = portfolioValue > 0 ? portfolioValue : objective.startingValue;
+    const cagr = requiredCAGRWithContrib(
+      start,
+      objective.targetValue,
+      years,
+      objective.monthlyContribution,
+    );
+    const weekly = periodicGrowth(start, objective.targetValue, years, 52);
+    const monthlyGrowth = periodicGrowth(start, objective.targetValue, years, 12);
     const prob = probabilityOfReachingTarget(
       start,
-      target,
+      objective.targetValue,
       years,
       riskToExpectedReturn(risk),
       riskToVol(risk),
     );
+    const span = objective.targetValue - objective.startingValue;
     const progress =
-      target > starting
-        ? Math.max(0, Math.min(1, (portfolioValue - starting) / (target - starting)))
-        : 0;
+      span > 0 ? Math.max(0, Math.min(1, (portfolioValue - objective.startingValue) / span)) : null;
     const completions = [0.1, 0.15, 0.2].map((r) => ({
       rate: r,
-      date: estimatedCompletionDate(start, target, r, monthly),
+      date: estimatedCompletionDate(start, objective.targetValue, r, objective.monthlyContribution),
     }));
     return { years, cagr, weekly, monthlyGrowth, prob, progress, completions };
-  }, [portfolioValue, starting, target, date, risk]);
+  }, [portfolioValue, starting, target, date, monthly, risk]);
 
   const save = () => {
     if (!goal) return;
@@ -122,8 +137,8 @@ function GoalsPage() {
         name,
         starting_value: starting,
         target_value: target,
-        target_date: date,
-        monthly_contribution: monthly,
+        target_date: date || null,
+        monthly_contribution: monthly ?? 0,
         risk_preference: risk as "conservative" | "moderate" | "aggressive",
         margin_preference: margin as "none" | "conservative" | "moderate" | "aggressive",
       },
@@ -149,13 +164,17 @@ function GoalsPage() {
               <Label className="text-xs">Starting value</Label>
               <Input
                 type="number"
-                value={starting}
-                onChange={(e) => setStarting(+e.target.value)}
+                value={starting ?? ""}
+                onChange={(e) => setStarting(e.target.value === "" ? null : +e.target.value)}
               />
             </div>
             <div>
               <Label className="text-xs">Target value</Label>
-              <Input type="number" value={target} onChange={(e) => setTarget(+e.target.value)} />
+              <Input
+                type="number"
+                value={target ?? ""}
+                onChange={(e) => setTarget(e.target.value === "" ? null : +e.target.value)}
+              />
             </div>
             <div>
               <Label className="text-xs">Target date</Label>
@@ -163,7 +182,11 @@ function GoalsPage() {
             </div>
             <div>
               <Label className="text-xs">Monthly contribution</Label>
-              <Input type="number" value={monthly} onChange={(e) => setMonthly(+e.target.value)} />
+              <Input
+                type="number"
+                value={monthly ?? ""}
+                onChange={(e) => setMonthly(e.target.value === "" ? null : +e.target.value)}
+              />
             </div>
             <div>
               <Label className="text-xs">Risk preference</Label>
