@@ -43,7 +43,7 @@ describe("chartNumber", () => {
 });
 
 describe("fmtChartUSD covers what fmtUSD alone does not", () => {
-  test("infinity is absent, not \"$∞\"", () => {
+  test('infinity is absent, not "$∞"', () => {
     // `fmtUSD` guards NaN but not Infinity, so it formats it as currency.
     expect(fmtUSD(Number.POSITIVE_INFINITY)).toBe("$∞");
     expect(fmtChartUSD(Number.POSITIVE_INFINITY)).toBe("—");

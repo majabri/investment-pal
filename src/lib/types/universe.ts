@@ -6,8 +6,8 @@ export interface UniverseEntry {
   symbol: string;
   company_name: string | null;
   tier: UniverseTier;
-  replaces_symbol: string | null;   // replacement matrix: which holding this would displace
-  business_quality: number | null;  // all scores 1-10
+  replaces_symbol: string | null; // replacement matrix: which holding this would displace
+  business_quality: number | null; // all scores 1-10
   growth: number | null;
   valuation: number | null;
   technical_strength: number | null;

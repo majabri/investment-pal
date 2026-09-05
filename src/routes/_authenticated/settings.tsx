@@ -89,17 +89,29 @@ function IpsLiteCard() {
     <section className="mb-4 rounded-2xl border bg-card p-5">
       <div className="mb-1 text-sm font-medium">Investment policy (IPS-lite)</div>
       <p className="mb-3 text-xs text-muted-foreground">
-        Governs the committee prompt and the Constitution Check strip. The objective never
-        justifies overriding these limits or the evidence contract.
+        Governs the committee prompt and the Constitution Check strip. The objective never justifies
+        overriding these limits or the evidence contract.
       </p>
       <div className="grid gap-3 sm:grid-cols-[200px_200px_160px_auto]">
         <div>
           <Label className="text-xs">Max single position (% of gross)</Label>
-          <Input type="number" min={0} max={100} value={posCap} onChange={(e) => setPosCap(e.target.value)} />
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            value={posCap}
+            onChange={(e) => setPosCap(e.target.value)}
+          />
         </div>
         <div>
           <Label className="text-xs">Max margin utilization (% of acct)</Label>
-          <Input type="number" min={0} max={100} value={marginCap} onChange={(e) => setMarginCap(e.target.value)} />
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            value={marginCap}
+            onChange={(e) => setMarginCap(e.target.value)}
+          />
         </div>
         <div>
           <Label className="text-xs">Position cap enforcement</Label>
@@ -159,8 +171,8 @@ function ObjectiveCard() {
       <section className="mb-4 rounded-2xl border bg-card p-5">
         <div className="mb-1 text-sm font-medium">Objective</div>
         <p className="text-xs text-muted-foreground">
-          No objective set yet. Create one on the Goal screen — the dashboard, the goal screen
-          and the committee prompt all read that single row.
+          No objective set yet. Create one on the Goal screen — the dashboard, the goal screen and
+          the committee prompt all read that single row.
         </p>
       </section>
     );
@@ -223,11 +235,21 @@ function ObjectiveCard() {
         </div>
         <div>
           <Label className="text-xs">Starting value ($)</Label>
-          <Input type="number" min={0} value={starting} onChange={(e) => setStarting(e.target.value)} />
+          <Input
+            type="number"
+            min={0}
+            value={starting}
+            onChange={(e) => setStarting(e.target.value)}
+          />
         </div>
         <div>
           <Label className="text-xs">Monthly contribution ($)</Label>
-          <Input type="number" min={0} value={monthly} onChange={(e) => setMonthly(e.target.value)} />
+          <Input
+            type="number"
+            min={0}
+            value={monthly}
+            onChange={(e) => setMonthly(e.target.value)}
+          />
         </div>
         <div className="flex items-end">
           <Button size="sm" onClick={onSave} disabled={update.isPending}>
@@ -314,10 +336,10 @@ function MarginRateCard() {
     <section className="mb-4 rounded-2xl border bg-card p-5">
       <div className="mb-1 text-sm font-medium">Margin rate</div>
       <p className="mb-3 text-xs text-muted-foreground">
-        Your current Fidelity margin rate. Nothing in the app supplies a default: while this
-        is blank, the dashboard shows no interest cost and the committee is told the rate is
-        not set. Fidelity tiers by debit balance and floats with the base rate, so enter the
-        tier that applies to your balance and re-check it periodically.
+        Your current Fidelity margin rate. Nothing in the app supplies a default: while this is
+        blank, the dashboard shows no interest cost and the committee is told the rate is not set.
+        Fidelity tiers by debit balance and floats with the base rate, so enter the tier that
+        applies to your balance and re-check it periodically.
       </p>
       {status.kind === "stale" ? (
         <p className="mb-3 text-xs font-medium text-amber-500">
@@ -378,7 +400,7 @@ function SettingsPage() {
   const { data: priorities = [], add: addPriority, dismiss: dismissP } = usePriorities();
   const { data: actions = [], add: addAction, dismiss: dismissA } = useRecommendedActions();
   const { data: syncs = [] } = useSyncLog();
-  
+
   const { data: accounts = [], create: createAccount } = useAccounts();
 
   const [pLabel, setPLabel] = useState("");
@@ -422,10 +444,14 @@ function SettingsPage() {
             onChange={(e) => setNewAcctName(e.target.value)}
           />
           <Select value={newAcctType} onValueChange={setNewAcctType}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {ACCOUNT_TYPES.map((t) => (
-                <SelectItem key={t} value={t}>{t.replace("_", " ").toUpperCase()}</SelectItem>
+                <SelectItem key={t} value={t}>
+                  {t.replace("_", " ").toUpperCase()}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -454,7 +480,11 @@ function SettingsPage() {
             <p className="text-sm text-muted-foreground">No accounts yet. Add one above.</p>
           )}
           {accounts.map((a) => (
-            <AccountCard key={a.id} account={a} onSynced={() => qc.invalidateQueries({ queryKey: ["sync_log"] })} />
+            <AccountCard
+              key={a.id}
+              account={a}
+              onSynced={() => qc.invalidateQueries({ queryKey: ["sync_log"] })}
+            />
           ))}
         </div>
       </section>
@@ -467,9 +497,15 @@ function SettingsPage() {
             <span className="text-xs text-muted-foreground">Shown on Dashboard</span>
           </div>
           <div className="mb-3 flex gap-2">
-            <Input placeholder="e.g., NVDA earnings tomorrow" value={pLabel} onChange={(e) => setPLabel(e.target.value)} />
+            <Input
+              placeholder="e.g., NVDA earnings tomorrow"
+              value={pLabel}
+              onChange={(e) => setPLabel(e.target.value)}
+            />
             <Select value={pSev} onValueChange={(v) => setPSev(v as typeof pSev)}>
-              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="info">Info</SelectItem>
                 <SelectItem value="warning">Warning</SelectItem>
@@ -491,17 +527,25 @@ function SettingsPage() {
           </div>
           <ul className="space-y-2">
             {priorities.map((p) => (
-              <li key={p.id} className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+              <li
+                key={p.id}
+                className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+              >
                 <span className="flex items-center gap-2">
                   <Badge variant="outline">{p.severity}</Badge>
                   {p.label}
                 </span>
-                <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => dismissP.mutate(p.id)}>
+                <button
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => dismissP.mutate(p.id)}
+                >
                   Remove
                 </button>
               </li>
             ))}
-            {priorities.length === 0 && <li className="text-sm text-muted-foreground">No priorities.</li>}
+            {priorities.length === 0 && (
+              <li className="text-sm text-muted-foreground">No priorities.</li>
+            )}
           </ul>
         </section>
 
@@ -509,7 +553,9 @@ function SettingsPage() {
           <div className="mb-3 text-sm font-medium">Recommended actions</div>
           <div className="mb-3 grid gap-2 sm:grid-cols-[110px_120px_1fr_auto]">
             <Select value={aCat} onValueChange={(v) => setACat(v as typeof aCat)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="review">Review</SelectItem>
                 <SelectItem value="buy">Buy</SelectItem>
@@ -518,14 +564,23 @@ function SettingsPage() {
                 <SelectItem value="watch">Watch</SelectItem>
               </SelectContent>
             </Select>
-            <Input placeholder="Symbol" value={aSym} onChange={(e) => setASym(e.target.value.toUpperCase())} />
+            <Input
+              placeholder="Symbol"
+              value={aSym}
+              onChange={(e) => setASym(e.target.value.toUpperCase())}
+            />
             <Input placeholder="Rationale" value={aRat} onChange={(e) => setARat(e.target.value)} />
             <Button
               size="icon"
               onClick={() => {
                 addAction.mutate(
                   { category: aCat, symbol: aSym || null, rationale: aRat || null },
-                  { onSuccess: () => { setASym(""); setARat(""); } },
+                  {
+                    onSuccess: () => {
+                      setASym("");
+                      setARat("");
+                    },
+                  },
                 );
               }}
             >
@@ -534,13 +589,23 @@ function SettingsPage() {
           </div>
           <ul className="space-y-2">
             {actions.map((a) => (
-              <li key={a.id} className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+              <li
+                key={a.id}
+                className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+              >
                 <span>
-                  <Badge variant="outline" className="mr-2">{a.category}</Badge>
+                  <Badge variant="outline" className="mr-2">
+                    {a.category}
+                  </Badge>
                   {a.symbol ? <span className="font-medium">{a.symbol}</span> : null}
-                  {a.rationale ? <span className="ml-2 text-muted-foreground">— {a.rationale}</span> : null}
+                  {a.rationale ? (
+                    <span className="ml-2 text-muted-foreground">— {a.rationale}</span>
+                  ) : null}
                 </span>
-                <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => dismissA.mutate(a.id)}>
+                <button
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => dismissA.mutate(a.id)}
+                >
                   Remove
                 </button>
               </li>
@@ -622,7 +687,6 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
     );
   };
 
-
   return (
     <div className="rounded-xl border bg-background/40 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -650,15 +714,23 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
               </>
             ) : null}
             {account.last_synced_at && (
-              <> · Last sync {formatDistanceToNow(new Date(account.last_synced_at), { addSuffix: true })}</>
+              <>
+                {" "}
+                · Last sync{" "}
+                {formatDistanceToNow(new Date(account.last_synced_at), { addSuffix: true })}
+              </>
             )}
           </div>
         </div>
         <div className="flex items-center gap-1">
           {editing ? (
             <>
-              <Button size="icon" variant="ghost" onClick={save}><Check className="h-4 w-4" /></Button>
-              <Button size="icon" variant="ghost" onClick={() => setEditing(false)}><X className="h-4 w-4" /></Button>
+              <Button size="icon" variant="ghost" onClick={save}>
+                <Check className="h-4 w-4" />
+              </Button>
+              <Button size="icon" variant="ghost" onClick={() => setEditing(false)}>
+                <X className="h-4 w-4" />
+              </Button>
             </>
           ) : (
             <Button size="icon" variant="ghost" onClick={() => setEditing(true)}>
@@ -692,40 +764,75 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
               value={form.account_type}
               onValueChange={(v) => setForm({ ...form, account_type: v })}
             >
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {ACCOUNT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>{t.replace("_", " ").toUpperCase()}</SelectItem>
+                  <SelectItem key={t} value={t}>
+                    {t.replace("_", " ").toUpperCase()}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </Field>
           <Field label="Broker">
-            <Input value={form.broker} onChange={(e) => setForm({ ...form, broker: e.target.value })} placeholder="Fidelity" />
+            <Input
+              value={form.broker}
+              onChange={(e) => setForm({ ...form, broker: e.target.value })}
+              placeholder="Fidelity"
+            />
           </Field>
           <Field label="Cash ($)">
-            <Input type="number" value={form.cash} onChange={(e) => setForm({ ...form, cash: +e.target.value })} />
+            <Input
+              type="number"
+              value={form.cash}
+              onChange={(e) => setForm({ ...form, cash: +e.target.value })}
+            />
           </Field>
           <Field label="Buying power ($)">
-            <Input type="number" value={form.buying_power} onChange={(e) => setForm({ ...form, buying_power: +e.target.value })} />
+            <Input
+              type="number"
+              value={form.buying_power}
+              onChange={(e) => setForm({ ...form, buying_power: +e.target.value })}
+            />
           </Field>
           <Field label="Margin used ($)">
-            <Input type="number" value={form.margin_used} onChange={(e) => setForm({ ...form, margin_used: +e.target.value })} />
+            <Input
+              type="number"
+              value={form.margin_used}
+              onChange={(e) => setForm({ ...form, margin_used: +e.target.value })}
+            />
           </Field>
           <Field label="Margin limit ($)">
-            <Input type="number" value={form.margin_limit} onChange={(e) => setForm({ ...form, margin_limit: +e.target.value })} />
+            <Input
+              type="number"
+              value={form.margin_limit}
+              onChange={(e) => setForm({ ...form, margin_limit: +e.target.value })}
+            />
           </Field>
           <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
-            <Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            <Textarea
+              rows={2}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
           </Field>
         </div>
       )}
-
     </div>
   );
 }
 
-function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+function Field({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <div className={className}>
       <Label className="text-xs text-muted-foreground">{label}</Label>
@@ -733,7 +840,6 @@ function Field({ label, children, className }: { label: string; children: React.
     </div>
   );
 }
-
 
 function AddAccountForm() {
   const qc = useQueryClient();
@@ -753,13 +859,22 @@ function AddAccountForm() {
       void qc.invalidateQueries();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <div className="flex items-center gap-2 py-1">
-      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Add account (e.g. HSA, ROTH IRA)"
-        className="h-8 max-w-xs text-sm" onKeyDown={(e) => e.key === "Enter" && void add()} />
-      <Button size="sm" className="h-8" disabled={busy || !name.trim()} onClick={() => void add()}>Add</Button>
+      <Input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Add account (e.g. HSA, ROTH IRA)"
+        className="h-8 max-w-xs text-sm"
+        onKeyDown={(e) => e.key === "Enter" && void add()}
+      />
+      <Button size="sm" className="h-8" disabled={busy || !name.trim()} onClick={() => void add()}>
+        Add
+      </Button>
     </div>
   );
 }

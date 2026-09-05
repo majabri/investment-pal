@@ -74,9 +74,12 @@ function parseConfidence(text: string): number | null {
 }
 
 export const Route = createFileRoute("/_authenticated/prompt-center")({
-  validateSearch: (search: Record<string, unknown>): { tab?: "morning" | "midday" | "evening" | "weekly" | "monthly" } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { tab?: "morning" | "midday" | "evening" | "weekly" | "monthly" } => ({
     tab: ["morning", "midday", "evening", "weekly", "monthly"].includes(search.tab as string)
-      ? (search.tab as "morning" | "midday" | "evening" | "weekly" | "monthly") : undefined,
+      ? (search.tab as "morning" | "midday" | "evening" | "weekly" | "monthly")
+      : undefined,
   }),
   head: () => ({
     meta: [
@@ -100,26 +103,42 @@ function PromptCenter() {
   const { data: ipsLite } = useIpsLite();
   const addJournal = useAddJournal();
   const { data: journalEntries = [] } = useJournal("");
-  const { data: news = [] } = useQuery({ queryKey: ["news"], queryFn: () => getNewsFn(), staleTime: 10 * 60 * 1000 });
+  const { data: news = [] } = useQuery({
+    queryKey: ["news"],
+    queryFn: () => getNewsFn(),
+    staleTime: 10 * 60 * 1000,
+  });
   const { data: decisions = [] } = useQuery({
     queryKey: ["decisions-for-prompt"],
     queryFn: async () => {
-      const { data } = await supabase.from("decisions" as never)
+      const { data } = await supabase
+        .from("decisions" as never)
         .select("decided_on,symbol,recommendation,decision,outcome_pl")
-        .order("decided_on", { ascending: false }).limit(10);
-      return (data ?? []) as unknown as { decided_on: string; symbol: string | null; recommendation: string; decision: string; outcome_pl: number | null }[];
+        .order("decided_on", { ascending: false })
+        .limit(10);
+      return (data ?? []) as unknown as {
+        decided_on: string;
+        symbol: string | null;
+        recommendation: string;
+        decision: string;
+        outcome_pl: number | null;
+      }[];
     },
   });
   // Committee scorecard: graded track record by action type (migration item 4).
   const { data: scorecardRows = [] } = useQuery({
     queryKey: ["decisions-scorecard"],
     queryFn: async () => {
-      const { data } = await supabase.from("decisions" as never)
+      const { data } = await supabase
+        .from("decisions" as never)
         .select("action,recommendation,grade,outcome_1m")
-        .in("grade", ["CORRECT", "WRONG"]).limit(200);
+        .in("grade", ["CORRECT", "WRONG"])
+        .limit(200);
       return (data ?? []) as unknown as {
-        action: string | null; recommendation: string;
-        grade: "CORRECT" | "WRONG" | "NEUTRAL" | "PENDING" | null; outcome_1m: number | null;
+        action: string | null;
+        recommendation: string;
+        grade: "CORRECT" | "WRONG" | "NEUTRAL" | "PENDING" | null;
+        outcome_1m: number | null;
       }[];
     },
   });
@@ -134,7 +153,9 @@ function PromptCenter() {
   const qc = useQueryClient();
   const { tab: urlTab } = Route.useSearch();
   const [tab, setTab] = useState<string>(urlTab ?? "morning");
-  useEffect(() => { if (urlTab) setTab(urlTab); }, [urlTab]);
+  useEffect(() => {
+    if (urlTab) setTab(urlTab);
+  }, [urlTab]);
 
   const { data: liveQuotes } = useQuery({
     queryKey: ["pc-quotes", amirHoldings.map((h) => h.symbol).join(",")],
@@ -143,18 +164,34 @@ function PromptCenter() {
     refetchInterval: 60 * 1000,
   });
   const { data: liveEconCal = [] } = useQuery({
-    queryKey: ["econ-cal-pc"], queryFn: () => getEconCalendarFn({ data: { days: 7 } }),
+    queryKey: ["econ-cal-pc"],
+    queryFn: () => getEconCalendarFn({ data: { days: 7 } }),
     refetchInterval: 60 * 60 * 1000,
   });
   const { data: liveEarnCal = [] } = useQuery({
     queryKey: ["earn-cal-pc", amirHoldings.map((h) => h.symbol).join(",")],
-    queryFn: () => getEarningsCalendarFn({ data: { symbols: [...amirHoldings.map((h) => h.symbol), "NVDA","META","COST","PANW","TSM","AAPL"], days: 7 } }),
+    queryFn: () =>
+      getEarningsCalendarFn({
+        data: {
+          symbols: [
+            ...amirHoldings.map((h) => h.symbol),
+            "NVDA",
+            "META",
+            "COST",
+            "PANW",
+            "TSM",
+            "AAPL",
+          ],
+          days: 7,
+        },
+      }),
     enabled: amirHoldings.length > 0,
     refetchInterval: 60 * 60 * 1000,
   });
   const ctx: PromptContext = useMemo(() => {
-    const holdings = amirHoldings.map((h) => liveQuotes?.[h.symbol]
-      ? { ...h, current_price: liveQuotes[h.symbol].price } : h);
+    const holdings = amirHoldings.map((h) =>
+      liveQuotes?.[h.symbol] ? { ...h, current_price: liveQuotes[h.symbol].price } : h,
+    );
     const positionsValue = holdings.reduce((s, h) => s + h.quantity * h.current_price, 0);
     const cost = holdings.reduce((s, h) => s + h.quantity * h.cost_basis, 0);
     const pl = positionsValue - cost;
@@ -168,7 +205,9 @@ function PromptCenter() {
     }, 0);
     const today = new Date();
     const years = goal ? Math.max(yearsBetween(today, new Date(goal.target_date)), 0.01) : 1;
-    const cagr = goal ? requiredCAGR(portfolioValue || goal.starting_value, goal.target_value, years) : 0;
+    const cagr = goal
+      ? requiredCAGR(portfolioValue || goal.starting_value, goal.target_value, years)
+      : 0;
     const prob = goal
       ? probabilityOfReachingTarget(
           portfolioValue || goal.starting_value,
@@ -205,22 +244,62 @@ function PromptCenter() {
       })),
       priorities: priorities.map((p) => p.label),
       userNotes,
-      watchlist: ["NVDA","AVGO","TSM","AMD","META","COST","NFLX","NOW","PANW","MA","LLY","BRK.B"],
-      upcomingEarnings: liveEarnCal.map((e) =>
-        `${e.date} ${e.symbol} (${e.session === "bmo" ? "pre-market" : "after close"})${amirHoldings.some((h) => h.symbol === e.symbol) ? " — HELD" : ""}`),
-      upcomingEcon: liveEconCal.filter((e) => e.importance !== "low")
-        .map((e) => `${e.date} ${e.name} [${e.importance}]${e.consensus ? ` est ${e.consensus}` : ""}`),
+      watchlist: [
+        "NVDA",
+        "AVGO",
+        "TSM",
+        "AMD",
+        "META",
+        "COST",
+        "NFLX",
+        "NOW",
+        "PANW",
+        "MA",
+        "LLY",
+        "BRK.B",
+      ],
+      upcomingEarnings: liveEarnCal.map(
+        (e) =>
+          `${e.date} ${e.symbol} (${e.session === "bmo" ? "pre-market" : "after close"})${amirHoldings.some((h) => h.symbol === e.symbol) ? " — HELD" : ""}`,
+      ),
+      upcomingEcon: liveEconCal
+        .filter((e) => e.importance !== "low")
+        .map(
+          (e) => `${e.date} ${e.name} [${e.importance}]${e.consensus ? ` est ${e.consensus}` : ""}`,
+        ),
       topHeadlines: news.slice(0, 6).map((n) => `${n.title} (${n.source})`),
-      recentDecisions: decisions.map((d) =>
-        `${d.decided_on}${d.symbol ? ` ${d.symbol}` : ""}: "${d.recommendation}" → ${d.decision}${d.outcome_pl != null ? ` → ${d.outcome_pl >= 0 ? "+" : ""}$${d.outcome_pl.toFixed(2)}` : ""}`),
-      recentJournal: journalEntries.slice(0, 3).map((j) =>
-        `${j.created_at.slice(0, 10)}: ${(j.title ?? j.body ?? "").slice(0, 120)}`),
+      recentDecisions: decisions.map(
+        (d) =>
+          `${d.decided_on}${d.symbol ? ` ${d.symbol}` : ""}: "${d.recommendation}" → ${d.decision}${d.outcome_pl != null ? ` → ${d.outcome_pl >= 0 ? "+" : ""}$${d.outcome_pl.toFixed(2)}` : ""}`,
+      ),
+      recentJournal: journalEntries
+        .slice(0, 3)
+        .map((j) => `${j.created_at.slice(0, 10)}: ${(j.title ?? j.body ?? "").slice(0, 120)}`),
       committeeScorecard,
     };
-  }, [amirHoldings, liveQuotes, selectedAccount, balance, goal, priorities, ipsLite, userNotes, news, journalEntries, decisions, committeeScorecard, liveEconCal, liveEarnCal]);
+  }, [
+    amirHoldings,
+    liveQuotes,
+    selectedAccount,
+    balance,
+    goal,
+    priorities,
+    ipsLite,
+    userNotes,
+    news,
+    journalEntries,
+    decisions,
+    committeeScorecard,
+    liveEconCal,
+    liveEarnCal,
+  ]);
 
   const MEETING: Record<string, MeetingType> = {
-    morning: "Morning", midday: "Mid-Day", evening: "Evening", weekly: "Weekly", monthly: "Monthly",
+    morning: "Morning",
+    midday: "Mid-Day",
+    evening: "Evening",
+    weekly: "Weekly",
+    monthly: "Monthly",
   };
   const prompt = buildV6Prompt({ ...ctx, meeting: MEETING[tab] ?? "Morning", tradesToday });
 
@@ -233,14 +312,19 @@ function PromptCenter() {
     if (!aiResponse.trim()) return toast.error("Paste the committee response first");
     const lines = aiResponse.split("\n").map((l) => l.trim());
     const actions: { action: string; line: string; symbol: string | null }[] = [];
-    const ACT = /^[-*•\s]*\**(BUY MORE|BUY|SELL|TRIM|MARGIN|HIGHEST PRIORITY ACTION|SINGLE HIGHEST PRIORITY ACTION)\**[:\s|—-]/i;
+    const ACT =
+      /^[-*•\s]*\**(BUY MORE|BUY|SELL|TRIM|MARGIN|HIGHEST PRIORITY ACTION|SINGLE HIGHEST PRIORITY ACTION)\**[:\s|—-]/i;
     for (const l of lines) {
       const m = ACT.exec(l);
       if (!m) continue;
       const body = l.replace(ACT, "").trim();
       if (!body || /^(none|n\/a|no action)/i.test(body)) continue;
       const sym = /\b([A-Z]{1,5}(?:\.[A-B])?)\b/.exec(body)?.[1] ?? null;
-      actions.push({ action: m[1].toUpperCase(), line: `${m[1].toUpperCase()}: ${body}`.slice(0, 300), symbol: sym });
+      actions.push({
+        action: m[1].toUpperCase(),
+        line: `${m[1].toUpperCase()}: ${body}`.slice(0, 300),
+        symbol: sym,
+      });
       if (actions.length >= 12) break;
     }
     if (!actions.length) return toast.error("No Action Sheet lines found (BUY/SELL/TRIM/MARGIN…)");
@@ -249,8 +333,11 @@ function PromptCenter() {
       if (!auth.user) throw new Error("Not signed in");
       const today = new Date().toISOString().slice(0, 10);
       const rows = actions.map((a) => ({
-        user_id: auth.user!.id, decided_on: today, symbol: a.symbol,
-        recommendation: a.line, decision: "pending",
+        user_id: auth.user!.id,
+        decided_on: today,
+        symbol: a.symbol,
+        recommendation: a.line,
+        decision: "pending",
         // Evidence-contract columns: populate what a line-based extract can.
         // The Action Sheet carries the action verb; per-line evidence/risks/
         // confidence live in the committee body, so those stay null here.
@@ -263,7 +350,10 @@ function PromptCenter() {
       const { error } = await supabase.from("decisions" as never).insert(rows as never);
       if (error) throw error;
       toast.success(`Action Sheet extracted: ${actions.length} items logged as pending decisions`);
-      void qc.invalidateQueries({ predicate: (q: { queryKey: readonly unknown[] }) => String(q.queryKey[0]).startsWith("decisions") });
+      void qc.invalidateQueries({
+        predicate: (q: { queryKey: readonly unknown[] }) =>
+          String(q.queryKey[0]).startsWith("decisions"),
+      });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Extract failed");
     }
@@ -379,8 +469,11 @@ function PromptCenter() {
           />
         </TabsContent>
       </Tabs>
-          <div className="mt-6">
-        <CommitteeChat systemPrompt={prompt} title={`Investment Committee Chat — ${MEETING[tab] ?? "Morning"}`} />
+      <div className="mt-6">
+        <CommitteeChat
+          systemPrompt={prompt}
+          title={`Investment Committee Chat — ${MEETING[tab] ?? "Morning"}`}
+        />
       </div>
     </AppShell>
   );
@@ -432,7 +525,7 @@ function PromptEditor({
             </div>
           </div>
           <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-background p-3 text-xs leading-relaxed text-foreground/90">
-{prompt}
+            {prompt}
           </pre>
         </div>
       </div>

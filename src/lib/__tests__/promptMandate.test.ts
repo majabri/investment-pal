@@ -149,7 +149,8 @@ describe("the objective has exactly one home", () => {
   // But a direct `supabase.from("accounts").update({ ... })` need carry
   // neither key, so those call sites are scanned too. Named tables only: the
   // point is to catch a write to THIS table, not to flag every mutation.
-  const ACCOUNTS_TABLE_WRITE = /\.from\(\s*["']accounts["']\s*\)[\s\S]{0,80}?\.(update|insert|upsert)\(/g;
+  const ACCOUNTS_TABLE_WRITE =
+    /\.from\(\s*["']accounts["']\s*\)[\s\S]{0,80}?\.(update|insert|upsert)\(/g;
   const WINDOW = 700;
 
   function accountPayloads(code: string): string[] {

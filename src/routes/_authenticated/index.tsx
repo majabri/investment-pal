@@ -64,10 +64,7 @@ export const Route = createFileRoute("/_authenticated/")({
   component: Dashboard,
 });
 
-const CATEGORY_META: Record<
-  string,
-  { label: string; className: string }
-> = {
+const CATEGORY_META: Record<string, { label: string; className: string }> = {
   review: { label: "Review", className: "bg-primary/15 text-primary" },
   buy: { label: "Buy candidate", className: "bg-success/20 text-success" },
   hold: { label: "Hold", className: "bg-muted text-muted-foreground" },
@@ -104,7 +101,10 @@ function Dashboard() {
   const { data: actions = [], dismiss: dismissAction } = useRecommendedActions();
   const logSync = useLogSync();
 
-  const householdSymbols = useMemo(() => [...new Set(allHoldings.map((h) => h.symbol))], [allHoldings]);
+  const householdSymbols = useMemo(
+    () => [...new Set(allHoldings.map((h) => h.symbol))],
+    [allHoldings],
+  );
   const heldSymbols = useMemo(() => holdings.map((h) => h.symbol), [holdings]);
   const { data: liveQuotes } = useQuery({
     queryKey: ["daily-quotes", householdSymbols.join(",")],
@@ -112,17 +112,22 @@ function Dashboard() {
     enabled: householdSymbols.length > 0,
     refetchInterval: 60 * 1000,
   });
-  const px = (h: { symbol: string; current_price: number }) => liveQuotes?.[h.symbol]?.price ?? h.current_price;
-  const week = new Date(); week.setDate(week.getDate() + 7);
+  const px = (h: { symbol: string; current_price: number }) =>
+    liveQuotes?.[h.symbol]?.price ?? h.current_price;
+  const week = new Date();
+  week.setDate(week.getDate() + 7);
   const weekEnd = week.toISOString().slice(0, 10);
   const todayStr = new Date().toISOString().slice(0, 10);
   const { data: todaysPlan = [] } = useQuery({
     queryKey: ["decisions-today"],
     queryFn: async () => {
       const today = new Date().toISOString().slice(0, 10);
-      const { data } = await supabase.from("decisions" as never)
-        .select("id,recommendation,decision").eq("decided_on", today)
-        .order("id", { ascending: true }).limit(12);
+      const { data } = await supabase
+        .from("decisions" as never)
+        .select("id,recommendation,decision")
+        .eq("decided_on", today)
+        .order("id", { ascending: true })
+        .limit(12);
       return (data ?? []) as unknown as { id: string; recommendation: string; decision: string }[];
     },
     refetchInterval: 5 * 60 * 1000,
@@ -133,11 +138,13 @@ function Dashboard() {
     queryFn: async (): Promise<TrimDecision[]> => {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 45);
-      const { data } = await supabase.from("decisions" as never)
+      const { data } = await supabase
+        .from("decisions" as never)
         .select("id,symbol,action,recommendation,price_at_rec,decided_on")
         .gte("decided_on", cutoff.toISOString().slice(0, 10))
         .not("price_at_rec", "is", null)
-        .order("decided_on", { ascending: false }).limit(100);
+        .order("decided_on", { ascending: false })
+        .limit(100);
       return (data ?? []) as unknown as TrimDecision[];
     },
   });
@@ -161,18 +168,34 @@ function Dashboard() {
     refetchInterval: 60 * 60 * 1000,
   });
   const alerts = useMemo(() => {
-    const econ = liveEcon.filter((e) => e.importance === "high" && e.date >= todayStr && e.date <= weekEnd)
+    const econ = liveEcon
+      .filter((e) => e.importance === "high" && e.date >= todayStr && e.date <= weekEnd)
       .map((e) => ({ date: e.date, text: e.name, kind: "econ" as const }));
-    const earn = liveEarn.filter((e) => e.date >= todayStr && e.date <= weekEnd)
-      .map((e) => ({ date: e.date, text: `${e.symbol} earnings (${e.session === "bmo" ? "pre-market" : "after close"})`, kind: "earnings" as const }));
+    const earn = liveEarn
+      .filter((e) => e.date >= todayStr && e.date <= weekEnd)
+      .map((e) => ({
+        date: e.date,
+        text: `${e.symbol} earnings (${e.session === "bmo" ? "pre-market" : "after close"})`,
+        kind: "earnings" as const,
+      }));
     const seen = new Set<string>();
-    return [...econ, ...earn].sort((a, b) => a.date.localeCompare(b.date))
-      .filter((a) => { const k = a.text; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 6);
+    return [...econ, ...earn]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .filter((a) => {
+        const k = a.text;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      })
+      .slice(0, 6);
   }, [liveEcon, liveEarn, todayStr, weekEnd]);
   // One reconcilable arithmetic for every figure below, over the scoped
   // positions and the scoped balance, priced live where a quote exists.
   // `cash ?? account?.cash` used to fall through to the household aggregate.
-  const totals = useMemo(() => accountTotals(holdings, balance, px), [holdings, balance, liveQuotes]);
+  const totals = useMemo(
+    () => accountTotals(holdings, balance, px),
+    [holdings, balance, liveQuotes],
+  );
   const { cash, marginDebit: marginUsed, grossValue, totalAccountValue: portfolioValue } = totals;
   const scopeName = scopeLabel(scope);
   const noScope = scopeIsEmpty(scope) || balance === null;
@@ -194,7 +217,12 @@ function Dashboard() {
     const targetDate = new Date(goal.target_date);
     const years = Math.max(yearsBetween(today, targetDate), 0.01);
     const startVal = portfolioValue > 0 ? portfolioValue : goal.starting_value;
-    const cagr = requiredCAGRWithContrib(startVal, goal.target_value, years, Number(goal.monthly_contribution ?? 0));
+    const cagr = requiredCAGRWithContrib(
+      startVal,
+      goal.target_value,
+      years,
+      Number(goal.monthly_contribution ?? 0),
+    );
     const prob = probabilityOfReachingTarget(
       startVal,
       goal.target_value,
@@ -208,19 +236,23 @@ function Dashboard() {
             1,
             Math.max(
               0,
-              (portfolioValue - goal.starting_value) /
-                (goal.target_value - goal.starting_value),
+              (portfolioValue - goal.starting_value) / (goal.target_value - goal.starting_value),
             ),
           )
         : 0;
     return { years, cagr, prob, progress };
   }, [goal, portfolioValue]);
 
-
   const now = new Date();
   const hour = now.getHours();
   const greeting =
-    hour < 5 ? "Late night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+    hour < 5
+      ? "Late night"
+      : hour < 12
+        ? "Good morning"
+        : hour < 18
+          ? "Good afternoon"
+          : "Good evening";
 
   return (
     <AppShell
@@ -275,7 +307,9 @@ function Dashboard() {
           const u = (h as { updated_at?: string }).updated_at ?? null;
           return u && (!m || u > m) ? u : m;
         }, null);
-        const staleDays = lastUpdate ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / 86400000) : null;
+        const staleDays = lastUpdate
+          ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / 86400000)
+          : null;
         const breaches: string[] = [];
         // IPS-lite (ADR-APP-004): configurable soft/hard position cap + margin cap.
         const posCap = ipsLite.position_cap_pct / 100;
@@ -292,8 +326,19 @@ function Dashboard() {
         if (marginUsed > 0 && equityPct < 0.5) breaches.push(`Equity ${fmtPct(equityPct)} < 50%`);
         return (
           <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-xs">
-            <span className={staleDays != null && staleDays >= 1 ? "font-medium text-amber-500" : "text-muted-foreground"}>
-              Positions: {staleDays == null ? "never imported" : staleDays === 0 ? "imported today" : `imported ${staleDays}d ago`}
+            <span
+              className={
+                staleDays != null && staleDays >= 1
+                  ? "font-medium text-amber-500"
+                  : "text-muted-foreground"
+              }
+            >
+              Positions:{" "}
+              {staleDays == null
+                ? "never imported"
+                : staleDays === 0
+                  ? "imported today"
+                  : `imported ${staleDays}d ago`}
             </span>
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground">
@@ -342,7 +387,9 @@ function Dashboard() {
               <span className="font-medium text-red-500">⚠ {breaches.join(" · ")}</span>
             )}
             {(staleDays == null || staleDays >= 1) && (
-              <Link to="/settings" className="ml-auto font-medium text-primary hover:underline">Import now →</Link>
+              <Link to="/settings" className="ml-auto font-medium text-primary hover:underline">
+                Import now →
+              </Link>
             )}
           </div>
         );
@@ -360,30 +407,38 @@ function Dashboard() {
               return { net: pos + Number(a.cash ?? 0) - Number(a.margin_used ?? 0), day };
             };
             const groups = new Map<string, { net: number; day: number }>();
-            let total = 0, totalDay = 0;
+            let total = 0,
+              totalDay = 0;
             for (const a of accountsList) {
               const { net, day } = statsOf(a);
-              total += net; totalDay += day;
+              total += net;
+              totalDay += day;
               const cat = accountCategory(a.name);
               const g = groups.get(cat) ?? { net: 0, day: 0 };
-              g.net += net; g.day += day;
+              g.net += net;
+              g.day += day;
               groups.set(cat, g);
             }
-            const Day = ({ v }: { v: number }) => (
+            const Day = ({ v }: { v: number }) =>
               Math.abs(v) < 0.005 ? null : (
                 <span className={v >= 0 ? "text-emerald-500" : "text-red-500"}>
-                  {" "}{v >= 0 ? "+" : ""}{fmtUSD(v)}
+                  {" "}
+                  {v >= 0 ? "+" : ""}
+                  {fmtUSD(v)}
                 </span>
-              )
-            );
+              );
             return (
               <>
                 <span className="font-medium">
-                  Household {fmtUSD(total)}<Day v={totalDay} />
+                  Household {fmtUSD(total)}
+                  <Day v={totalDay} />
                 </span>
                 {CATEGORY_ORDER.filter((c) => groups.has(c)).map((c) => (
                   <span key={c} className="text-muted-foreground">
-                    {c} <span className="tabular-nums text-foreground">{fmtUSD(groups.get(c)!.net)}</span>
+                    {c}{" "}
+                    <span className="tabular-nums text-foreground">
+                      {fmtUSD(groups.get(c)!.net)}
+                    </span>
                     <Day v={groups.get(c)!.day} />
                   </span>
                 ))}
@@ -394,11 +449,15 @@ function Dashboard() {
       )}
       {todaysPlan.length > 0 && (
         <div className="mb-4 rounded-xl border bg-card/60 px-4 py-3">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today's Plan — committee Action Sheet</div>
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Today's Plan — committee Action Sheet
+          </div>
           <ul className="space-y-0.5 text-sm">
             {todaysPlan.map((d) => (
               <li key={d.id} className="flex items-center gap-2">
-                <span className={d.decision === "pending" ? "text-amber-500" : "text-emerald-500"}>●</span>
+                <span className={d.decision === "pending" ? "text-amber-500" : "text-emerald-500"}>
+                  ●
+                </span>
                 <span>{d.recommendation}</span>
               </li>
             ))}
@@ -420,7 +479,9 @@ function Dashboard() {
                 {p.zones.map((z) => (
                   <span
                     key={z.pct}
-                    className={z.status === "hit" ? "font-medium text-emerald-500" : "text-muted-foreground"}
+                    className={
+                      z.status === "hit" ? "font-medium text-emerald-500" : "text-muted-foreground"
+                    }
                   >
                     {z.pct}% {fmtUSD(z.price, 2)}
                     {z.status === "hit" ? " ✓ reached" : ""}
@@ -438,8 +499,10 @@ function Dashboard() {
       {alerts.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2">
           {alerts.map((a) => (
-            <span key={a.text + a.date}
-              className={`rounded-full border px-3 py-1 text-xs ${a.kind === "econ" ? "border-warning/40 bg-warning/10" : "border-primary/30 bg-primary/10"}`}>
+            <span
+              key={a.text + a.date}
+              className={`rounded-full border px-3 py-1 text-xs ${a.kind === "econ" ? "border-warning/40 bg-warning/10" : "border-primary/30 bg-primary/10"}`}
+            >
               <span className="font-medium">{a.date.slice(5)}</span> · {a.text}
             </span>
           ))}
@@ -489,14 +552,9 @@ function Dashboard() {
               <div className="text-xs uppercase tracking-wide text-muted-foreground">
                 Goal outlook
               </div>
-              <div className="mt-1 text-lg font-semibold">
-                {goal ? goal.name : "No goal"}
-              </div>
+              <div className="mt-1 text-lg font-semibold">{goal ? goal.name : "No goal"}</div>
             </div>
-            <Link
-              to="/goals"
-              className="text-xs text-primary hover:underline"
-            >
+            <Link to="/goals" className="text-xs text-primary hover:underline">
               Edit goal →
             </Link>
           </div>
@@ -504,9 +562,7 @@ function Dashboard() {
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
               <div>
                 <div className="text-xs text-muted-foreground">Required CAGR</div>
-                <div className="mt-1 text-xl font-semibold tabular">
-                  {fmtPct(goalMetrics.cagr)}
-                </div>
+                <div className="mt-1 text-xl font-semibold tabular">{fmtPct(goalMetrics.cagr)}</div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Probability of success</div>
@@ -531,7 +587,11 @@ function Dashboard() {
             </div>
           ) : (
             <p className="mt-4 text-sm text-muted-foreground">
-              Head to <Link to="/goals" className="text-primary hover:underline">Goals</Link> to set your target.
+              Head to{" "}
+              <Link to="/goals" className="text-primary hover:underline">
+                Goals
+              </Link>{" "}
+              to set your target.
             </p>
           )}
         </div>
@@ -600,7 +660,8 @@ function Dashboard() {
         </div>
         {actions.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">
-            No actions queued. Save recommendations from ChatGPT via the Prompt Center or add them in Settings.
+            No actions queued. Save recommendations from ChatGPT via the Prompt Center or add them
+            in Settings.
           </p>
         ) : (
           <ul className="mt-3 grid gap-2 md:grid-cols-2">
@@ -613,7 +674,9 @@ function Dashboard() {
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${meta.className}`}>
+                      <span
+                        className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${meta.className}`}
+                      >
                         {meta.label}
                       </span>
                       {a.symbol ? (

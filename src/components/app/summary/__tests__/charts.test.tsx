@@ -23,9 +23,27 @@ const scope: AccountScope = {
 };
 
 const series = balanceSeries([
-  { created_at: "2026-09-01T10:00:00Z", snapshot_date: "2026-09-01", gross: 60_000, net: 53_000, margin_used: 7_000 },
-  { created_at: "2026-09-02T10:00:00Z", snapshot_date: "2026-09-02", gross: 60_400, net: 53_500, margin_used: 6_900 },
-  { created_at: "2026-09-03T10:00:00Z", snapshot_date: "2026-09-03", gross: 60_602.68, net: 53_938.35, margin_used: 6_664.33 },
+  {
+    created_at: "2026-09-01T10:00:00Z",
+    snapshot_date: "2026-09-01",
+    gross: 60_000,
+    net: 53_000,
+    margin_used: 7_000,
+  },
+  {
+    created_at: "2026-09-02T10:00:00Z",
+    snapshot_date: "2026-09-02",
+    gross: 60_400,
+    net: 53_500,
+    margin_used: 6_900,
+  },
+  {
+    created_at: "2026-09-03T10:00:00Z",
+    snapshot_date: "2026-09-03",
+    gross: 60_602.68,
+    net: 53_938.35,
+    margin_used: 6_664.33,
+  },
 ]);
 
 describe("BalanceOverTime under recharts 3", () => {
@@ -48,9 +66,7 @@ describe("BalanceOverTime under recharts 3", () => {
   });
 
   test("the empty state renders without touching recharts at all", () => {
-    const { getByText } = render(
-      <BalanceOverTime scope={scope} series={[]} unscopedCount={0} />,
-    );
+    const { getByText } = render(<BalanceOverTime scope={scope} series={[]} unscopedCount={0} />);
     expect(getByText(/No balance history recorded/)).toBeInTheDocument();
   });
 });

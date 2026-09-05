@@ -109,7 +109,12 @@ export const navSections: NavSection[] = [
  * The sections worth a permanent thumb-reach slot. Everything else is one tap
  * away via More, which renders every section and every tab.
  */
-export const MOBILE_PRIMARY: Array<{ to: string; label: string; shortLabel: string; icon: typeof LayoutDashboard }> = [
+export const MOBILE_PRIMARY: Array<{
+  to: string;
+  label: string;
+  shortLabel: string;
+  icon: typeof LayoutDashboard;
+}> = [
   { to: "/", label: "Investment Office", shortLabel: "Office", icon: LayoutDashboard },
   { to: "/portfolio", label: "Portfolio", shortLabel: "Portfolio", icon: Briefcase },
   { to: "/decisions", label: "Decisions", shortLabel: "Decisions", icon: Gavel },

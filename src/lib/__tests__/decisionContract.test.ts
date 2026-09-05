@@ -67,7 +67,15 @@ describe("decisions table satisfies the contract", () => {
 describe("action enum", () => {
   test("carries exactly the contract's nine actions", () => {
     expect([...RECOMMENDATION_ACTIONS]).toEqual([
-      "BUY", "SELL", "HOLD", "REDUCE", "ADD", "REBALANCE", "ROTATE", "WAIT", "ESCALATE",
+      "BUY",
+      "SELL",
+      "HOLD",
+      "REDUCE",
+      "ADD",
+      "REBALANCE",
+      "ROTATE",
+      "WAIT",
+      "ESCALATE",
     ]);
   });
 

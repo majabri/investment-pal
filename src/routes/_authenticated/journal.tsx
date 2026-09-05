@@ -72,7 +72,10 @@ function JournalPage() {
         entry_type: type,
         title: title || undefined,
         body,
-        tickers: tickers.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
+        tickers: tickers
+          .split(",")
+          .map((s) => s.trim().toUpperCase())
+          .filter(Boolean),
       },
       {
         onSuccess: () => {
@@ -178,7 +181,11 @@ function JournalPage() {
             </div>
             <div>
               <Label className="text-xs">Tickers (comma-separated)</Label>
-              <Input value={tickers} onChange={(e) => setTickers(e.target.value)} placeholder="AAPL, NVDA" />
+              <Input
+                value={tickers}
+                onChange={(e) => setTickers(e.target.value)}
+                placeholder="AAPL, NVDA"
+              />
             </div>
             <div>
               <Label className="text-xs">Body</Label>
@@ -210,7 +217,7 @@ function JournalPage() {
                 <span>{new Date(selected.created_at).toLocaleString()}</span>
               </div>
               <pre className="mt-4 whitespace-pre-wrap rounded-lg bg-background p-3 text-sm">
-{selected.body}
+                {selected.body}
               </pre>
               {selected.ai_summary ? (
                 <>
@@ -218,7 +225,7 @@ function JournalPage() {
                     AI summary
                   </div>
                   <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-background p-3 text-sm">
-{selected.ai_summary}
+                    {selected.ai_summary}
                   </pre>
                 </>
               ) : null}
@@ -229,7 +236,9 @@ function JournalPage() {
           )}
         </SheetContent>
       </Sheet>
-          <div className="mt-4"><LearningLog /></div>
+      <div className="mt-4">
+        <LearningLog />
+      </div>
     </AppShell>
   );
 }

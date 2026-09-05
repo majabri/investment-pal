@@ -39,10 +39,7 @@ export const MARGIN_POLICY_UNSET: MarginPolicy = {
  * Returns **null** when the rate is unset — the caller must render an explicit
  * "not set" state rather than a number. Returning 0 here would be the bug.
  */
-export function dailyMarginInterest(
-  marginUsed: number,
-  policy: MarginPolicy,
-): number | null {
+export function dailyMarginInterest(marginUsed: number, policy: MarginPolicy): number | null {
   const rate = policy.margin_rate_annual_pct;
   if (rate == null || !Number.isFinite(rate)) return null;
   if (!Number.isFinite(marginUsed) || marginUsed <= 0) return 0;
@@ -50,10 +47,7 @@ export function dailyMarginInterest(
 }
 
 /** Annual interest at the current balance. Null when the rate is unset. */
-export function annualMarginInterest(
-  marginUsed: number,
-  policy: MarginPolicy,
-): number | null {
+export function annualMarginInterest(marginUsed: number, policy: MarginPolicy): number | null {
   const daily = dailyMarginInterest(marginUsed, policy);
   return daily == null ? null : daily * 365;
 }
@@ -106,9 +100,7 @@ export function marginRatePromptLine(policy: MarginPolicy): string {
   if (policy.margin_rate_annual_pct == null) {
     return "Margin interest rate: NOT SET. Do not assume, estimate, or carry forward a margin rate. If a recommendation depends on the cost of leverage, say so explicitly and ask for the current rate instead of proceeding.";
   }
-  const kind = policy.margin_rate_is_floating
-    ? "floating with the broker base rate"
-    : "fixed";
+  const kind = policy.margin_rate_is_floating ? "floating with the broker base rate" : "fixed";
   const status = rateStatus(policy);
   // Claim a verification date ONLY when the date actually parsed. A malformed
   // value used to be echoed as "verified not-a-date", which is worse than
@@ -118,7 +110,10 @@ export function marginRatePromptLine(policy: MarginPolicy): string {
     status.kind === "unverified"
       ? ", verification date not recorded"
       : `, verified ${policy.margin_rate_as_of}`;
-  const stale = status.kind === "stale" ? ` This value is ${status.ageDays} days old and may be out of date.` : "";
+  const stale =
+    status.kind === "stale"
+      ? ` This value is ${status.ageDays} days old and may be out of date.`
+      : "";
   return `Margin interest rate: ${policy.margin_rate_annual_pct}% APR (${kind}${asOf}).${stale}`;
 }
 

@@ -22,7 +22,15 @@
 
 /** `action` enum from the canonical contract. */
 export const RECOMMENDATION_ACTIONS = [
-  "BUY", "SELL", "HOLD", "REDUCE", "ADD", "REBALANCE", "ROTATE", "WAIT", "ESCALATE",
+  "BUY",
+  "SELL",
+  "HOLD",
+  "REDUCE",
+  "ADD",
+  "REBALANCE",
+  "ROTATE",
+  "WAIT",
+  "ESCALATE",
 ] as const;
 export type RecommendationAction = (typeof RECOMMENDATION_ACTIONS)[number];
 

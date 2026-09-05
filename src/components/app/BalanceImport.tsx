@@ -84,7 +84,9 @@ export function BalanceImport() {
               {
                 onSuccess: () => toast.success(`IPS margin rate set to ${pastedRate}%`),
                 onError: (e) =>
-                  toast.error(`Balances saved, but the margin rate was not: ${(e as Error).message}`),
+                  toast.error(
+                    `Balances saved, but the margin rate was not: ${(e as Error).message}`,
+                  ),
               },
             );
           }
@@ -148,9 +150,7 @@ export function BalanceImport() {
               {found.map((key) => (
                 <div key={key} className="flex items-center justify-between px-3 py-1.5">
                   <dt className="text-muted-foreground">{BALANCE_FIELD_LABELS[key]}</dt>
-                  <dd className="tabular font-medium">
-                    {displayValue(key, parse.fields[key]!)}
-                  </dd>
+                  <dd className="tabular font-medium">{displayValue(key, parse.fields[key]!)}</dd>
                 </div>
               ))}
             </dl>
@@ -199,9 +199,7 @@ export function BalanceImport() {
                 onChange={(e) => setConfirmed(e.target.checked)}
                 className="mt-0.5"
               />
-              <span>
-                These figures match my Fidelity balances page for {scope.accountName}.
-              </span>
+              <span>These figures match my Fidelity balances page for {scope.accountName}.</span>
             </label>
             {/* The margin rate is IPS policy, not an account figure, so it is
                 its own line item rather than part of the balances above. */}
@@ -214,12 +212,10 @@ export function BalanceImport() {
                   className="mt-0.5"
                 />
                 <span>
-                  Also set the IPS margin rate to{" "}
-                  <span className="font-medium">{pastedRate}%</span>, verified {rateAsOf}{" "}
-                  <span className="text-muted-foreground">
-                    (currently {marginRateLabel(ips)})
-                  </span>
-                  . This changes policy for the whole app, not just this account.
+                  Also set the IPS margin rate to <span className="font-medium">{pastedRate}%</span>
+                  , verified {rateAsOf}{" "}
+                  <span className="text-muted-foreground">(currently {marginRateLabel(ips)})</span>.
+                  This changes policy for the whole app, not just this account.
                 </span>
               </label>
             ) : null}

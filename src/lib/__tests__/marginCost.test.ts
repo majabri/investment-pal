@@ -216,10 +216,7 @@ describe("no margin rate survives anywhere in production source", () => {
   });
 
   test("the migration supplies no DEFAULT for the rate", () => {
-    const sql = readFileSync(
-      "supabase/migrations/20260903020000_ips_lite_margin_rate.sql",
-      "utf8",
-    );
+    const sql = readFileSync("supabase/migrations/20260903020000_ips_lite_margin_rate.sql", "utf8");
     expect(sql).toMatch(/margin_rate_annual_pct\s+NUMERIC\s*,/);
     expect(sql).not.toMatch(/margin_rate_annual_pct\s+NUMERIC[^,]*DEFAULT/);
   });
@@ -273,7 +270,7 @@ describe("observed interest beats computed interest", () => {
     expect(interestProvenance(f)).toContain("no balance imported");
   });
 
-  test("an import that omitted the accrued line says so, not \"never imported\"", () => {
+  test('an import that omitted the accrued line says so, not "never imported"', () => {
     // Two different facts. Claiming no balance was ever imported, when one was
     // and simply did not carry the line, is itself an assertion the data does
     // not support — the same defect class as the figures it guards.

@@ -134,9 +134,7 @@ function AuthPage() {
             onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
             className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground"
           >
-            {mode === "signin"
-              ? "Need an account? Create one"
-              : "Have an account? Sign in"}
+            {mode === "signin" ? "Need an account? Create one" : "Have an account? Sign in"}
           </button>
         </div>
       </div>

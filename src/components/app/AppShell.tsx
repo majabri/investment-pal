@@ -8,13 +8,7 @@ import { APP_VERSION } from "@/lib/version";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { AccountSwitcher } from "./AccountSwitcher";
 
 export function AppShell({
@@ -87,9 +81,7 @@ export function AppShell({
         <header className="flex flex-col gap-2 border-b bg-background/80 px-6 py-5 backdrop-blur sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
-            {subtitle ? (
-              <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-            ) : null}
+            {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
           </div>
           {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
         </header>
@@ -132,8 +124,7 @@ export function AppShell({
             array was reordered. Every route is now reachable at 390px. */}
         <nav className="sticky bottom-0 flex justify-around border-t bg-sidebar/95 px-2 py-1 backdrop-blur md:hidden">
           {MOBILE_PRIMARY.map((item) => {
-            const active =
-              item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+            const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             return (
               <Link
                 key={item.to}

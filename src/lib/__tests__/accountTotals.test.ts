@@ -99,10 +99,10 @@ describe("absent data reads as absent, never as zero", () => {
   });
 
   test("a non-finite price does not poison the total", () => {
-    const t = accountTotals(
-      [{ quantity: 1, cost_basis: 1, current_price: Number.NaN }],
-      { cash: 10, margin_used: 0 },
-    );
+    const t = accountTotals([{ quantity: 1, cost_basis: 1, current_price: Number.NaN }], {
+      cash: 10,
+      margin_used: 0,
+    });
     expect(t.totalAccountValue).toBe(10);
   });
 });
@@ -120,8 +120,9 @@ describe("scope labelling", () => {
   });
 
   test("a single account is named, not described generically", () => {
-    expect(scopeLabel({ kind: "account", accountId: "a", accountName: "Amir — TOD" }))
-      .toBe("Amir — TOD");
+    expect(scopeLabel({ kind: "account", accountId: "a", accountName: "Amir — TOD" })).toBe(
+      "Amir — TOD",
+    );
   });
 
   test("all-accounts says how many, so blending is visible", () => {

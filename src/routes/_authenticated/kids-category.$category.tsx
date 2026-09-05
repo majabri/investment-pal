@@ -72,8 +72,7 @@ function Page() {
     return (
       <AppShell title="Unknown category" subtitle="This family category does not exist">
         <div className="rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
-          No family category named “{category}”. Known categories:{" "}
-          {KIDS_CATEGORIES.join(", ")}.
+          No family category named “{category}”. Known categories: {KIDS_CATEGORIES.join(", ")}.
         </div>
       </AppShell>
     );

@@ -61,7 +61,6 @@ export type Account = {
   updated_at: string;
 };
 
-
 export type Priority = {
   id: string;
   label: string;
@@ -82,13 +81,7 @@ export type RecommendedAction = {
 export type JournalEntry = {
   id: string;
   entry_type:
-    | "morning_review"
-    | "eod_review"
-    | "trade"
-    | "ai_summary"
-    | "note"
-    | "lesson"
-    | "decision";
+    "morning_review" | "eod_review" | "trade" | "ai_summary" | "note" | "lesson" | "decision";
   title: string | null;
   body: string;
   tickers: string[];
@@ -110,11 +103,7 @@ export function useProfile() {
   return useQuery({
     queryKey: ["profile"],
     queryFn: async (): Promise<Profile | null> => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .limit(1)
-        .maybeSingle();
+      const { data, error } = await supabase.from("profiles").select("*").limit(1).maybeSingle();
       if (error) throw error;
       return data as Profile | null;
     },
@@ -164,10 +153,7 @@ export function useAllHoldings() {
   return useQuery({
     queryKey: ["holdings"],
     queryFn: async (): Promise<Holding[]> => {
-      const { data, error } = await supabase
-        .from("holdings")
-        .select("*")
-        .order("symbol");
+      const { data, error } = await supabase.from("holdings").select("*").order("symbol");
       if (error) throw error;
       return (data ?? []) as Holding[];
     },
@@ -284,8 +270,7 @@ export function useScopedAccount(scope: AccountScope) {
     if (scope.kind === "none") return null;
     // An "all accounts" scope still blends — but now only because a caller
     // asked for it by name, and `scopeLabel` puts that on screen.
-    const rows =
-      scope.kind === "all" ? accounts : accounts.filter((a) => a.id === scope.accountId);
+    const rows = scope.kind === "all" ? accounts : accounts.filter((a) => a.id === scope.accountId);
     // A scope that resolves to no rows is unknown, not zero. Returning zeroes
     // here would render "$0.00 cash" for an account that was simply not found.
     if (rows.length === 0) return null;
@@ -317,7 +302,6 @@ export function useScopedAccount(scope: AccountScope) {
 
   return { data, isLoading, upsert };
 }
-
 
 /**
  * The most recent balance import for a scope, and the write path for a new one.
@@ -563,7 +547,11 @@ export function useRecommendedActions() {
     },
   });
   const add = useMutation({
-    mutationFn: async (p: Omit<RecommendedAction, "id" | "active" | "source"> & { source?: RecommendedAction["source"] }) => {
+    mutationFn: async (
+      p: Omit<RecommendedAction, "id" | "active" | "source"> & {
+        source?: RecommendedAction["source"];
+      },
+    ) => {
       const { data: userData } = await supabase.auth.getUser();
       const { error } = await supabase.from("recommended_actions").insert({
         user_id: userData.user!.id,
@@ -578,7 +566,10 @@ export function useRecommendedActions() {
   });
   const dismiss = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("recommended_actions").update({ active: false }).eq("id", id);
+      const { error } = await supabase
+        .from("recommended_actions")
+        .update({ active: false })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["recommended_actions"] }),
@@ -590,7 +581,10 @@ export function useJournal(search = "") {
   return useQuery({
     queryKey: ["journal", search],
     queryFn: async (): Promise<JournalEntry[]> => {
-      let q = supabase.from("journal_entries").select("*").order("created_at", { ascending: false });
+      let q = supabase
+        .from("journal_entries")
+        .select("*")
+        .order("created_at", { ascending: false });
       if (search.trim()) {
         const s = `%${search.trim()}%`;
         q = q.or(`title.ilike.${s},body.ilike.${s}`);

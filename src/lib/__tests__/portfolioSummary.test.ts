@@ -18,7 +18,12 @@ import {
   type SnapshotLike,
 } from "../portfolioSummary";
 
-const snap = (created_at: string, net: number, gross = net, margin_used = gross - net): SnapshotLike => ({
+const snap = (
+  created_at: string,
+  net: number,
+  gross = net,
+  margin_used = gross - net,
+): SnapshotLike => ({
   created_at,
   net,
   gross,
@@ -38,10 +43,7 @@ describe("balanceSeries", () => {
 
   test("the last snapshot of a day wins, rather than an average of them", () => {
     // An average is a value the account never actually held at any moment.
-    const s = balanceSeries([
-      snap("2026-09-01T09:00:00Z", 100),
-      snap("2026-09-01T16:00:00Z", 180),
-    ]);
+    const s = balanceSeries([snap("2026-09-01T09:00:00Z", 100), snap("2026-09-01T16:00:00Z", 180)]);
     expect(s).toHaveLength(1);
     expect(s[0].net).toBe(180);
   });
@@ -209,7 +211,7 @@ describe("allocation", () => {
     expect(unclassified.value).toBe(100);
   });
 
-  test("a blank sector string counts as unclassified, not as a sector named \" \"", () => {
+  test('a blank sector string counts as unclassified, not as a sector named " "', () => {
     const slices = allocation([{ sector: "   ", quantity: 1, current_price: 10 }]);
     expect(slices[0].name).toBe("Unclassified");
   });
@@ -223,7 +225,10 @@ describe("allocation", () => {
   });
 
   test("a live price overrides the stored one", () => {
-    const slices = allocation([{ sector: "Technology", quantity: 10, current_price: 100 }], () => 200);
+    const slices = allocation(
+      [{ sector: "Technology", quantity: 10, current_price: 100 }],
+      () => 200,
+    );
     expect(slices[0].value).toBe(2_000);
   });
 
@@ -276,10 +281,10 @@ describe("event sources say what they cannot show", () => {
 
 describe("the metric row", () => {
   test("reads straight off accountTotals and reconciles to the statement", () => {
-    const totals = accountTotals(
-      [{ quantity: 100, cost_basis: 500, current_price: 606.023 }],
-      { cash: 0.38, margin_used: 6_664.33 },
-    );
+    const totals = accountTotals([{ quantity: 100, cost_basis: 500, current_price: 606.023 }], {
+      cash: 0.38,
+      margin_used: 6_664.33,
+    });
     const metrics = summaryMetrics(totals);
     const value = (label: string) => metrics.find((m) => m.label === label)!.value;
     expect(value("Total account value")!).toBeCloseTo(53_938.35, 2);
@@ -391,4 +396,3 @@ describe("day change", () => {
     expect(dayChange(positions, { AAA: { price: 110, prevClose: 0 } })).toBeNull();
   });
 });
-

@@ -91,7 +91,10 @@ export const BALANCE_FIELD_LABELS: Record<BalanceFieldKey, string> = {
  * is invisible on screen because both are plausible dollar amounts.
  */
 const LABEL_PATTERNS: [BalanceFieldKey, RegExp][] = [
-  ["marginInterestAccruedMtd", /margin\s+interest\s+(accrued|charged)(\s+this\s+month|\s+mtd|\s+month\s+to\s+date)?/i],
+  [
+    "marginInterestAccruedMtd",
+    /margin\s+interest\s+(accrued|charged)(\s+this\s+month|\s+mtd|\s+month\s+to\s+date)?/i,
+  ],
   ["marginInterestRatePct", /margin\s+interest\s+rate|margin\s+rate|interest\s+rate/i],
   ["nonMarginBuyingPower", /non[\s-]*margin(\s+buying\s+power)?/i],
   ["marginBuyingPower", /margin\s+buying\s+power/i],
@@ -101,7 +104,10 @@ const LABEL_PATTERNS: [BalanceFieldKey, RegExp][] = [
   ["marginMarketValue", /margin\s+market\s+value/i],
   ["netDebit", /net\s+debit|margin\s+debit|debit\s+balance|margin\s+loan/i],
   ["equityPct", /equity\s*(percent(age)?|%)?/i],
-  ["dayChange", /day(?:'s)?\s+(change|gain\/loss|gain or loss)|today(?:'s)?\s+change|change\s+since\s+(previous\s+)?close/i],
+  [
+    "dayChange",
+    /day(?:'s)?\s+(change|gain\/loss|gain or loss)|today(?:'s)?\s+change|change\s+since\s+(previous\s+)?close/i,
+  ],
   ["totalAccountValue", /total\s+account\s+value|account\s+value|^\s*total\s*$/i],
 ];
 
@@ -165,7 +171,8 @@ export function parseAmount(text: string): number | null {
  * scroll past — which is how the real unrecognised line, the renamed field,
  * gets missed.
  */
-const DATE_OR_TIME = /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}:\d{2}\s*(am|pm|et|ct|pt)?\b/i;
+const DATE_OR_TIME =
+  /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}:\d{2}\s*(am|pm|et|ct|pt)?\b/i;
 
 /** True for a fragment that is a timestamp rather than a figure. */
 export function isDateOrTime(fragment: string): boolean {

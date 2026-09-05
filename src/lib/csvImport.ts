@@ -8,8 +8,8 @@ export type ParsedHolding = {
   cost_basis: number; // per-share
   current_price: number;
   sector: string | null;
-  accountName?: string;   // from "Account Name" column when present
-  currentValue?: number;  // from "Current Value" column when present
+  accountName?: string; // from "Account Name" column when present
+  currentValue?: number; // from "Current Value" column when present
 };
 
 export type ParseResult = {
@@ -102,10 +102,17 @@ export function parsePositionsCsv(input: string): ParseResult {
       const raw = lines[li];
       const cells = splitCsvLine(raw);
       const sym = (cells[iSym] || "").toUpperCase().trim();
-      const acctLabel = iAcct >= 0 ? (cells[iAcct]?.trim() || "Unlabeled account") : "Unlabeled account";
+      const acctLabel =
+        iAcct >= 0 ? cells[iAcct]?.trim() || "Unlabeled account" : "Unlabeled account";
       const desc = (cells[findIdx(headers, "description")] ?? "").toUpperCase();
       // Money market / core position → account cash, not a holding
-      if (sym.includes("**") || desc.includes("MONEY MARKET") || sym === "SPAXX" || sym === "FCASH" || sym === "FDRXX") {
+      if (
+        sym.includes("**") ||
+        desc.includes("MONEY MARKET") ||
+        sym === "SPAXX" ||
+        sym === "FCASH" ||
+        sym === "FDRXX"
+      ) {
         const v = iVal >= 0 ? toNumber(cells[iVal]) : 0;
         cashByAccount[acctLabel] = (cashByAccount[acctLabel] ?? 0) + v;
         skipped.push({ line: raw, reason: "Core cash → account cash" });
@@ -119,11 +126,7 @@ export function parsePositionsCsv(input: string): ParseResult {
       // NOT the security type — never skip on it.
       const qty = iQty >= 0 ? toNumber(cells[iQty]) : 0;
       const price =
-        iPx >= 0
-          ? toNumber(cells[iPx])
-          : iVal >= 0 && qty
-            ? toNumber(cells[iVal]) / qty
-            : 0;
+        iPx >= 0 ? toNumber(cells[iPx]) : iVal >= 0 && qty ? toNumber(cells[iVal]) / qty : 0;
       let costPer = iCostAvg >= 0 ? toNumber(cells[iCostAvg]) : 0;
       if (!costPer && iCostTot >= 0 && qty) {
         costPer = toNumber(cells[iCostTot]) / qty;

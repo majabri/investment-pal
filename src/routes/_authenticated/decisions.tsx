@@ -23,7 +23,8 @@ export const Route = createFileRoute("/_authenticated/decisions")({
       { title: "Decisions — Investment Companion" },
       {
         name: "description",
-        content: "Governed committee decisions with their evidence, risks and invalidation conditions.",
+        content:
+          "Governed committee decisions with their evidence, risks and invalidation conditions.",
       },
     ],
   }),
@@ -94,7 +95,10 @@ function DecisionsPage() {
   }
 
   return (
-    <AppShell title="Decisions" subtitle="Committee decisions with their evidence and invalidation conditions">
+    <AppShell
+      title="Decisions"
+      subtitle="Committee decisions with their evidence and invalidation conditions"
+    >
       <div className="mb-4 max-w-sm">
         <Input
           value={q}

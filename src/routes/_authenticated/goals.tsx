@@ -47,7 +47,6 @@ export const Route = createFileRoute("/_authenticated/goals")({
 function GoalsPage() {
   const { data: goal, update } = useGoal();
 
-
   const [name, setName] = useState("");
   const [starting, setStarting] = useState(0);
   const [target, setTarget] = useState(0);
@@ -85,11 +84,8 @@ function GoalsPage() {
   });
   const portfolioValue = useMemo(
     () =>
-      accountTotals(
-        holdings,
-        balance,
-        (h) => liveQuotes?.[h.symbol]?.price ?? h.current_price,
-      ).totalAccountValue, // net equity — same arithmetic as the Office
+      accountTotals(holdings, balance, (h) => liveQuotes?.[h.symbol]?.price ?? h.current_price)
+        .totalAccountValue, // net equity — same arithmetic as the Office
     [holdings, balance, liveQuotes],
   );
 
@@ -100,10 +96,18 @@ function GoalsPage() {
     const cagr = requiredCAGRWithContrib(start, target, years, monthly);
     const weekly = periodicGrowth(start, target, years, 52);
     const monthlyGrowth = periodicGrowth(start, target, years, 12);
-    const prob = probabilityOfReachingTarget(start, target, years, riskToExpectedReturn(risk), riskToVol(risk));
+    const prob = probabilityOfReachingTarget(
+      start,
+      target,
+      years,
+      riskToExpectedReturn(risk),
+      riskToVol(risk),
+    );
     const progress =
-      target > starting ? Math.max(0, Math.min(1, (portfolioValue - starting) / (target - starting))) : 0;
-    const completions = [0.10, 0.15, 0.20].map((r) => ({
+      target > starting
+        ? Math.max(0, Math.min(1, (portfolioValue - starting) / (target - starting)))
+        : 0;
+    const completions = [0.1, 0.15, 0.2].map((r) => ({
       rate: r,
       date: estimatedCompletionDate(start, target, r, monthly),
     }));
@@ -143,7 +147,11 @@ function GoalsPage() {
             </div>
             <div>
               <Label className="text-xs">Starting value</Label>
-              <Input type="number" value={starting} onChange={(e) => setStarting(+e.target.value)} />
+              <Input
+                type="number"
+                value={starting}
+                onChange={(e) => setStarting(+e.target.value)}
+              />
             </div>
             <div>
               <Label className="text-xs">Target value</Label>
@@ -160,7 +168,9 @@ function GoalsPage() {
             <div>
               <Label className="text-xs">Risk preference</Label>
               <Select value={risk} onValueChange={setRisk}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="conservative">Conservative</SelectItem>
                   <SelectItem value="moderate">Moderate</SelectItem>
@@ -171,7 +181,9 @@ function GoalsPage() {
             <div>
               <Label className="text-xs">Margin preference</Label>
               <Select value={margin} onValueChange={setMargin}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
                   <SelectItem value="conservative">Conservative</SelectItem>
@@ -228,17 +240,28 @@ function GoalsPage() {
       </div>
 
       <div className="mt-4 rounded-2xl border bg-card p-5">
-        <div className="mb-1 text-sm font-medium">Estimated completion — when would you actually get there?</div>
+        <div className="mb-1 text-sm font-medium">
+          Estimated completion — when would you actually get there?
+        </div>
         <p className="mb-3 text-xs text-muted-foreground">
-          At realistic sustained returns (with your monthly contribution), the target date implied by the math:
+          At realistic sustained returns (with your monthly contribution), the target date implied
+          by the math:
         </p>
         <div className="grid gap-4 md:grid-cols-3">
           {metrics?.completions.map((c) => (
             <StatCard
               key={c.rate}
               label={`At ${Math.round(c.rate * 100)}% annual`}
-              value={c.date ? c.date.toLocaleDateString("en-US", { month: "short", year: "numeric" }) : ">40 yrs"}
-              hint={c.date && c.date <= new Date(date) ? "Before your target date" : "After your target date"}
+              value={
+                c.date
+                  ? c.date.toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                  : ">40 yrs"
+              }
+              hint={
+                c.date && c.date <= new Date(date)
+                  ? "Before your target date"
+                  : "After your target date"
+              }
               tone={c.date && c.date <= new Date(date) ? "positive" : "warning"}
             />
           ))}
@@ -251,7 +274,10 @@ function GoalsPage() {
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
             <li>Extend the target date by 6–12 months to relax required CAGR.</li>
             <li>Increase monthly contributions — even small additions compound the probability.</li>
-            <li>Reassess risk preference: too conservative for the required return, or too aggressive vs your temperament?</li>
+            <li>
+              Reassess risk preference: too conservative for the required return, or too aggressive
+              vs your temperament?
+            </li>
             <li>Reduce concentration risk in single positions to lower drawdown probability.</li>
           </ul>
         </div>

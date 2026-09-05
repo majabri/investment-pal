@@ -104,7 +104,10 @@ function dataBlock(ctx: PromptContext): string {
         .join("\n")
     : "- (no holdings recorded)";
   const today = new Date().toLocaleDateString("en-US", {
-    weekday: "long", month: "long", day: "numeric", year: "numeric",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
   });
   return `===========================================================
 MY VERIFIED DATA — GROUND EVERY RECOMMENDATION ONLY IN THIS
@@ -158,7 +161,9 @@ const CONTINUITY = `"Maintain continuity with previous Investment Committee deci
 
 // ─── Amir's verbatim Investment Committee templates ───
 
-const MORNING_TEMPLATE = (m: Mandate) => String.raw`You are the Chief Investment Officer (CIO) and Investment Committee for my ${m.account} portfolio.
+const MORNING_TEMPLATE = (
+  m: Mandate,
+) => String.raw`You are the Chief Investment Officer (CIO) and Investment Committee for my ${m.account} portfolio.
 
 MISSION
 Your sole mandate is to maximize the probability of growing the ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date}.
@@ -344,7 +349,9 @@ export function buildMorningPrompt(ctx: PromptContext): string {
   return [MORNING_TEMPLATE(mandateOf(ctx)), "", dataBlock(ctx), "", CONTINUITY].join("\n");
 }
 
-const EOD_TEMPLATE = (m: Mandate) => String.raw`You are my Investment Committee and Chief Investment Officer.
+const EOD_TEMPLATE = (
+  m: Mandate,
+) => String.raw`You are my Investment Committee and Chief Investment Officer.
 Your job is NOT to tell me whether my portfolio went up or down today.
 Your job is to determine whether today's information changes my investment strategy or improves/reduces the probability of reaching my goal.
 Primary Objective:
@@ -431,7 +438,9 @@ export function buildEODPrompt(ctx: PromptContext & { tradesToday: string }): st
   return [EOD_TEMPLATE(mandateOf(ctx)), "", dataBlock(ctx), "", trades, "", CONTINUITY].join("\n");
 }
 
-const WEEKLY_TEMPLATE = (m: Mandate) => String.raw`You are my Investment Committee, Chief Investment Officer (CIO), Chief Risk Officer (CRO), and Devil's Advocate.
+const WEEKLY_TEMPLATE = (
+  m: Mandate,
+) => String.raw`You are my Investment Committee, Chief Investment Officer (CIO), Chief Risk Officer (CRO), and Devil's Advocate.
 Your responsibility is to evaluate my portfolio exactly as an institutional investment committee would.
 Your mission is NOT to maximize next week's return.
 Your mission is to maximize the probability of growing my ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date}, while managing downside risk and using leverage intelligently.
@@ -680,7 +689,9 @@ export function buildWeeklyPrompt(ctx: PromptContext): string {
 
 // Midday Update — derived companion to the verbatim Morning/EOD/Weekly templates
 // (drafted by Claude per Amir's approval of the Companion constitution, Phase 4).
-const MIDDAY_TEMPLATE = (m: Mandate) => String.raw`You are my Investment Committee and Chief Investment Officer.
+const MIDDAY_TEMPLATE = (
+  m: Mandate,
+) => String.raw`You are my Investment Committee and Chief Investment Officer.
 This is a MIDDAY UPDATE, not a full review. Be brief and decisive.
 Primary Objective: grow my ${m.account} portfolio to ${m.target} by ${m.date}.
 Assumptions: ${m.marginRate} I execute all trades myself; use only the data I provide; compare against this morning's Investment Committee recommendations.
@@ -701,7 +712,9 @@ export function buildMiddayPrompt(ctx: PromptContext): string {
 // Amir 2026-07-25 (drafted with ChatGPT), stored verbatim.
 export type MeetingType = "Morning" | "Mid-Day" | "Evening" | "Weekly" | "Monthly";
 
-const UNIVERSAL_TEMPLATE = (m: Mandate) => String.raw`You are my Chief Investment Officer (CIO) and Investment Committee.
+const UNIVERSAL_TEMPLATE = (
+  m: Mandate,
+) => String.raw`You are my Chief Investment Officer (CIO) and Investment Committee.
 Your primary mandate is to maximize the probability of growing my ${m.account} portfolio from approximately ${m.start} to ${m.target} by ${m.date} while recognizing this is an aggressive objective.
 Every recommendation should increase the probability of reaching that objective—not simply maximize today's return.
 Assumptions
@@ -870,15 +883,16 @@ Every review ends with a one-page CIO Action Sheet containing only:
 * NEXT CATALYSTS: earnings, economic releases, or geopolitical events that matter
 * HIGHEST PRIORITY ACTION: the single most important decision for the current review`;
 
-export function buildUniversalPrompt(ctx: PromptContext & { meeting: MeetingType; tradesToday?: string }): string {
+export function buildUniversalPrompt(
+  ctx: PromptContext & { meeting: MeetingType; tradesToday?: string },
+): string {
   if (ctx.meeting === "Morning") {
     return buildMorningPrompt(ctx);
   }
   const body = UNIVERSAL_TEMPLATE(mandateOf(ctx)).replace("{{MEETING_TYPE}}", ctx.meeting);
   const rateNote = marginRatePromptLine(ctx.marginPolicy ?? MARGIN_POLICY_UNSET);
-  const trades = ctx.meeting === "Evening"
-    ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n`
-    : "";
+  const trades =
+    ctx.meeting === "Evening" ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n` : "";
   return [body, "", dataBlock(ctx), rateNote, trades, CONTINUITY].join("\n");
 }
 
@@ -1046,11 +1060,23 @@ Before presenting the final recommendation, the Investment OS must perform a sel
     * Single highest-impact action for today
     * Biggest risk to the investment objective`;
 
-export function buildV5Prompt(ctx: PromptContext & { meeting: MeetingType; tradesToday?: string }): string {
+export function buildV5Prompt(
+  ctx: PromptContext & { meeting: MeetingType; tradesToday?: string },
+): string {
   const header = `You are the Amir Investment OS v5.0 — the complete institutional investment office. Operate strictly per the following constitution.\n\nTODAY'S MEETING TYPE: ${ctx.meeting} CIO Meeting`;
   const rateNote = marginRatePromptLine(ctx.marginPolicy ?? MARGIN_POLICY_UNSET);
-  const trades = ctx.meeting === "Evening" ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n` : "";
-  return [header, "", OS_V5_TEMPLATE(mandateOf(ctx)), "", dataBlock(ctx), rateNote, trades, CONTINUITY].join("\n");
+  const trades =
+    ctx.meeting === "Evening" ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n` : "";
+  return [
+    header,
+    "",
+    OS_V5_TEMPLATE(mandateOf(ctx)),
+    "",
+    dataBlock(ctx),
+    rateNote,
+    trades,
+    CONTINUITY,
+  ].join("\n");
 }
 
 // ─── AMIR INVESTMENT OS v6.0 — supplied by Amir 2026-08-04, stored verbatim ───
@@ -1283,9 +1309,21 @@ Summarize:
 * Highest-impact action today
 * Biggest risk to achieving the ${m.target} objective`;
 
-export function buildV6Prompt(ctx: PromptContext & { meeting: MeetingType; tradesToday?: string }): string {
+export function buildV6Prompt(
+  ctx: PromptContext & { meeting: MeetingType; tradesToday?: string },
+): string {
   const header = `TODAY'S MEETING TYPE: ${ctx.meeting} CIO Meeting`;
   const rateNote = marginRatePromptLine(ctx.marginPolicy ?? MARGIN_POLICY_UNSET);
-  const trades = ctx.meeting === "Evening" ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n` : "";
-  return [OS_V6_TEMPLATE(mandateOf(ctx)), "", header, "", dataBlock(ctx), rateNote, trades, CONTINUITY].join("\n");
+  const trades =
+    ctx.meeting === "Evening" ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n` : "";
+  return [
+    OS_V6_TEMPLATE(mandateOf(ctx)),
+    "",
+    header,
+    "",
+    dataBlock(ctx),
+    rateNote,
+    trades,
+    CONTINUITY,
+  ].join("\n");
 }
