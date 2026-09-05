@@ -1374,6 +1374,9 @@ Two practices earned their place and are recorded in ADR-APP-012:
 **Waiting on a decision:**
 
 - **#172, the four ADRs.** Proposed, unmerged, per ADR-APP-005 §2.
+- **#174, the policy-editor load window.** Money-adjacent, unmerged. See the
+  addendum below.
+- **#135**, which #174 supersedes. Yours to close.
 
 **Configuration you need to enter:**
 
@@ -1391,3 +1394,63 @@ Two practices earned their place and are recorded in ADR-APP-012:
   difference is not that the code got better.
 - **CI still does not run lint.** Every file touched in this session is clean;
   the rest of the tree is not.
+
+---
+
+## 2026-09-05 — Addendum after the close: the policy editors and the load window
+
+The eight phases were done and the log above was written. Then the hourly
+check-in's "list open PRs" step turned up **#135**, a fix I had opened at 18:38Z
+— before the rebuild programme started — and then lost track of for five hours
+while I worked on everything else. It was still open, still unmerged, still
+describing a live bug.
+
+### The bug
+
+`useIpsLite` returns `query.data ?? IPS_LITE_DEFAULTS`. During the load window
+`query.data` is undefined, so the hook hands the caller the app's defaults, and
+`IpsLiteCard`, `MarginRateCard` and `ObjectiveCard` each populate their form
+state from that in a `useEffect` — with Save enabled and no loading guard. For
+the width of the fetch, the settings page shows you numbers that are not yours
+and lets you save them.
+
+### What my own work did to it
+
+**#159 made it worse.** It added `caps_source`, so the app can distinguish a cap
+you chose from a column default it inherited — rule 15. But `useIpsLite.save`
+now stamps `caps_source: "user_set"` on any cap write. A Save during the load
+window therefore launders the app's 30/25 defaults into a *confirmed user
+preference*, and nothing downstream can ever tell the difference again. The
+provenance field built to prevent the masquerade became the thing that made it
+permanent.
+
+That is worth stating plainly: adding provenance to a system that still has an
+unguarded write path does not add safety, it adds a confident lie. The order
+matters.
+
+### The fix, and why it hides rather than disables
+
+Three `if (isLoading)` guards, one per card, returning the card's skeleton. Not
+`disabled` on the Save button: a user reads figures before they read whether a
+button is greyed out, and a wrong 30% that you cannot save is still a wrong 30%
+that you believed. Nothing else changed — no extraction, no restructuring —
+because this one has to be reviewed line by line.
+
+Verified by fault injection rather than by the tests passing: removing the
+`MarginRateCard` guard turned exactly its two assertions red and nothing else;
+restoring it returned 13/13. A guard test that stays green when you delete the
+guard is not a test.
+
+Gate green — typecheck, test:typecheck, 911 pass / 0 fail, boot `/auth` 200 and
+`/settings` 200. **Not merged**: it is money-adjacent (a cap and a margin rate),
+so it stops for your line-item sign-off under OD-001, the same as #172 stops
+under ADR-APP-005 §2.
+
+### The process finding
+
+Nothing in the loop was watching for my own abandoned work. The check-in step
+that found it exists to catch *incoming* events — a review, a red build — and it
+caught this one only as a side effect of listing PRs. Five hours is how long a
+known live bug sat open because the thing that knew about it was me, and I was
+busy. Worth remembering next time the phases are the plan: the plan is not the
+inventory.
