@@ -21,6 +21,7 @@ import {
   BALANCE_FIELD_ORDER,
   type BalanceFieldKey,
 } from "@/lib/balanceImport";
+import { checkEquityIdentity } from "@/lib/canonicalBalances";
 import { fmtUSD } from "@/lib/finance";
 import { useIpsLite, useRecordBalanceImport } from "@/hooks/useAppData";
 import { marginRateLabel } from "@/lib/marginCost";
@@ -53,6 +54,20 @@ export function BalanceImport() {
   const patch = useMemo(() => accountPatch(parse.fields), [parse]);
   const moneyEntries = Object.entries(patch).filter(
     (e): e is [string, number] => typeof e[1] === "number",
+  );
+  // The broker prints an identity about itself: total account value = cash
+  // market value + margin market value − net debit. Checking it here is what
+  // makes the field mapping CHECKABLE rather than asserted (Phase 2) — a
+  // mapping error otherwise produces a plausible total and nothing notices.
+  const identity = useMemo(
+    () =>
+      checkEquityIdentity(
+        parse.fields.totalAccountValue,
+        parse.fields.cashMarketValue,
+        parse.fields.marginMarketValue,
+        parse.fields.netDebit,
+      ),
+    [parse],
   );
 
   // The rate the paste carries, offered only when it is actually different
@@ -200,6 +215,16 @@ export function BalanceImport() {
                 : moneyEntries
                     .map(([k, v]) => `${k.replace(/_/g, " ")} → ${fmtUSD(v)}`)
                     .join(" · ")}
+              {identity.kind === "differs" && (
+                <div className="mt-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-400">
+                  <span className="font-medium">These figures do not add up.</span> The
+                  broker&rsquo;s own total is {fmtUSD(identity.reported)}, but cash + margin market
+                  value − net debit comes to {fmtUSD(identity.computed)} — a difference of{" "}
+                  {fmtUSD(Math.abs(identity.difference))}. Either the paste is being read wrongly or
+                  the block is from two different moments. Importing still records what was pasted;
+                  the figures should not be trusted until this is explained.
+                </div>
+              )}
               {moneyEntries.length > 0 && (
                 <div className="mt-1 text-muted-foreground">
                   Recorded as an imported snapshot, as of now — so the app can say how old these
