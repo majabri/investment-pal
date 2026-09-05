@@ -67,7 +67,7 @@ function SettingsPage() {
   // window is a money-adjacent hazard (see PolicyCards) and the guard is
   // easier to test when the components do not fetch for themselves.
   const { data: ips, isLoading: ipsLoading, save: saveIps } = useIpsLite();
-  const { data: goal, isLoading: goalLoading, update: updateGoal } = useGoal();
+  const { data: goal, isLoading: goalLoading, isError: goalError, update: updateGoal } = useGoal();
 
   const [pLabel, setPLabel] = useState("");
   const [pSev, setPSev] = useState<"info" | "warning" | "critical">("info");
@@ -87,7 +87,7 @@ function SettingsPage() {
       <div className="mb-4">
         <BalanceImport />
       </div>
-      <ObjectiveCard goal={goal} isLoading={goalLoading} update={updateGoal} />
+      <ObjectiveCard goal={goal} isLoading={goalLoading} isError={goalError} update={updateGoal} />
       <IpsLiteCard ips={ips} isLoading={ipsLoading} save={saveIps} />
       <MarginRateCard ips={ips} isLoading={ipsLoading} save={saveIps} />
       {/* ACCOUNTS */}

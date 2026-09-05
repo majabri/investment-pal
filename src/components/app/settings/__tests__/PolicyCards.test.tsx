@@ -113,6 +113,16 @@ describe("ObjectiveCard", () => {
     expect(screen.getByText(/Loading the objective/)).toBeInTheDocument();
   });
 
+  test("a failed fetch is not reported as an absent objective", () => {
+    // `goal` is undefined on error too, so the absent-branch would otherwise
+    // tell the owner their objective does not exist when it merely could not
+    // be loaded (Copilot, #135).
+    render(<ObjectiveCard goal={undefined} isLoading={false} isError update={noop} />);
+
+    expect(screen.queryByText(/No objective set yet/)).toBeNull();
+    expect(screen.getByText(/could not be loaded/)).toBeInTheDocument();
+  });
+
   test("still reports a genuinely absent objective once loaded", () => {
     render(<ObjectiveCard goal={null} isLoading={false} update={noop} />);
 

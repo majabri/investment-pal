@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { rateStatus } from "@/lib/marginCost";
-import { isFutureLocalDate } from "@/lib/localDate";
+import { isFutureLocalDate, isRealCalendarDate } from "@/lib/localDate";
 import type { IpsLite } from "@/lib/ipsPolicy";
 
 // Only the objective fields this card reads and writes, rather than the whole
@@ -175,10 +175,13 @@ function IpsLiteForm({ ips, save }: { ips: IpsLite; save: Saver<Partial<IpsLite>
 export function ObjectiveCard({
   goal,
   isLoading,
+  isError,
   update,
 }: {
   goal: Objective | null | undefined;
   isLoading: boolean;
+  /** The fetch failed. Distinct from `goal === null`, which means there is none. */
+  isError?: boolean;
   update: Saver<Partial<Objective> & { id: string }>;
 }) {
   return (
@@ -189,6 +192,14 @@ export function ObjectiveCard({
         // objective set yet" for the whole load window, telling the owner their
         // objective did not exist while it was still being fetched.
         <p className="text-xs text-muted-foreground">Loading the objective…</p>
+      ) : isError ? (
+        // A failed fetch is not an absent objective. Saying "not set" here
+        // would report unavailable data as a fact about the objective, which
+        // is the same class of error as the load window itself (Copilot, #135).
+        <p className="text-xs text-muted-foreground">
+          The objective could not be loaded. It is not shown here rather than reported as unset —
+          reload to try again.
+        </p>
       ) : !goal ? (
         // No goal row: say so rather than rendering a form whose save has nowhere
         // to go. Creating one from here would invent a target.
@@ -377,8 +388,10 @@ function MarginRateForm({ ips, save }: { ips: IpsLite; save: Saver<Partial<IpsLi
     // provenance claim the data does not support. Reject it here rather than
     // letting it reach the committee prompt.
     if (r != null) {
-      const parsed = new Date(`${asOf}T00:00:00Z`);
-      if (Number.isNaN(parsed.getTime())) {
+      // Not a NaN check: `new Date("2026-02-31T00:00:00Z")` is not Invalid Date,
+      // it is 3 March. A NaN test accepts 31 February and stores a day the user
+      // never chose — provenance the data does not support (Copilot, #135).
+      if (!isRealCalendarDate(asOf)) {
         return toast.error("Verified-on must be a real date (YYYY-MM-DD)");
       }
       // Compared as a LOCAL calendar date. `parsed > Date.now()` rejects
