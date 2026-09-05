@@ -239,13 +239,13 @@ describe("observed interest beats computed interest", () => {
 
   test("the broker's figure wins when both exist", () => {
     const f = marginInterestFigure({
-      accruedMtd: 91.22,
+      accruedMtd: 175,
       importedAt: "2026-09-03T14:00:00Z",
       marginUsed: 20_000,
       policy,
     });
     expect(f.kind).toBe("actual");
-    expect(f.kind === "actual" && f.accruedMtd).toBe(91.22);
+    expect(f.kind === "actual" && f.accruedMtd).toBe(175);
   });
 
   test("a broker figure of zero is still the broker's figure", () => {
@@ -295,7 +295,7 @@ describe("observed interest beats computed interest", () => {
     // stops appearing on one screen.
     const estimate = marginInterestFigure({ accruedMtd: null, marginUsed: 1, policy });
     expect(interestProvenanceShort(estimate)).toBe("estimate");
-    const actual = marginInterestFigure({ accruedMtd: 91.22, marginUsed: 1, policy });
+    const actual = marginInterestFigure({ accruedMtd: 175, marginUsed: 1, policy });
     expect(interestProvenanceShort(actual)).toBe("per Fidelity");
     for (const hasImport of [false, true]) {
       const none = marginInterestFigure({
@@ -312,7 +312,7 @@ describe("observed interest beats computed interest", () => {
     // The observation stands on its own. It does not need the app's rate to be
     // set, because it was not computed from it.
     const f = marginInterestFigure({
-      accruedMtd: 91.22,
+      accruedMtd: 175,
       marginUsed: 20_000,
       policy: MARGIN_POLICY_UNSET,
     });
@@ -321,7 +321,7 @@ describe("observed interest beats computed interest", () => {
 
   test("every figure says where it came from, and an estimate says so", () => {
     const actual = marginInterestFigure({
-      accruedMtd: 91.22,
+      accruedMtd: 175,
       importedAt: "2026-09-03T14:00:00Z",
       marginUsed: 1,
       policy,
