@@ -235,9 +235,10 @@ function PromptCenter() {
       todaysPL: dayPL,
       todaysPLPct: portfolioValue - dayPL > 0 ? dayPL / (portfolioValue - dayPL) : 0,
       accountName: goal?.name?.trim() || selectedAccount?.name || "this portfolio",
-      goalStartingValue: goal?.starting_value ?? 0,
-      goalTarget: goal?.target_value ?? 0,
-      goalDate: goal?.target_date ?? "—",
+      // `objectiveOf`'s answer, carried whole. This used to be three fields
+      // filled with `?? 0` and `?? "—"`, which the mandate then handed to the
+      // committee as "from approximately $0 to $0 by —" (Copilot, #138).
+      objective,
       requiredCagr: cagr,
       probability: prob,
       ipsPositionCapPct: ipsLite.position_cap_pct,

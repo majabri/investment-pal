@@ -66,6 +66,26 @@ describe("objectiveOf", () => {
   });
 });
 
+// A date that is not a real day is not a horizon. Postgres rejects these at the
+// DATE column, so this is the contract holding at the module boundary rather
+// than a path reachable through the app today — but `objectiveOf` is what every
+// consumer trusts, and "kind: set" has to mean every field is usable
+// (Copilot, #138).
+describe("a target date that is not a real day is not a horizon", () => {
+  for (const bad of ["2027-02-31", "2027-02-30", "2026-02-29", "2027-04-31", "2027-13-01", "soon", "—"]) {
+    test(`${bad} counts as missing`, () => {
+      const o = objectiveOf({ ...full, target_date: bad });
+      expect(o.kind).toBe("unset");
+      expect(o.kind === "unset" && o.missing).toEqual(["target date"]);
+    });
+  }
+
+  test("a leap day in a leap year is a real date and stays set", () => {
+    // The check must not reject valid dates to catch the invalid ones.
+    expect(objectiveOf({ ...full, target_date: "2028-02-29" }).kind).toBe("set");
+  });
+});
+
 describe("objectiveMissingLabel", () => {
   test("names one missing field", () => {
     expect(objectiveMissingLabel(objectiveOf({ ...full, target_value: null }))).toBe(

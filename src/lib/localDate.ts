@@ -28,3 +28,19 @@ export function localIsoDate(now: Date = new Date()): string {
 export function isFutureLocalDate(iso: string, now: Date = new Date()): boolean {
   return iso > localIsoDate(now);
 }
+
+/**
+ * Whether a string is a real calendar date in `YYYY-MM-DD` form.
+ *
+ * The shape test alone is not enough: `new Date("2027-02-31T00:00:00Z")` does
+ * not throw, it rolls forward to 3 March. Round-tripping through the parser
+ * catches every such day — 2 February 31st, 29 February in a non-leap year,
+ * 31 April — which a shape check silently accepts and every consumer then
+ * treats as a real horizon.
+ */
+export function isRealCalendarDate(iso: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const parsed = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return parsed.toISOString().slice(0, 10) === iso;
+}

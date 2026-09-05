@@ -12,6 +12,7 @@
 //
 // This module is the single place that decides whether an objective is usable,
 // so no screen has to re-derive it and none of them can disagree.
+import { isRealCalendarDate } from "./localDate";
 
 export type GoalLike = {
   starting_value: number | null;
@@ -48,12 +49,19 @@ const FIELDS = [
 export function objectiveOf(goal: GoalLike | null | undefined): Objective {
   if (!goal) return { kind: "unset", missing: FIELDS.map(([label]) => label) };
 
-  const missing = FIELDS.filter(([, read]) => {
+  const missing = FIELDS.filter(([label, read]) => {
     const v = read(goal);
     // An empty date string is as unset as null; a non-finite number is not a
     // value either, however it got here.
     if (v === null || v === undefined || v === "") return true;
-    return typeof v === "number" && !Number.isFinite(v);
+    if (typeof v === "number") return !Number.isFinite(v);
+    // A date that is not a real calendar date is not a horizon. Postgres
+    // rejects "2027-02-31" at the column, but this module is the contract
+    // every consumer trusts, and "kind: set" has to mean every field is
+    // usable — an unparseable date reaches yearsBetween() as Invalid Date and
+    // comes back out as NaN%, which is a figure the committee would read
+    // (Copilot raised this on #138).
+    return label === "target date" && !isRealCalendarDate(v);
   }).map(([label]) => label);
 
   if (missing.length > 0) return { kind: "unset", missing };
