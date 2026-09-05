@@ -9,6 +9,7 @@ import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 import { localIsoDate } from "@/lib/localDate";
 import { isUniqueViolation } from "@/lib/postgresError";
 import type { HouseholdMember } from "@/lib/household";
+import { policySourceOf, type PolicySource } from "@/lib/policy";
 
 export type Goal = {
   id: string;
@@ -772,6 +773,14 @@ export type IpsLite = {
   position_cap_pct: number;
   position_cap_hard: boolean;
   margin_cap_pct: number;
+  /**
+   * Where the three caps above came from (Phase 4, rule 15). `default` means
+   * there is no stored policy at all and these are ADR-APP-004's signed-off
+   * defaults; `legacy_unknown` means a row exists from before this column and
+   * the app cannot tell a choice from a column default. Only `user_set` may be
+   * described to a person, or to a model, as the user's own policy.
+   */
+  caps_source: PolicySource;
 } & MarginPolicy;
 
 /**
@@ -796,10 +805,15 @@ export function useUniverse() {
 }
 
 // Signed-off defaults (ADR-APP-004): 30% soft position cap, 25% margin cap.
+//
+// Still defaults, and still legitimate — what changed in Phase 4 is that they
+// now carry `caps_source: "default"` so nothing downstream can present them as
+// the user's decision (rule 15).
 export const IPS_LITE_DEFAULTS: IpsLite = {
   position_cap_pct: 30,
   position_cap_hard: false,
   margin_cap_pct: 25,
+  caps_source: "default",
   // The caps have signed-off defaults (ADR-APP-004). The margin RATE does not
   // and must not (ADR-APP-007): unset means unset, and the UI suppresses the
   // cost figure rather than computing with a fallback.
@@ -816,16 +830,20 @@ export function useIpsLite() {
       const { data, error } = await supabase
         .from("ips_lite" as never)
         .select(
-          "position_cap_pct,position_cap_hard,margin_cap_pct,margin_rate_annual_pct,margin_rate_as_of,margin_rate_is_floating,margin_rate_stale_days",
+          "position_cap_pct,position_cap_hard,margin_cap_pct,caps_source,margin_rate_annual_pct,margin_rate_as_of,margin_rate_is_floating,margin_rate_stale_days",
         )
         .limit(1);
-      const rows = (data ?? []) as unknown as Partial<IpsLite>[];
+      const rows = (data ?? []) as unknown as (Partial<IpsLite> & { caps_source?: string | null })[];
       if (error || rows.length === 0) return IPS_LITE_DEFAULTS;
       const row = rows[0]!;
       return {
         position_cap_pct: Number(row.position_cap_pct ?? IPS_LITE_DEFAULTS.position_cap_pct),
         position_cap_hard: Boolean(row.position_cap_hard ?? IPS_LITE_DEFAULTS.position_cap_hard),
         margin_cap_pct: Number(row.margin_cap_pct ?? IPS_LITE_DEFAULTS.margin_cap_pct),
+        // A stored row is never `default`: the values in it are whatever was
+        // written, and `policySourceOf` refuses to promote an unreadable
+        // provenance into a confirmation.
+        caps_source: policySourceOf(row.caps_source),
         // No `??` fallback on the rate — a null rate stays null all the way to
         // the screen. Coercing it to a number here is how a fallback sneaks in.
         margin_rate_annual_pct:
@@ -844,9 +862,17 @@ export function useIpsLite() {
     mutationFn: async (patch: Partial<IpsLite>) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Not signed in");
+      // Saving a cap is a person choosing it — the same distinction the Phase 1b
+      // account editor records. Stamped here rather than at the call site so a
+      // future editor cannot save a cap and forget to say who chose it.
+      const touchesCaps =
+        "position_cap_pct" in patch ||
+        "position_cap_hard" in patch ||
+        "margin_cap_pct" in patch;
+      const stamped = touchesCaps ? { ...patch, caps_source: "user_set" } : patch;
       const { error } = await supabase
         .from("ips_lite" as never)
-        .upsert({ user_id: userData.user.id, ...patch } as never, { onConflict: "user_id" });
+        .upsert({ user_id: userData.user.id, ...stamped } as never, { onConflict: "user_id" });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ips_lite"] }),

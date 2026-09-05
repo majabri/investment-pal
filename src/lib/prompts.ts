@@ -4,6 +4,7 @@ import { marginRatePromptLine, MARGIN_POLICY_UNSET, type MarginPolicy } from "./
 import { isRealCalendarDate } from "./localDate";
 import { NOT_KNOWN, usdOrNotKnown } from "./unavailable";
 import type { Objective } from "./objective";
+import type { PolicySource } from "./policy";
 
 export type PromptContext = {
   /** Name of the portfolio the mandate is written about (the goal's name). */
@@ -54,9 +55,19 @@ export type PromptContext = {
   requiredCagr: number | null;
   /** NULL when the objective is unset. Never 0% — that reads as no chance. */
   probability: number | null;
-  ipsPositionCapPct?: number;
-  ipsPositionCapHard?: boolean;
-  ipsMarginCapPct?: number;
+  /**
+   * The IPS-lite caps, and WHERE THEY CAME FROM (Phase 4, rules 15 and 21).
+   *
+   * These were optional with `?? 30` / `?? 25` fallbacks at the template, so a
+   * caller that forgot to pass them produced a prompt asserting a 30% position
+   * cap as the user's HARD GOVERNANCE. Required now, and stated to the model
+   * with their provenance: a model told a default is the user's decision will
+   * defend a limit nobody chose as though it were a commitment.
+   */
+  ipsPositionCapPct: number;
+  ipsPositionCapHard: boolean;
+  ipsMarginCapPct: number;
+  ipsCapsSource: PolicySource;
   /** Margin policy from ips_lite (ADR-APP-007). Omitted = rate not set. */
   marginPolicy?: MarginPolicy;
   holdings: Array<{
@@ -216,6 +227,27 @@ export function mandateOf(ctx: PromptContext): Mandate {
 const money = usdOrNotKnown;
 
 /** Equity as a percentage, or why it cannot be given. */
+/**
+ * One line telling the model whether the caps below are the user's decision.
+ *
+ * Rule 15. The caps used to be stated under "HARD GOVERNANCE" with no
+ * provenance, so a model reading a 30% cap that nobody had ever chosen would
+ * argue for it, cite it back, and treat a breach of it as the user breaking
+ * their own commitment.
+ */
+function capsProvenanceLine(source: PolicySource): string {
+  switch (source) {
+    case "user_set":
+      return "These limits were set by the user. Treat them as their decision.";
+    case "default":
+      return "NOTE: these are the APP'S DEFAULT limits. The user has not set them. Apply them, but do not describe them as the user's choice or commitment, and say plainly that they are defaults if the analysis turns on them.";
+    case "legacy_unknown":
+      return "NOTE: it is NOT KNOWN whether the user chose these limits or whether they are old app defaults. Apply them, and do not attribute them to the user.";
+    case "not_set":
+      return "NOTE: no position or margin limit is set. Do not invent one.";
+  }
+}
+
 function equityLine(ctx: PromptContext): string {
   const gross = ctx.grossValue ?? ctx.portfolioValue;
   if (gross === null || ctx.portfolioValue === null) return NOT_KNOWN;
@@ -262,8 +294,9 @@ Goal: ${objectiveLine(ctx)}
 Required pace: ${paceLine(ctx.requiredCagr)}
 
 INVESTMENT POLICY (IPS-lite) — HARD GOVERNANCE
-Max single position: ${ctx.ipsPositionCapPct ?? 30}% of gross${ctx.ipsPositionCapHard ? " (HARD — do not exceed)" : " (soft — flag any breach; explicit justification required)"}.
-Max margin utilization: ${ctx.ipsMarginCapPct ?? 25}% of account value.
+${capsProvenanceLine(ctx.ipsCapsSource)}
+Max single position: ${ctx.ipsPositionCapPct}% of gross${ctx.ipsPositionCapHard ? " (HARD — do not exceed)" : " (soft — flag any breach; explicit justification required)"}.
+Max margin utilization: ${ctx.ipsMarginCapPct}% of account value.
 The objective never justifies overriding risk limits or the evidence contract.
 
 HOLDINGS

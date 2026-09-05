@@ -44,6 +44,12 @@ import {
 import { rateStatus } from "@/lib/marginCost";
 import { isFutureLocalDate, isRealCalendarDate } from "@/lib/localDate";
 import { RELATIONSHIPS, ageOf } from "@/lib/household";
+import {
+  POLICY_CLASS_LABEL,
+  POLICY_CLASS_MEANING,
+  POLICY_SOURCE_LABEL,
+  policyIsConfirmed,
+} from "@/lib/policy";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -86,11 +92,31 @@ function IpsLiteCard() {
 
   return (
     <section className="mb-4 rounded-2xl border bg-card p-5">
-      <div className="mb-1 text-sm font-medium">Investment policy (IPS-lite)</div>
-      <p className="mb-3 text-xs text-muted-foreground">
+      <div className="mb-1 flex items-center gap-2 text-sm font-medium">
+        Investment policy (IPS-lite)
+        {/* Rule 21: the UI must show which KIND of rule a limit is. These two
+            are the user's own risk policy — not a system safety rule the app
+            enforces regardless, and not a broker or regulatory constraint the
+            user could not move if they wanted to. */}
+        <Badge variant="outline" className="text-[10px] uppercase">
+          {POLICY_CLASS_LABEL.user_policy}
+        </Badge>
+      </div>
+      <p className="mb-2 text-xs text-muted-foreground">
         Governs the committee prompt and the Constitution Check strip. The objective never justifies
-        overriding these limits or the evidence contract.
+        overriding these limits or the evidence contract. {POLICY_CLASS_MEANING.user_policy}
       </p>
+      {/* Rule 15: a default must never masquerade as a preference. Until
+          somebody saves this form, the numbers in it are ADR-APP-004's
+          defaults — shown, used, and said out loud to be defaults. */}
+      {!policyIsConfirmed(ips.caps_source) && (
+        <p className="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs">
+          <span className="font-medium">{POLICY_SOURCE_LABEL[ips.caps_source]}.</span>{" "}
+          {ips.caps_source === "default"
+            ? "These are the app's signed-off defaults (ADR-APP-004). The dashboard flags breaches of them and the committee prompt states them, so they are doing real work — but you have not chosen them."
+            : "This policy was stored before the app recorded who chose it, so it may be your decision or may be the old column defaults. Save the form to confirm."}
+        </p>
+      )}
       <div className="grid gap-3 sm:grid-cols-[200px_200px_160px_auto]">
         <div>
           <Label className="text-xs">Max single position (% of gross)</Label>

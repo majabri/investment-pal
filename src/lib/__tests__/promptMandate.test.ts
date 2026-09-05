@@ -42,6 +42,13 @@ function ctx(overrides: Partial<PromptContext> = {}): PromptContext {
     buyingPower: 5_000,
     todaysPL: 0,
     todaysPLPct: 0,
+    // Required as of Phase 4: the caps used to be optional with `?? 30` and
+    // `?? 25` fallbacks at the template, so a caller that forgot them still
+    // produced a prompt asserting a 30% cap as HARD GOVERNANCE.
+    ipsPositionCapPct: 30,
+    ipsPositionCapHard: false,
+    ipsMarginCapPct: 25,
+    ipsCapsSource: "user_set",
     objective: setObjective(),
     requiredCagr: 0.2,
     probability: 0.4,

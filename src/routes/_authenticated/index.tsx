@@ -27,6 +27,7 @@ import { ReconciliationPanel } from "@/components/app/ReconciliationPanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { interestProvenanceShort, marginInterestFigure, rateStatus } from "@/lib/marginCost";
+import { policyIsConfirmed } from "@/lib/policy";
 import { balanceSeries, dayChange } from "@/lib/portfolioSummary";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
 import {
@@ -322,21 +323,34 @@ function Dashboard() {
           : null;
         const breaches: string[] = [];
         // IPS-lite (ADR-APP-004): configurable soft/hard position cap + margin cap.
+        //
+        // Rule 15: these are the USER'S RISK POLICY, and until somebody saves
+        // the Settings form they are the app's defaults rather than anybody's
+        // choice. "⚠ NVDA 34.2% > 30% cap" read as the user breaching their
+        // own commitment either way; the qualifier below is the difference.
+        const capsConfirmed = policyIsConfirmed(ipsLite.caps_source);
+        const capNote = capsConfirmed ? "" : " (default, not your setting)";
         const posCap = ipsLite.position_cap_pct / 100;
         for (const h of scopedHoldings) {
           const v = h.quantity * px(h);
           if (net !== null && net > 0 && v / net > posCap)
             breaches.push(
-              `${h.symbol} ${fmtPct(v / net)} > ${ipsLite.position_cap_pct}% cap${ipsLite.position_cap_hard ? " (HARD)" : ""}`,
+              `${h.symbol} ${fmtPct(v / net)} > ${ipsLite.position_cap_pct}% cap${ipsLite.position_cap_hard ? " (HARD)" : ""}${capNote}`,
             );
         }
         const marginUtil =
           net !== null && net > 0 && marginUsed !== null ? marginUsed / net : null;
         if (marginUsed !== null && marginUsed > 0 && marginUtil !== null)
           if (marginUtil > ipsLite.margin_cap_pct / 100)
-            breaches.push(`Margin util ${fmtPct(marginUtil)} > ${ipsLite.margin_cap_pct}% cap`);
+            breaches.push(
+              `Margin util ${fmtPct(marginUtil)} > ${ipsLite.margin_cap_pct}% cap${capNote}`,
+            );
+        // Not a user policy and deliberately not labelled as one: 50% is the
+        // Reg-T maintenance floor. Rule 21 — a constraint the user cannot move
+        // must not read like a preference they set, and this one carries no
+        // "(default, not your setting)" note because it is neither.
         if (marginUsed !== null && marginUsed > 0 && equityPct !== null && equityPct < 0.5)
-          breaches.push(`Equity ${fmtPct(equityPct)} < 50%`);
+          breaches.push(`Equity ${fmtPct(equityPct)} < 50% (regulatory minimum)`);
         return (
           <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-xs">
             <span
