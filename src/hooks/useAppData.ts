@@ -10,6 +10,7 @@ import { localIsoDate } from "@/lib/localDate";
 import { isUniqueViolation } from "@/lib/postgresError";
 import type { HouseholdMember } from "@/lib/household";
 import { policySourceOf, type PolicySource } from "@/lib/policy";
+import type { Strategy, StrategySymbol } from "@/lib/strategy";
 
 export type Goal = {
   id: string;
@@ -291,6 +292,95 @@ export function useHouseholdMembers() {
     },
   });
   return { ...query, create, update, remove };
+}
+
+/**
+ * Strategy configuration — the approved universe and the rules with it
+ * (Phase 4, rules 16 and 21).
+ *
+ * No rows are provisioned. An empty result means there is no strategy, which
+ * is not the same as a strategy that approves nothing: `approvedSymbols`
+ * returns null for it and the screens say "no approved universe set" rather
+ * than reporting 0% in approved names.
+ */
+export function useStrategies() {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["strategies"],
+    queryFn: async (): Promise<Strategy[]> => {
+      const { data, error } = await supabase
+        .from("strategies")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Strategy[];
+    },
+  });
+  const create = useMutation({
+    mutationFn: async (patch: { name: string }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("strategies")
+        .insert({ ...patch, user_id: userData.user!.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as Strategy;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["strategies"] }),
+  });
+  const update = useMutation({
+    mutationFn: async ({ id, ...patch }: Partial<Strategy> & { id: string }) => {
+      const { error } = await supabase.from("strategies").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["strategies"] }),
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("strategies").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["strategies"] });
+      // The symbols go with it (ON DELETE CASCADE); the cache does not know.
+      qc.invalidateQueries({ queryKey: ["strategy_symbols"] });
+    },
+  });
+  return { ...query, create, update, remove };
+}
+
+export function useStrategySymbols() {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["strategy_symbols"],
+    queryFn: async (): Promise<StrategySymbol[]> => {
+      const { data, error } = await supabase
+        .from("strategy_symbols")
+        .select("*")
+        .order("symbol", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as StrategySymbol[];
+    },
+  });
+  const add = useMutation({
+    mutationFn: async (p: { strategy_id: string; symbol: string; bucket: string }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("strategy_symbols")
+        .insert({ ...p, user_id: userData.user!.id });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["strategy_symbols"] }),
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("strategy_symbols").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["strategy_symbols"] }),
+  });
+  return { ...query, add, remove };
 }
 
 export function useAccounts() {

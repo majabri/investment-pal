@@ -5,14 +5,19 @@ import { Progress } from "@/components/ui/progress";
 import { fmtUSD, fmtPct, yearsBetween } from "@/lib/finance";
 import { UNAVAILABLE, usdOrUnavailable } from "@/lib/unavailable";
 import {
-  FAMILY_POLICY,
-  approvedSymbols,
   requiredCagrWithContributions,
   fvWithContributions,
-} from "@/lib/data/familyPolicy";
+} from "@/lib/objectiveMath";
+import { approvedShare, approvedSymbols } from "@/lib/strategy";
 import { combinedTarget, nextContributionDate } from "@/lib/accountObjective";
 import { kidAccounts } from "@/lib/kidAccounts";
-import { useAccounts, useAllHoldings, useHouseholdMembers } from "@/hooks/useAppData";
+import {
+  useAccounts,
+  useAllHoldings,
+  useHouseholdMembers,
+  useStrategies,
+  useStrategySymbols,
+} from "@/hooks/useAppData";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
@@ -25,6 +30,8 @@ function KidsPage() {
   const { data: accounts = [] } = useAccounts();
   const { data: allHoldings = [] } = useAllHoldings();
   const { data: members = [] } = useHouseholdMembers();
+  const { data: strategies = [] } = useStrategies();
+  const { data: strategySymbols = [] } = useStrategySymbols();
   // Custodial accounts, by TYPE, with whoever holds them.
   //
   // The seed fallback that used to sit here is gone. When there were no
@@ -110,7 +117,13 @@ function KidsPage() {
           month: "short",
           day: "numeric",
         });
-  const approved = approvedSymbols();
+  // NULL when there is no strategy at all. Not an empty set: an empty set
+  // answers "is this approved?" with "no", and there being no list answers it
+  // with "nobody has said" (rules 13, 16).
+  const strategy = strategies[0] ?? null;
+  const approved = approvedSymbols(
+    strategy === null ? [] : strategySymbols.filter((s) => s.strategy_id === strategy.id),
+  );
   // All-or-nothing: a family total that quietly omits one child's cash is not
   // the family's total (Phase 1a).
   // No accounts is not a total of zero either. `[].reduce(..., 0)` returns 0,
@@ -166,9 +179,9 @@ function KidsPage() {
       subtitle={
         // The cadence was "every other Thursday" in the copy and 14 days in the
         // code, and both were one household's. Said only when a plan exists.
-        next === null
-          ? `Family Investment OS v${FAMILY_POLICY.version} · no contribution plan set`
-          : `Family Investment OS v${FAMILY_POLICY.version} · next contribution ${next}`
+        // "Family Investment OS v1.0" went with the constants it versioned —
+        // a version number on a policy the app no longer holds names nothing.
+        next === null ? "No contribution plan set" : `Next contribution ${next}`
       }
     >
       <Card className="mb-6">
@@ -232,10 +245,14 @@ function KidsPage() {
             total === null || years === null
               ? null
               : fvWithContributions(total, 0.1, years, perPeriod);
-          const approvedShare =
-            kid.holdings
-              .filter((h) => approved.has(h.symbol))
-              .reduce((s, h) => s + h.shares * h.price, 0) / Math.max(1, mv);
+          // NULL when there is no approved universe, and null when the account
+          // holds nothing. The version this replaces divided by
+          // `Math.max(1, mv)`, so an empty account read "0% in approved names"
+          // — a failing grade against a standard nobody had written.
+          const inApproved = approvedShare(
+            kid.holdings.map((h) => ({ symbol: h.symbol, value: h.shares * h.price })),
+            approved,
+          );
           const largest = [...kid.holdings].sort(
             (a, b) => b.shares * b.price - a.shares * a.price,
           )[0];
@@ -306,7 +323,9 @@ function KidsPage() {
                   <span className="text-muted-foreground">Projected @10%</span>
                   <span className="tabular-nums">{usdOrUnavailable(at10)}</span>
                   <span className="text-muted-foreground">In approved names</span>
-                  <span className="tabular-nums">{fmtPct(approvedShare)}</span>
+                  <span className="tabular-nums">
+                    {inApproved === null ? UNAVAILABLE : fmtPct(inApproved)}
+                  </span>
                   <span className="text-muted-foreground">Largest position</span>
                   <span>
                     {largest
@@ -414,10 +433,20 @@ function KidsPage() {
           );
         })}
       </div>
-      <p className="mt-4 text-xs text-muted-foreground">
-        Parity rule: {FAMILY_POLICY.parityRule} TSLA (~15% each) sits outside the approved list —
-        standing committee agenda item.
-      </p>
+      {/* The parity rule belongs to the strategy and is shown only when one is
+          written. It used to be a compiled-in sentence followed by a hardcoded
+          editorial note about a specific holding's weight — one household's
+          committee agenda, rendered to every user as if it were theirs. */}
+      {strategy?.parity_rule ? (
+        <p className="mt-4 text-xs text-muted-foreground">
+          Parity rule ({strategy.name}): {strategy.parity_rule}
+        </p>
+      ) : approved === null ? (
+        <p className="mt-4 text-xs text-muted-foreground">
+          No strategy set, so &ldquo;in approved names&rdquo; is unavailable rather than 0%. Add one
+          under Settings → Strategy.
+        </p>
+      ) : null}
     </AppShell>
   );
 }

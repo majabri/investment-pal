@@ -6,10 +6,16 @@ import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
-import { FAMILY_POLICY } from "@/lib/data/familyPolicy";
 import { nextContributionDate } from "@/lib/accountObjective";
 import { kidAccounts, holderLabel } from "@/lib/kidAccounts";
-import { useAccounts, useAllHoldings, useHouseholdMembers } from "@/hooks/useAppData";
+import {
+  useAccounts,
+  useAllHoldings,
+  useHouseholdMembers,
+  useStrategies,
+  useStrategySymbols,
+} from "@/hooks/useAppData";
+import { BUCKET_LABEL, byBucket } from "@/lib/strategy";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD } from "@/lib/finance";
 import { NOT_KNOWN, usdOrNotKnown } from "@/lib/unavailable";
@@ -21,6 +27,11 @@ function Page() {
   const { data: accounts = [] } = useAccounts();
   const { data: allHoldings = [] } = useAllHoldings();
   const { data: members = [] } = useHouseholdMembers();
+  const { data: strategies = [] } = useStrategies();
+  const { data: strategySymbols = [] } = useStrategySymbols();
+  const strategy = strategies[0] ?? null;
+  const mySymbols =
+    strategy === null ? [] : strategySymbols.filter((s) => s.strategy_id === strategy.id);
   // By TYPE, not by a hardcoded list of first names (Phase 1b, rule 4), and
   // with no seed fallback: a prompt built from `KIDS_SEED` described somebody
   // else's children and somebody else's positions to a model, in the first
@@ -73,6 +84,19 @@ function Page() {
     // prompt asserted their names and ages to the model regardless of whose
     // accounts were on screen.
     const kidsLine = kidsData.map(holderLabel).join(", ");
+    // The approved universe is the STRATEGY's, and there may not be one. The
+    // paragraph this replaces named 28 tickers and a 5% cap as "family policy"
+    // to the model, for every user of the app (rules 16, 21, 37).
+    const buckets = byBucket(mySymbols);
+    const universeLine =
+      buckets.length === 0
+        ? `Approved universe: ${NOT_KNOWN}. No strategy is configured. Do not treat any symbol as approved or unapproved, and do not invent an approved list.`
+        : `Approved universe (strategy "${strategy!.name}" — the user's own list, additions require their approval): ` +
+          buckets.map(([b, list]) => `${BUCKET_LABEL[b]} ${list.join(", ")}`).join("; ") +
+          (strategy!.speculative_max_pct == null
+            ? `; speculative cap ${NOT_KNOWN}`
+            : `; speculative cap ${strategy!.speculative_max_pct}%`);
+
     const data = kidsData
       .map((k) => {
         const live = k.holdings.map((h) =>
@@ -197,9 +221,9 @@ End with a one-page Family Action Sheet containing only the final actions.
 
 MY VERIFIED DATA (live prices as of ${new Date().toLocaleString("en-US")})
 Next contribution date: ${next}
-Approved universe (family policy — committee approval required for additions): Core ${FAMILY_POLICY.core.join(", ")}; Supporting ${FAMILY_POLICY.supporting.join(", ")}; Preferred future ${FAMILY_POLICY.preferredFuture.join(", ")}; Speculative cap ${FAMILY_POLICY.speculative.maxPct}% (${FAMILY_POLICY.speculative.symbols.join(", ")})
+${universeLine}
 ${data}`;
-  }, [kidsData, quotes]);
+  }, [kidsData, quotes, mySymbols, strategy]);
 
   // No custodial accounts: there is no prompt to build. Rendering the template
   // anyway would send a model a first-person brief about "my children's
