@@ -8,11 +8,12 @@ import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PRODUCT_NAME } from "@/lib/branding";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — Amir Investment Companion" },
+      { title: `Sign in — ${PRODUCT_NAME}` },
       { name: "description", content: "Sign in to your investment command center." },
       { name: "robots", content: "noindex" },
     ],
@@ -82,7 +83,7 @@ function AuthPage() {
             <LineChart className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">Amir Investment Companion</h1>
+            <h1 className="text-xl font-semibold tracking-tight">{PRODUCT_NAME}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Your personal investment command center.
             </p>

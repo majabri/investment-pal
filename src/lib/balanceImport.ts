@@ -34,14 +34,14 @@ export type BalanceFields = {
   netHouseSurplus: number | null;
   /** Interest the broker has actually accrued this month. An observed fact. */
   marginInterestAccruedMtd: number | null;
-  /** Annual rate as a percentage (11.325 for 11.325%), not a fraction. */
+  /** Annual rate as a percentage (9.750 for 9.75%), not a fraction. */
   marginInterestRatePct: number | null;
   cashMarketValue: number | null;
   marginMarketValue: number | null;
   /**
    * The margin debit, stored as a POSITIVE magnitude.
    *
-   * Fidelity prints it as a negative ("−$6,664.33"). `accounts.margin_used` and
+   * Fidelity prints it as a negative ("−$20,000.00"). `accounts.margin_used` and
    * `accountTotals` both hold it positive and subtract it. Normalising the sign
    * here, once, is why the rest of the app cannot get the direction wrong — a
    * sign error on a debit is silent and the size of the whole loan.

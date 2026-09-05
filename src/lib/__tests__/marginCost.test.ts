@@ -201,7 +201,11 @@ describe("no margin rate survives anywhere in production source", () => {
     const offenders: string[] = [];
     for (const file of productionSources()) {
       const code = stripComments(readFileSync(file, "utf8"));
-      for (const pattern of ["11.825", "12.075", "0.11825", "0.12075"]) {
+      // 11.325 is the owner's real rate as of 2026-09-03. It is listed here
+      // for the same reason as the others: so it cannot be reintroduced as a
+      // constant. Adding a rate to this list is the cheap half of removing it
+      // from the code (P0 remediation, 2026-09-05).
+      for (const pattern of ["11.825", "12.075", "11.325", "0.11825", "0.12075", "0.11325"]) {
         if (code.includes(pattern)) offenders.push(`${file} contains ${pattern}`);
       }
     }
@@ -227,7 +231,7 @@ describe("observed interest beats computed interest", () => {
   // balance import carries what Fidelity has actually charged. An estimate
   // shown next to an available actual is a worse number with equal authority.
   const policy: MarginPolicy = {
-    margin_rate_annual_pct: 11.325,
+    margin_rate_annual_pct: 9.75,
     margin_rate_as_of: "2026-09-03",
     margin_rate_is_floating: true,
     margin_rate_stale_days: 30,
@@ -235,34 +239,34 @@ describe("observed interest beats computed interest", () => {
 
   test("the broker's figure wins when both exist", () => {
     const f = marginInterestFigure({
-      accruedMtd: 91.22,
+      accruedMtd: 175,
       importedAt: "2026-09-03T14:00:00Z",
-      marginUsed: 6_664.33,
+      marginUsed: 20_000,
       policy,
     });
     expect(f.kind).toBe("actual");
-    expect(f.kind === "actual" && f.accruedMtd).toBe(91.22);
+    expect(f.kind === "actual" && f.accruedMtd).toBe(175);
   });
 
   test("a broker figure of zero is still the broker's figure", () => {
     // "Fidelity has charged nothing this month" is a fact. Replacing it with an
     // estimate of what it might charge would be inventing a broker state.
-    const f = marginInterestFigure({ accruedMtd: 0, marginUsed: 6_664.33, policy });
+    const f = marginInterestFigure({ accruedMtd: 0, marginUsed: 20_000, policy });
     expect(f.kind).toBe("actual");
     expect(f.kind === "actual" && f.accruedMtd).toBe(0);
   });
 
   test("with no import, the estimate is offered as an estimate", () => {
-    const f = marginInterestFigure({ accruedMtd: null, marginUsed: 6_664.33, policy });
+    const f = marginInterestFigure({ accruedMtd: null, marginUsed: 20_000, policy });
     expect(f.kind).toBe("estimate");
-    // 6,664.33 × 11.325% ÷ 365
-    expect(f.kind === "estimate" && f.daily).toBeCloseTo(2.0676, 3);
+    // 20,000.00 × 9.75% ÷ 365
+    expect(f.kind === "estimate" && f.daily).toBeCloseTo(5.3425, 3);
   });
 
   test("no rate and no import shows nothing, not zero", () => {
     const f = marginInterestFigure({
       accruedMtd: null,
-      marginUsed: 6_664.33,
+      marginUsed: 20_000,
       policy: MARGIN_POLICY_UNSET,
     });
     expect(f.kind).toBe("unavailable");
@@ -277,7 +281,7 @@ describe("observed interest beats computed interest", () => {
     const f = marginInterestFigure({
       accruedMtd: null,
       hasImport: true,
-      marginUsed: 6_664.33,
+      marginUsed: 20_000,
       policy: MARGIN_POLICY_UNSET,
     });
     expect(f.kind === "unavailable" && f.reason).toBe("import-omitted-accrued");
@@ -291,7 +295,7 @@ describe("observed interest beats computed interest", () => {
     // stops appearing on one screen.
     const estimate = marginInterestFigure({ accruedMtd: null, marginUsed: 1, policy });
     expect(interestProvenanceShort(estimate)).toBe("estimate");
-    const actual = marginInterestFigure({ accruedMtd: 91.22, marginUsed: 1, policy });
+    const actual = marginInterestFigure({ accruedMtd: 175, marginUsed: 1, policy });
     expect(interestProvenanceShort(actual)).toBe("per Fidelity");
     for (const hasImport of [false, true]) {
       const none = marginInterestFigure({
@@ -308,8 +312,8 @@ describe("observed interest beats computed interest", () => {
     // The observation stands on its own. It does not need the app's rate to be
     // set, because it was not computed from it.
     const f = marginInterestFigure({
-      accruedMtd: 91.22,
-      marginUsed: 6_664.33,
+      accruedMtd: 175,
+      marginUsed: 20_000,
       policy: MARGIN_POLICY_UNSET,
     });
     expect(f.kind).toBe("actual");
@@ -317,7 +321,7 @@ describe("observed interest beats computed interest", () => {
 
   test("every figure says where it came from, and an estimate says so", () => {
     const actual = marginInterestFigure({
-      accruedMtd: 91.22,
+      accruedMtd: 175,
       importedAt: "2026-09-03T14:00:00Z",
       marginUsed: 1,
       policy,
@@ -333,7 +337,7 @@ describe("observed interest beats computed interest", () => {
   });
 
   test("a non-finite accrued figure falls back to the estimate, not to NaN", () => {
-    const f = marginInterestFigure({ accruedMtd: Number.NaN, marginUsed: 6_664.33, policy });
+    const f = marginInterestFigure({ accruedMtd: Number.NaN, marginUsed: 20_000, policy });
     expect(f.kind).toBe("estimate");
   });
 });

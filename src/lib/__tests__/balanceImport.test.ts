@@ -1,5 +1,11 @@
-// Stage 2. The fixture is the real Fidelity balance block from 2026-09-03 —
-// if the parser does not reproduce it to the cent, nothing else here matters.
+// Stage 2. The fixture is a SYNTHETIC Fidelity-shaped balance block — no real
+// account, no real figures (P0 remediation, 2026-09-05). It is built so the
+// parser cannot pass by accident: every field carries a distinct value, so a
+// parser that maps two labels to one key fails; the rate differs from every
+// rate the app has ever hardcoded, so a reintroduced constant fails; the cash
+// term is non-trivial, so dropping it breaks reconciliation rather than
+// rounding away; and the debit is large enough that a sign error produces an
+// obviously wrong total instead of a near-miss.
 import { describe, expect, test } from "bun:test";
 
 import {
@@ -13,19 +19,20 @@ import {
   BALANCE_FIELD_ORDER,
 } from "../balanceImport";
 
-// Amir — TOD, 2026-09-03, as it comes off the Fidelity balances page.
-const FIXTURE = `Total account value $53,938.35
-Day change +$1,196.68
-Equity percentage 89.00%
-Margin buying power $82,191.43
-Non-margin buying power $24,657.43
-Committed to open orders $18,209.97
-Net house surplus $30,803.11
-Margin interest accrued this month $91.22
-Margin interest rate 11.325%
-Cash market value $0.38
-Margin market value $60,602.30
-Net debit −$6,664.33`;
+// Synthetic, in the shape Fidelity's balances page prints.
+// Reconciles exactly: 2,500.00 + 145,950.00 − 20,000.00 = 128,450.00
+const FIXTURE = `Total account value $128,450.00
+Day change +$1,234.56
+Equity percentage 86.50%
+Margin buying power $190,000.00
+Non-margin buying power $95,000.00
+Committed to open orders $7,500.00
+Net house surplus $45,000.00
+Margin interest accrued this month $175.00
+Margin interest rate 9.750%
+Cash market value $2,500.00
+Margin market value $145,950.00
+Net debit −$20,000.00`;
 
 describe("the real balance block parses to the cent", () => {
   const p = parseBalanceBlock(FIXTURE);
@@ -38,18 +45,18 @@ describe("the real balance block parses to the cent", () => {
 
   test("each figure lands in its own column", () => {
     expect(p.fields).toEqual({
-      totalAccountValue: 53_938.35,
-      dayChange: 1_196.68,
-      equityPct: 89,
-      marginBuyingPower: 82_191.43,
-      nonMarginBuyingPower: 24_657.43,
-      committedToOpenOrders: 18_209.97,
-      netHouseSurplus: 30_803.11,
-      marginInterestAccruedMtd: 91.22,
-      marginInterestRatePct: 11.325,
-      cashMarketValue: 0.38,
-      marginMarketValue: 60_602.3,
-      netDebit: 6_664.33,
+      totalAccountValue: 128_450,
+      dayChange: 1_234.56,
+      equityPct: 86.5,
+      marginBuyingPower: 190_000,
+      nonMarginBuyingPower: 95_000,
+      committedToOpenOrders: 7_500,
+      netHouseSurplus: 45_000,
+      marginInterestAccruedMtd: 175,
+      marginInterestRatePct: 9.75,
+      cashMarketValue: 2_500,
+      marginMarketValue: 145_950,
+      netDebit: 20_000,
     });
   });
 
@@ -67,56 +74,56 @@ describe("the real balance block parses to the cent", () => {
   test("the debit is stored positive however Fidelity printed it", () => {
     // The app subtracts `margin_used`. A debit arriving negative would be
     // added, overstating the account by twice the loan.
-    for (const spelling of ["−$6,664.33", "-$6,664.33", "($6,664.33)", "$6,664.33"]) {
+    for (const spelling of ["−$20,000.00", "-$20,000.00", "($20,000.00)", "$20,000.00"]) {
       const q = parseBalanceBlock(`Net debit ${spelling}`);
-      expect(q.fields.netDebit).toBe(6_664.33);
+      expect(q.fields.netDebit).toBe(20_000);
     }
   });
 
   test("the rate is a percentage, not a fraction", () => {
-    // 11.325 vs 0.11325 is a factor of 100 on a money figure. Pin it.
-    expect(p.fields.marginInterestRatePct).toBe(11.325);
+    // 9.75 vs 0.0975 is a factor of 100 on a money figure. Pin it.
+    expect(p.fields.marginInterestRatePct).toBe(9.75);
   });
 });
 
 describe("labels that contain one another do not swallow each other", () => {
   test("non-margin buying power is not margin buying power", () => {
     const p = parseBalanceBlock(
-      "Margin buying power $82,191.43\nNon-margin buying power $24,657.43",
+      "Margin buying power $190,000.00\nNon-margin buying power $95,000.00",
     );
-    expect(p.fields.marginBuyingPower).toBe(82_191.43);
-    expect(p.fields.nonMarginBuyingPower).toBe(24_657.43);
+    expect(p.fields.marginBuyingPower).toBe(190_000);
+    expect(p.fields.nonMarginBuyingPower).toBe(95_000);
   });
 
   test("order in the paste does not decide which is which", () => {
     // The reversed paste must produce the identical mapping. If it does not,
     // the parser is matching on position rather than on the label.
     const p = parseBalanceBlock(
-      "Non-margin buying power $24,657.43\nMargin buying power $82,191.43",
+      "Non-margin buying power $95,000.00\nMargin buying power $190,000.00",
     );
-    expect(p.fields.marginBuyingPower).toBe(82_191.43);
-    expect(p.fields.nonMarginBuyingPower).toBe(24_657.43);
+    expect(p.fields.marginBuyingPower).toBe(190_000);
+    expect(p.fields.nonMarginBuyingPower).toBe(95_000);
   });
 
   test("margin market value is not the margin interest rate", () => {
-    const p = parseBalanceBlock("Margin market value $60,602.30\nMargin interest rate 11.325%");
-    expect(p.fields.marginMarketValue).toBe(60_602.3);
-    expect(p.fields.marginInterestRatePct).toBe(11.325);
+    const p = parseBalanceBlock("Margin market value $145,950.00\nMargin interest rate 9.750%");
+    expect(p.fields.marginMarketValue).toBe(145_950);
+    expect(p.fields.marginInterestRatePct).toBe(9.75);
   });
 
   test("accrued interest is not the rate", () => {
     const p = parseBalanceBlock(
-      "Margin interest accrued this month $91.22\nMargin interest rate 11.325%",
+      "Margin interest accrued this month $175.00\nMargin interest rate 9.750%",
     );
-    expect(p.fields.marginInterestAccruedMtd).toBe(91.22);
-    expect(p.fields.marginInterestRatePct).toBe(11.325);
+    expect(p.fields.marginInterestAccruedMtd).toBe(175);
+    expect(p.fields.marginInterestRatePct).toBe(9.75);
   });
 });
 
 describe("a partial paste is reported, never completed", () => {
   test("what is missing is named, and the rest still parses", () => {
-    const p = parseBalanceBlock("Total account value $53,938.35\nCash market value $0.38");
-    expect(p.fields.totalAccountValue).toBe(53_938.35);
+    const p = parseBalanceBlock("Total account value $128,450.00\nCash market value $2,500.00");
+    expect(p.fields.totalAccountValue).toBe(128_450);
     expect(p.fields.netDebit).toBeNull();
     expect(p.missing).toContain("netDebit");
     expect(p.missing).toContain("marginBuyingPower");
@@ -125,7 +132,7 @@ describe("a partial paste is reported, never completed", () => {
   test("a missing figure is null, not zero", () => {
     // Zero is a claim: "this account has no margin loan". Null is the truth:
     // "the paste did not say". They must not be the same value.
-    const p = parseBalanceBlock("Total account value $53,938.35");
+    const p = parseBalanceBlock("Total account value $128,450.00");
     expect(p.fields.netDebit).toBeNull();
     expect(p.fields.netDebit).not.toBe(0);
   });
@@ -156,8 +163,8 @@ describe("a partial paste is reported, never completed", () => {
   });
 
   test("headings and dates are ignored without being flagged", () => {
-    const p = parseBalanceBlock("Balances\nAs of 09/03/2026\nTotal account value $53,938.35");
-    expect(p.fields.totalAccountValue).toBe(53_938.35);
+    const p = parseBalanceBlock("Balances\nAs of 09/03/2026\nTotal account value $128,450.00");
+    expect(p.fields.totalAccountValue).toBe(128_450);
     // The date carries digits that parse perfectly well as "09". Flagging it as
     // unrecognised would fire the warning on every ordinary paste, and a
     // warning that always fires is one the user scrolls past — which is how the
@@ -172,9 +179,9 @@ describe("a partial paste is reported, never completed", () => {
       "Updated 4:15 PM ET",
       "Last updated 09-03-26",
     ]) {
-      const p = parseBalanceBlock(`${stamp}\nTotal account value $53,938.35`);
+      const p = parseBalanceBlock(`${stamp}\nTotal account value $128,450.00`);
       expect(p.unrecognised).toEqual([]);
-      expect(p.fields.totalAccountValue).toBe(53_938.35);
+      expect(p.fields.totalAccountValue).toBe(128_450);
     }
   });
 
@@ -185,9 +192,9 @@ describe("a partial paste is reported, never completed", () => {
 
 describe("paste shapes", () => {
   test("the same block parses identically from lines, dots and pipes", () => {
-    const lines = "Total account value $53,938.35\nCash market value $0.38";
-    const dots = "Total account value $53,938.35 · Cash market value $0.38";
-    const pipes = "Total account value $53,938.35 | Cash market value $0.38";
+    const lines = "Total account value $128,450.00\nCash market value $2,500.00";
+    const dots = "Total account value $128,450.00 · Cash market value $2,500.00";
+    const pipes = "Total account value $128,450.00 | Cash market value $2,500.00";
     const want = parseBalanceBlock(lines).fields;
     expect(parseBalanceBlock(dots).fields).toEqual(want);
     expect(parseBalanceBlock(pipes).fields).toEqual(want);
@@ -208,27 +215,27 @@ describe("isDateOrTime", () => {
   test("money is not a timestamp", () => {
     // The guard must not swallow a real figure. A dollar amount with a comma
     // and a decimal must never look like a date to it.
-    expect(isDateOrTime("Total account value $53,938.35")).toBe(false);
-    expect(isDateOrTime("Margin interest rate 11.325%")).toBe(false);
-    expect(isDateOrTime("Net debit −$6,664.33")).toBe(false);
+    expect(isDateOrTime("Total account value $128,450.00")).toBe(false);
+    expect(isDateOrTime("Margin interest rate 9.750%")).toBe(false);
+    expect(isDateOrTime("Net debit −$20,000.00")).toBe(false);
   });
 });
 
 describe("parseAmount", () => {
   test("reads dollars, percentages and plain numbers", () => {
-    expect(parseAmount("$53,938.35")).toBe(53_938.35);
-    expect(parseAmount("89.00%")).toBe(89);
-    expect(parseAmount("1196.68")).toBe(1_196.68);
+    expect(parseAmount("$128,450.00")).toBe(128_450);
+    expect(parseAmount("86.50%")).toBe(86.5);
+    expect(parseAmount("1234.56")).toBe(1_234.56);
   });
 
   test("all three negative spellings are negative", () => {
-    expect(parseAmount("-$6,664.33")).toBe(-6_664.33);
-    expect(parseAmount("−$6,664.33")).toBe(-6_664.33); // U+2212, what the site emits
-    expect(parseAmount("($6,664.33)")).toBe(-6_664.33);
+    expect(parseAmount("-$20,000.00")).toBe(-20_000);
+    expect(parseAmount("−$20,000.00")).toBe(-20_000); // U+2212, what the site emits
+    expect(parseAmount("($20,000.00)")).toBe(-20_000);
   });
 
   test("a leading plus is positive, not dropped into a negative", () => {
-    expect(parseAmount("+$1,196.68")).toBe(1_196.68);
+    expect(parseAmount("+$1,234.56")).toBe(1_234.56);
   });
 
   test("text with no number is null, not zero", () => {
@@ -238,15 +245,15 @@ describe("parseAmount", () => {
 });
 
 describe("reconciliation is the point of the import", () => {
-  const pasted = 53_938.35;
+  const pasted = 128_450;
 
   test("agreement to the cent is a match", () => {
-    const r = reconcile(pasted, 53_938.35);
+    const r = reconcile(pasted, 128_450);
     expect(r.kind).toBe("matches");
   });
 
   test("a dollar out is a difference, not a rounding tolerance", () => {
-    const r = reconcile(pasted, 53_939.35);
+    const r = reconcile(pasted, 128_451);
     expect(r.kind).toBe("differs");
     expect(r.kind === "differs" && r.delta).toBeCloseTo(1, 2);
   });
@@ -266,7 +273,7 @@ describe("reconciliation is the point of the import", () => {
 
   test("no pasted total is its own state, not a match and not a difference", () => {
     // Reporting "matches" here would be an assertion made from no evidence.
-    expect(reconcile(null, 53_938.35).kind).toBe("no-pasted-total");
+    expect(reconcile(null, 128_450).kind).toBe("no-pasted-total");
   });
 });
 
@@ -274,19 +281,19 @@ describe("what an import writes back", () => {
   test("only the columns the paste supplied", () => {
     const p = parseBalanceBlock(FIXTURE);
     expect(accountPatch(p.fields)).toEqual({
-      cash: 0.38,
-      margin_used: 6_664.33,
-      buying_power: 82_191.43,
+      cash: 2_500,
+      margin_used: 20_000,
+      buying_power: 190_000,
     });
   });
 
   test("a missing figure writes nothing, rather than zero over a real balance", () => {
     // This is the silent-partial-accept failure in one test: a paste with no
     // cash line must not set cash to 0.
-    const p = parseBalanceBlock("Net debit −$6,664.33");
+    const p = parseBalanceBlock("Net debit −$20,000.00");
     const patch = accountPatch(p.fields);
     expect("cash" in patch).toBe(false);
-    expect(patch).toEqual({ margin_used: 6_664.33 });
+    expect(patch).toEqual({ margin_used: 20_000 });
   });
 
   test("an all-missing paste writes nothing at all", () => {
@@ -294,10 +301,10 @@ describe("what an import writes back", () => {
   });
 
   test("the snapshot keeps nulls as nulls and the paste verbatim", () => {
-    const raw = "Total account value $53,938.35";
+    const raw = "Total account value $128,450.00";
     const snap = toSnapshot("acct-1", parseBalanceBlock(raw), raw);
     expect(snap.account_id).toBe("acct-1");
-    expect(snap.total_account_value).toBe(53_938.35);
+    expect(snap.total_account_value).toBe(128_450);
     expect(snap.net_debit).toBeNull();
     // The raw text is kept so a mis-parse can be diagnosed after the fact,
     // rather than re-derived from a figure that is already wrong.

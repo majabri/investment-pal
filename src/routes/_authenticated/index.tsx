@@ -298,12 +298,12 @@ function Dashboard() {
         // ── Command-center strip: freshness · margin meter · constitution check ──
         // Same `totals` as the stat cards — recomputing here is how the strip
         // and the cards used to disagree about the same account.
-        const amirHs = holdings;
+        const scopedHoldings = holdings;
         const gross = grossValue;
         const net = portfolioValue;
         const equityPct = totals.equityPct ?? 1;
         const rateState = rateStatus(ipsLite);
-        const lastUpdate = amirHs.reduce<string | null>((m, h) => {
+        const lastUpdate = scopedHoldings.reduce<string | null>((m, h) => {
           const u = (h as { updated_at?: string }).updated_at ?? null;
           return u && (!m || u > m) ? u : m;
         }, null);
@@ -313,7 +313,7 @@ function Dashboard() {
         const breaches: string[] = [];
         // IPS-lite (ADR-APP-004): configurable soft/hard position cap + margin cap.
         const posCap = ipsLite.position_cap_pct / 100;
-        for (const h of amirHs) {
+        for (const h of scopedHoldings) {
           const v = h.quantity * px(h);
           if (net > 0 && v / net > posCap)
             breaches.push(

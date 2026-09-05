@@ -1,6 +1,6 @@
 // Buy-back zones (ADR-APP-003). When a valuation/overbought trim is logged, show
 // advisory re-entry levels below the sale price. ADVISORY ONLY — annotations, never
-// orders. Amir executes. Pure/deterministic.
+// orders. The owner executes. Pure/deterministic.
 
 export interface TrimDecision {
   id: string;
@@ -20,7 +20,7 @@ export interface BuybackZone {
 export interface BuybackPlan {
   decisionId: string;
   symbol: string;
-  anchor: number; // = price_at_rec (approximate — Amir's Fidelity fill may differ)
+  anchor: number; // = price_at_rec (approximate — the actual broker fill may differ)
   decidedOn: string;
   zones: BuybackZone[];
   expired: boolean; // past the 30-day window

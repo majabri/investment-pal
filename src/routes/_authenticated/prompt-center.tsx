@@ -97,7 +97,7 @@ function PromptCenter() {
   // household aggregate — was read here and passed into the memo's dependency
   // list, so a change to any other account's cash re-rendered this prompt.
   const scope = useAccountScope();
-  const { data: amirHoldings } = useScopedHoldings(scope, { includeUnassigned: true });
+  const { data: scopedHoldings } = useScopedHoldings(scope, { includeUnassigned: true });
   const { data: balance } = useScopedAccount(scope);
   const { data: priorities = [] } = usePriorities();
   const { data: ipsLite } = useIpsLite();
@@ -158,9 +158,9 @@ function PromptCenter() {
   }, [urlTab]);
 
   const { data: liveQuotes } = useQuery({
-    queryKey: ["pc-quotes", amirHoldings.map((h) => h.symbol).join(",")],
-    queryFn: () => getQuotesFn({ data: { symbols: amirHoldings.map((h) => h.symbol) } }),
-    enabled: amirHoldings.length > 0,
+    queryKey: ["pc-quotes", scopedHoldings.map((h) => h.symbol).join(",")],
+    queryFn: () => getQuotesFn({ data: { symbols: scopedHoldings.map((h) => h.symbol) } }),
+    enabled: scopedHoldings.length > 0,
     refetchInterval: 60 * 1000,
   });
   const { data: liveEconCal = [] } = useQuery({
@@ -169,12 +169,12 @@ function PromptCenter() {
     refetchInterval: 60 * 60 * 1000,
   });
   const { data: liveEarnCal = [] } = useQuery({
-    queryKey: ["earn-cal-pc", amirHoldings.map((h) => h.symbol).join(",")],
+    queryKey: ["earn-cal-pc", scopedHoldings.map((h) => h.symbol).join(",")],
     queryFn: () =>
       getEarningsCalendarFn({
         data: {
           symbols: [
-            ...amirHoldings.map((h) => h.symbol),
+            ...scopedHoldings.map((h) => h.symbol),
             "NVDA",
             "META",
             "COST",
@@ -185,11 +185,11 @@ function PromptCenter() {
           days: 7,
         },
       }),
-    enabled: amirHoldings.length > 0,
+    enabled: scopedHoldings.length > 0,
     refetchInterval: 60 * 60 * 1000,
   });
   const ctx: PromptContext = useMemo(() => {
-    const holdings = amirHoldings.map((h) =>
+    const holdings = scopedHoldings.map((h) =>
       liveQuotes?.[h.symbol] ? { ...h, current_price: liveQuotes[h.symbol].price } : h,
     );
     const positionsValue = holdings.reduce((s, h) => s + h.quantity * h.current_price, 0);
@@ -260,7 +260,7 @@ function PromptCenter() {
       ],
       upcomingEarnings: liveEarnCal.map(
         (e) =>
-          `${e.date} ${e.symbol} (${e.session === "bmo" ? "pre-market" : "after close"})${amirHoldings.some((h) => h.symbol === e.symbol) ? " — HELD" : ""}`,
+          `${e.date} ${e.symbol} (${e.session === "bmo" ? "pre-market" : "after close"})${scopedHoldings.some((h) => h.symbol === e.symbol) ? " — HELD" : ""}`,
       ),
       upcomingEcon: liveEconCal
         .filter((e) => e.importance !== "low")
@@ -278,7 +278,7 @@ function PromptCenter() {
       committeeScorecard,
     };
   }, [
-    amirHoldings,
+    scopedHoldings,
     liveQuotes,
     selectedAccount,
     balance,

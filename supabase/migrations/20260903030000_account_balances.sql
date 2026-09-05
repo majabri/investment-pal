@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS public.account_balances (
   -- What the broker actually accrued this month. An observed fact, and
   -- therefore preferred over the app's own estimate when both exist.
   margin_interest_accrued_mtd NUMERIC,
-  -- Percentage (11.325 for 11.325%), not a fraction.
+  -- Percentage (9.750 for 9.75%), not a fraction.
   margin_interest_rate_pct    NUMERIC,
   cash_market_value           NUMERIC,
   margin_market_value         NUMERIC,
@@ -75,7 +75,7 @@ COMMENT ON COLUMN public.account_balances.net_debit IS
 COMMENT ON COLUMN public.account_balances.equity_pct IS
   'Equity as a percentage (89 for 89.00%), not a fraction.';
 COMMENT ON COLUMN public.account_balances.margin_interest_rate_pct IS
-  'Annual margin rate as a percentage (11.325 for 11.325%), not a fraction. Same convention as ips_lite.margin_rate_annual_pct.';
+  'Annual margin rate as a percentage (9.750 for 9.75%), not a fraction. Same convention as ips_lite.margin_rate_annual_pct.';
 COMMENT ON COLUMN public.account_balances.margin_interest_accrued_mtd IS
   'Interest the broker has actually accrued this month. An observed figure — displayed in preference to the app''s estimate, which is labelled as an estimate.';
 

@@ -12,13 +12,13 @@ import { fmtUSD } from "../finance";
 
 describe("chartNumber", () => {
   test("a finite number is itself", () => {
-    expect(chartNumber(53_938.35)).toBe(53_938.35);
+    expect(chartNumber(128_450)).toBe(128_450);
     expect(chartNumber(0)).toBe(0);
-    expect(chartNumber(-6_664.33)).toBe(-6_664.33);
+    expect(chartNumber(-20_000)).toBe(-20_000);
   });
 
   test("a numeric string is read as a number", () => {
-    expect(chartNumber("53938.35")).toBe(53_938.35);
+    expect(chartNumber("128450")).toBe(128_450);
   });
 
   test("a non-numeric string is not a figure", () => {
@@ -60,8 +60,8 @@ describe("fmtChartUSD covers what fmtUSD alone does not", () => {
     // The subtle one: passed straight to `fmtUSD` it renders with no "$" and no
     // thousands separator, so it reads as a different kind of number from the
     // properly-formatted figures beside it.
-    expect(fmtUSD("53938.35" as never)).toBe("53938.35");
-    expect(fmtChartUSD("53938.35")).toBe("$53,938.35");
+    expect(fmtUSD("128450" as never)).toBe("128450");
+    expect(fmtChartUSD("128450")).toBe("$128,450.00");
   });
 
   test("a range is absent, not two figures jammed together", () => {
@@ -76,7 +76,7 @@ describe("fmtChartUSD covers what fmtUSD alone does not", () => {
   });
 
   test("a real figure formats as money, and zero is a figure", () => {
-    expect(fmtChartUSD(53_938.35)).toBe("$53,938.35");
+    expect(fmtChartUSD(128_450)).toBe("$128,450.00");
     // A genuine $0.00 must not be swallowed by the em-dash path.
     expect(fmtChartUSD(0)).toBe("$0.00");
   });

@@ -11,7 +11,7 @@
 //
 //   fmtUSD(Infinity)      -> "$∞"                a money figure that is not one
 //   fmtUSD("abc")         -> "abc"               a category label in a money slot
-//   fmtUSD("53938.35")    -> "53938.35"          no "$", no separator — reads as
+//   fmtUSD("128450")      -> "128450"            no "$", no separator — reads as
 //                                                a different kind of number from
 //                                                the properly-formatted figures
 //                                                beside it

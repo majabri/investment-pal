@@ -16,38 +16,38 @@ import {
 } from "../accountTotals";
 
 describe("reconciles to the Fidelity statement", () => {
-  // Amir — TOD, 2026-09-03. cash 0.38 + margin market value 60,602.30
-  // − net debit 6,664.33 = total account value 53,938.35.
+  // Synthetic (P0 remediation, 2026-09-05): cash 2,500.00 + margin market
+  // value 145,950.00 − net debit 20,000.00 = total account value 128,450.00.
   const positions: PositionLike[] = [
-    { quantity: 100, cost_basis: 500, current_price: 606.023 }, // 60,602.30
+    { quantity: 100, cost_basis: 500, current_price: 1_459.5 }, // 145,950.00
   ];
-  const balance = { cash: 0.38, margin_used: 6_664.33 };
+  const balance = { cash: 2_500, margin_used: 20_000 };
 
   test("total account value matches to the cent", () => {
     const t = accountTotals(positions, balance);
-    expect(t.positionsValue).toBeCloseTo(60_602.3, 2);
-    expect(t.totalAccountValue).toBeCloseTo(53_938.35, 2);
+    expect(t.positionsValue).toBeCloseTo(145_950, 2);
+    expect(t.totalAccountValue).toBeCloseTo(128_450, 2);
   });
 
   test("gross is before the debit and is not the account value", () => {
     // Reporting gross as "account value" overstates by the whole debit —
-    // $60,602.68 against a real $53,938.35 here.
+    // $148,450.00 against a net $128,450.00 here.
     const t = accountTotals(positions, balance);
-    expect(t.grossValue).toBeCloseTo(60_602.68, 2);
-    expect(t.grossValue - t.totalAccountValue).toBeCloseTo(6_664.33, 2);
+    expect(t.grossValue).toBeCloseTo(148_450, 2);
+    expect(t.grossValue - t.totalAccountValue).toBeCloseTo(20_000, 2);
   });
 
   test("the debit is subtracted, not added", () => {
     // Sign errors on a debit are silent and enormous. Pin the direction.
     const withDebit = accountTotals(positions, balance).totalAccountValue;
-    const noDebit = accountTotals(positions, { cash: 0.38, margin_used: 0 }).totalAccountValue;
+    const noDebit = accountTotals(positions, { cash: 2_500, margin_used: 0 }).totalAccountValue;
     expect(withDebit).toBeLessThan(noDebit);
   });
 
-  test("equity percent matches Fidelity's 89% to the tenth", () => {
-    // Statement says equity 89.00%; 53,938.35 / 60,602.68 = 0.8900.
+  test("equity percent matches the statement's 86.5% to the tenth", () => {
+    // Statement says equity 86.50%; 128,450.00 / 148,450.00 = 0.8653.
     const t = accountTotals(positions, balance);
-    expect(t.equityPct!).toBeCloseTo(0.89, 3);
+    expect(t.equityPct!).toBeCloseTo(0.8653, 3);
   });
 });
 
@@ -110,7 +110,7 @@ describe("absent data reads as absent, never as zero", () => {
 describe("scope labelling", () => {
   test("every scope produces a label — an unlabelled figure is the defect", () => {
     const scopes: AccountScope[] = [
-      { kind: "account", accountId: "a", accountName: "Amir — TOD" },
+      { kind: "account", accountId: "a", accountName: "Individual — TOD" },
       { kind: "all", accountCount: 6 },
       { kind: "none" },
     ];
@@ -120,8 +120,8 @@ describe("scope labelling", () => {
   });
 
   test("a single account is named, not described generically", () => {
-    expect(scopeLabel({ kind: "account", accountId: "a", accountName: "Amir — TOD" })).toBe(
-      "Amir — TOD",
+    expect(scopeLabel({ kind: "account", accountId: "a", accountName: "Individual — TOD" })).toBe(
+      "Individual — TOD",
     );
   });
 
@@ -146,7 +146,7 @@ describe("scoped rows never leak across accounts", () => {
     { id: "c1", account_id: "kid-529" },
     { id: "m1", account_id: null },
   ];
-  const tod: AccountScope = { kind: "account", accountId: "tod", accountName: "Amir — TOD" };
+  const tod: AccountScope = { kind: "account", accountId: "tod", accountName: "Individual — TOD" };
 
   test("an account scope returns that account's rows and nothing else", () => {
     expect(scopedRows(rows, tod).map((r) => r.id)).toEqual(["a1", "a2"]);
@@ -209,20 +209,20 @@ describe("totals over a scope match the formula, not the household", () => {
   // Negative control for the live bug: if the totals were computed over every
   // row instead of the scoped ones, this test is the thing that fails.
   const holdings = [
-    { account_id: "tod", quantity: 100, cost_basis: 500, current_price: 606.023 },
+    { account_id: "tod", quantity: 100, cost_basis: 500, current_price: 1_459.5 },
     { account_id: "ira", quantity: 50, cost_basis: 100, current_price: 200 },
     { account_id: "kid-529", quantity: 10, cost_basis: 20, current_price: 30 },
   ];
-  const tod: AccountScope = { kind: "account", accountId: "tod", accountName: "Amir — TOD" };
+  const tod: AccountScope = { kind: "account", accountId: "tod", accountName: "Individual — TOD" };
 
   test("the TOD total is the TOD statement, with the other accounts present", () => {
-    const t = accountTotals(scopedRows(holdings, tod), { cash: 0.38, margin_used: 6_664.33 });
+    const t = accountTotals(scopedRows(holdings, tod), { cash: 2_500, margin_used: 20_000 });
     expect(t.positionCount).toBe(1);
-    expect(t.totalAccountValue).toBeCloseTo(53_938.35, 2);
+    expect(t.totalAccountValue).toBeCloseTo(128_450, 2);
   });
 
   test("blending every account overstates the same figure", () => {
-    const blended = accountTotals(holdings, { cash: 0.38, margin_used: 6_664.33 });
-    expect(blended.totalAccountValue).toBeGreaterThan(53_938.35);
+    const blended = accountTotals(holdings, { cash: 2_500, margin_used: 20_000 });
+    expect(blended.totalAccountValue).toBeGreaterThan(128_450);
   });
 });
