@@ -24,6 +24,7 @@ export type Database = {
           household_id: string | null;
           owner_member_id: string | null;
           orders_as_of: string | null;
+          lots_as_of: string | null;
           orders_source: string | null;
           margin_enabled: boolean | null;
           tax_treatment: string | null;
@@ -58,6 +59,7 @@ export type Database = {
           household_id?: string | null;
           owner_member_id?: string | null;
           orders_as_of?: string | null;
+          lots_as_of?: string | null;
           orders_source?: string | null;
           margin_enabled?: boolean | null;
           tax_treatment?: string | null;
@@ -92,6 +94,7 @@ export type Database = {
           household_id?: string | null;
           owner_member_id?: string | null;
           orders_as_of?: string | null;
+          lots_as_of?: string | null;
           orders_source?: string | null;
           margin_enabled?: boolean | null;
           tax_treatment?: string | null;
@@ -312,6 +315,7 @@ export type Database = {
           limit_price: number | null;
           notes: string | null;
           oco_group: string | null;
+          lot_id: string | null;
           order_type: string;
           parent_order_id: string | null;
           placed_at: string | null;
@@ -337,6 +341,7 @@ export type Database = {
           limit_price?: number | null;
           notes?: string | null;
           oco_group?: string | null;
+          lot_id?: string | null;
           order_type: string;
           parent_order_id?: string | null;
           placed_at?: string | null;
@@ -362,6 +367,7 @@ export type Database = {
           limit_price?: number | null;
           notes?: string | null;
           oco_group?: string | null;
+          lot_id?: string | null;
           order_type?: string;
           parent_order_id?: string | null;
           placed_at?: string | null;
@@ -372,6 +378,60 @@ export type Database = {
           stop_price?: number | null;
           symbol?: string;
           time_in_force?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      position_lots: {
+        Row: {
+          account_id: string;
+          acquired_at: string | null;
+          as_of: string | null;
+          broker_lot_id: string | null;
+          closed_at: string | null;
+          cost_per_share: number | null;
+          created_at: string;
+          id: string;
+          notes: string | null;
+          quantity: number | null;
+          source: string;
+          symbol: string;
+          thesis: string | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          account_id: string;
+          acquired_at?: string | null;
+          as_of?: string | null;
+          broker_lot_id?: string | null;
+          closed_at?: string | null;
+          cost_per_share?: number | null;
+          created_at?: string;
+          id?: string;
+          notes?: string | null;
+          quantity?: number | null;
+          source: string;
+          symbol: string;
+          thesis?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          account_id?: string;
+          acquired_at?: string | null;
+          as_of?: string | null;
+          broker_lot_id?: string | null;
+          closed_at?: string | null;
+          cost_per_share?: number | null;
+          created_at?: string;
+          id?: string;
+          notes?: string | null;
+          quantity?: number | null;
+          source?: string;
+          symbol?: string;
+          thesis?: string | null;
           updated_at?: string;
           user_id?: string;
         };

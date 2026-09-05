@@ -12,6 +12,7 @@ import type { HouseholdMember } from "@/lib/household";
 import { policySourceOf, type PolicySource } from "@/lib/policy";
 import type { Strategy, StrategySymbol } from "@/lib/strategy";
 import type { Order } from "@/lib/orders";
+import type { Lot } from "@/lib/lots";
 
 export type Goal = {
   id: string;
@@ -91,6 +92,9 @@ export type Account = {
    */
   orders_as_of: string | null;
   orders_source: string | null;
+  /** When the app was last told this account's LOT composition. NULL = never;
+   *  a position with no lots is then of unknown composition (Phase 6b). */
+  lots_as_of: string | null;
   account_status: string | null;
   /** Provenance for the four money columns (Phase 1d, rule 14). Per BLOCK, not
    *  per field — the canonical model in Phase 2 is where that gets fixed. */
@@ -402,6 +406,57 @@ export function useStrategySymbols() {
  * An empty result is NOT "no open orders" — `openOrdersKnown` answers that
  * from `accounts.orders_as_of`, never from this list's length.
  */
+/**
+ * Position lots for one account (Phase 6, rule 19).
+ *
+ * Account-scoped by the query, like `useOrders`: a lot belongs to exactly one
+ * account, and a client-side filter would show another account's composition
+ * for as long as the filter was wrong.
+ *
+ * An empty result does NOT mean the position is one lot — it means the
+ * composition has not been recorded. `lotCoverage` is what reads that, and it
+ * returns `not_recorded` rather than a coverage figure.
+ */
+export function useLots(accountId: string | null) {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["position_lots", accountId],
+    enabled: accountId !== null,
+    queryFn: async (): Promise<Lot[]> => {
+      const { data, error } = await supabase
+        .from("position_lots")
+        .select("*")
+        .eq("account_id", accountId!)
+        .order("acquired_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Lot[];
+    },
+  });
+  const create = useMutation({
+    mutationFn: async (patch: Omit<Lot, "id" | "user_id" | "created_at" | "updated_at">) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("position_lots")
+        .insert({ ...patch, user_id: userData.user!.id });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["position_lots"] }),
+  });
+  const close = useMutation({
+    // A state change, never a delete: the lot's history and the decisions
+    // attached to it must survive (rule 29).
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("position_lots")
+        .update({ closed_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["position_lots"] }),
+  });
+  return { ...query, create, close };
+}
+
 export function useOrders(accountId: string | null) {
   const qc = useQueryClient();
   const query = useQuery({
