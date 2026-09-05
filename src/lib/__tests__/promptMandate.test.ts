@@ -14,6 +14,7 @@ import {
   buildUniversalPrompt,
   buildV5Prompt,
   mandateOf,
+  DEFAULT_OFFICE_NAME,
   type PromptContext,
 } from "../prompts";
 
@@ -89,6 +90,13 @@ describe("committee prompts are data-driven", () => {
       expect(out).not.toContain("$150,000");
       expect(out).not.toContain("$50,000");
       expect(out).not.toContain("March 31, 2027");
+    });
+
+    test(`${name}: no prompt names the owner`, () => {
+      // Rule 23. True of every builder, whether or not it carries the office
+      // identity — the name must not reach the model by any route.
+      expect(build(ctx())).not.toMatch(/\bamir\b/i);
+      expect(build(ctx({ officeName: "Northwind Family Office" }))).not.toMatch(/\bamir\b/i);
     });
 
     test(`${name}: a changed goal changes the prompt`, () => {
@@ -227,4 +235,45 @@ describe("the objective has exactly one home", () => {
     expect(after.target).toBe("$400,000");
     expect(after.date).toBe("January 31, 2032");
   });
+});
+
+// Only the v5 and v6 constitutions carry an office identity; the other builders
+// have their own wording and name no office at all. Asserting the identity is
+// data-driven therefore belongs here, not in the loop over every builder.
+//
+// The slots are asserted individually rather than by "the default no longer
+// appears": the constitutions contain the phrase "institutional investment
+// office" as ordinary prose, so a substring check on the default label can
+// never pass. Naming each slot also proves every occurrence was reached, which
+// the substring check would not.
+describe("the office identity in the constitutions is configuration, not a person", () => {
+  const slots = {
+    v5: (o: string) => [`${o.toUpperCase()} OS v5.0`, `investment office for the ${o}.`],
+    v6: (o: string) => [
+      `${o.toUpperCase()} OS v6.0`,
+      `You are ${o} OS v6.0.`,
+      `investment office for the ${o}.`,
+    ],
+  };
+
+  const builders = [
+    ["v5", (c: PromptContext) => buildV5Prompt({ ...c, meeting: "Morning" })],
+    ["v6", (c: PromptContext) => buildV6Prompt({ ...c, meeting: "Morning" })],
+  ] as const;
+
+  for (const [name, build] of builders) {
+    test(`${name}: falls back to a generic office, never to a person`, () => {
+      const out = build(ctx());
+      for (const slot of slots[name](DEFAULT_OFFICE_NAME)) expect(out).toContain(slot);
+      expect(out).not.toMatch(/\bamir\b/i);
+    });
+
+    test(`${name}: a configured office name fills every slot`, () => {
+      const office = "Northwind Family Office";
+      const out = build(ctx({ officeName: office }));
+      for (const slot of slots[name](office)) expect(out).toContain(slot);
+      // No slot may still be carrying the fallback.
+      for (const slot of slots[name](DEFAULT_OFFICE_NAME)) expect(out).not.toContain(slot);
+    });
+  }
 });
