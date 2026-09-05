@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getNewsFn, type NewsCategory } from "@/lib/newsServer";
+import { coverageNotice, coverageOf } from "@/lib/coverage";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/news")({ component: NewsPage });
@@ -27,11 +28,16 @@ function ago(iso: string | null) {
 
 function NewsPage() {
   const [cat, setCat] = useState<(typeof CATS)[number]>("All");
-  const { data, isLoading } = useQuery({
+  // The whole query, not just its data (rule 30). A failed fetch settles
+  // `isLoading` to false and rendered an empty grid with no message, which
+  // reads as "no news" — a claim, and one the committee prompt repeated.
+  const query = useQuery({
     queryKey: ["news"],
     queryFn: () => getNewsFn(),
     refetchInterval: 10 * 60 * 1000,
   });
+  const { data } = query;
+  const coverage = coverageOf(query);
   const items = (data ?? []).filter((i) => cat === "All" || i.category === cat);
 
   return (
@@ -51,7 +57,25 @@ function NewsPage() {
           </Button>
         ))}
       </div>
-      {isLoading && <p className="text-sm text-muted-foreground">Loading feeds…</p>}
+      {(() => {
+        const notice = coverageNotice(
+          "news",
+          coverage,
+          items.length,
+          "No stories matched this filter.",
+        );
+        return notice === null ? null : (
+          <p
+            className={
+              coverage === "UNAVAILABLE"
+                ? "mb-3 text-sm font-medium text-amber-600 dark:text-amber-400"
+                : "mb-3 text-sm text-muted-foreground"
+            }
+          >
+            {notice}
+          </p>
+        );
+      })()}
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {items.slice(0, 24).map((n) => (
           <a
