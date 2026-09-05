@@ -12,13 +12,23 @@ export type PromptContext = {
    * falls back to a generic label — never to a person.
    */
   officeName?: string;
-  portfolioValue: number; // NET account value (investments + cash − margin)
-  grossValue?: number;
-  cash: number;
-  marginUsed: number;
-  buyingPower: number;
+  /**
+   * The balance figures, or NULL where the account does not know them
+   * (Phase 1a, rule 13).
+   *
+   * These reach the model inside a block headed "MY VERIFIED DATA — GROUND
+   * EVERY RECOMMENDATION ONLY IN THIS". A fabricated $0.00 there is not a
+   * display defect: it is a false premise the committee is instructed to
+   * reason from, and it will size positions against it.
+   */
+  portfolioValue: number | null; // NET account value (investments + cash − margin)
+  grossValue?: number | null;
+  cash: number | null;
+  marginUsed: number | null;
+  buyingPower: number | null;
   todaysPL: number;
-  todaysPLPct: number;
+  /** NULL when the prior account value is not known. */
+  todaysPLPct: number | null;
   /**
    * The objective, exactly as `objectiveOf()` decided it.
    *
@@ -200,6 +210,24 @@ export function mandateOf(ctx: PromptContext): Mandate {
   };
 }
 
+/**
+ * A money figure for the model, or an explicit statement that it is unknown.
+ *
+ * Upper case and wordy on purpose. This text is read by a language model, not
+ * scanned by a person: "NOT KNOWN" is unambiguous where a dash would be
+ * guessed at, and "$0.00" would be believed.
+ */
+function money(v: number | null | undefined): string {
+  return v === null || v === undefined || !Number.isFinite(v) ? "NOT KNOWN" : fmtUSD(v);
+}
+
+/** Equity as a percentage, or why it cannot be given. */
+function equityLine(ctx: PromptContext): string {
+  const gross = ctx.grossValue ?? ctx.portfolioValue;
+  if (gross === null || ctx.portfolioValue === null) return "NOT KNOWN";
+  return gross > 0 ? fmtPct(ctx.portfolioValue / gross) : "—";
+}
+
 function dataBlock(ctx: PromptContext): string {
   const holdingsBlock = ctx.holdings.length
     ? ctx.holdings
@@ -207,8 +235,15 @@ function dataBlock(ctx: PromptContext): string {
           const value = h.quantity * h.currentPrice;
           const cost = h.quantity * h.costBasis;
           const gl = cost > 0 ? (value - cost) / cost : null;
-          const pct = ctx.portfolioValue > 0 ? value / ctx.portfolioValue : 0;
-          return `- ${h.symbol}: ${h.quantity} sh @ avg ${fmtUSD(h.costBasis, 2)}, last ${fmtUSD(h.currentPrice, 2)}, value ${fmtUSD(value)} (${fmtPct(pct)} of acct)${
+          // Concentration, which the position-size limits are expressed in.
+          // Without an account value this used to read "0.0% of acct" for every
+          // holding — telling the committee that nothing breaches the cap,
+          // computed from an account value nobody supplied.
+          const pct =
+            ctx.portfolioValue !== null && ctx.portfolioValue > 0
+              ? fmtPct(value / ctx.portfolioValue)
+              : "NOT KNOWN";
+          return `- ${h.symbol}: ${h.quantity} sh @ avg ${fmtUSD(h.costBasis, 2)}, last ${fmtUSD(h.currentPrice, 2)}, value ${fmtUSD(value)} (${pct} of acct)${
             gl != null ? `, total G/L ${gl >= 0 ? "+" : ""}${fmtPct(gl)}` : ""
           }${h.thesis ? ` — thesis: ${h.thesis}` : ""}`;
         })
@@ -225,10 +260,10 @@ MY VERIFIED DATA — GROUND EVERY RECOMMENDATION ONLY IN THIS
 ===========================================================
 TODAY IS ${today.toUpperCase()}.
 
-Account value (NET, investments + cash − margin): ${fmtUSD(ctx.portfolioValue)}
-Gross investments: ${fmtUSD(ctx.grossValue ?? ctx.portfolioValue)} | Account equity: ${ctx.grossValue && ctx.grossValue > 0 ? fmtPct(ctx.portfolioValue / ctx.grossValue) : "—"}
-Today's P/L (vs prior close, live-quoted positions): ${fmtUSD(ctx.todaysPL)} (${fmtPct(ctx.todaysPLPct)})
-Cash: ${fmtUSD(ctx.cash)} | Margin used: ${fmtUSD(ctx.marginUsed)} | Buying power: ${fmtUSD(ctx.buyingPower)}
+Account value (NET, investments + cash − margin): ${money(ctx.portfolioValue)}
+Gross investments: ${money(ctx.grossValue ?? ctx.portfolioValue)} | Account equity: ${equityLine(ctx)}
+Today's P/L (vs prior close, live-quoted positions): ${fmtUSD(ctx.todaysPL)} (${ctx.todaysPLPct === null ? "NOT KNOWN" : fmtPct(ctx.todaysPLPct)})
+Cash: ${money(ctx.cash)} | Margin used: ${money(ctx.marginUsed)} | Buying power: ${money(ctx.buyingPower)}
 Goal: ${objectiveLine(ctx)}
 Required pace: ${paceLine(ctx.requiredCagr)}
 

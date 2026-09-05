@@ -217,7 +217,9 @@ function PortfolioPage() {
         {selectedAccount ? (
           <MarginCard
             accountId={selectedAccount.id}
-            marginUsed={Number(selectedAccount.margin_used ?? 0)}
+            marginUsed={
+              selectedAccount.margin_used === null ? null : Number(selectedAccount.margin_used)
+            }
           />
         ) : (
           <StatCard

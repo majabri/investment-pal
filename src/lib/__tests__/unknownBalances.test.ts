@@ -15,6 +15,16 @@ import {
   type MarginPolicy,
 } from "../marginCost";
 import { UNAVAILABLE, usdOrUnavailable, pctOrUnavailable } from "../unavailable";
+import {
+  buildV5Prompt,
+  buildV6Prompt,
+  buildUniversalPrompt,
+  buildMorningPrompt,
+  buildEODPrompt,
+  buildWeeklyPrompt,
+  buildMiddayPrompt,
+  type PromptContext,
+} from "../prompts";
 
 const account = (over: Partial<BalanceFields>): BalanceFields => ({
   cash: 100,
@@ -111,4 +121,87 @@ describe("rendering a figure the app does not have", () => {
     // action fixes it.
     expect(UNAVAILABLE).not.toBe("—");
   });
+});
+
+// The committee prompt is the highest-stakes renderer of an unknown balance.
+// The figures below sit inside a block headed "MY VERIFIED DATA — GROUND EVERY
+// RECOMMENDATION ONLY IN THIS", so a fabricated $0.00 is not a display defect:
+// it is a false premise the model is instructed to reason from, and position
+// sizing is expressed as a percentage of exactly these numbers.
+describe("an unknown balance reaches the committee as unknown", () => {
+  const base: PromptContext = {
+    accountName: "Growth Brokerage",
+    portfolioValue: null,
+    grossValue: null,
+    cash: null,
+    marginUsed: null,
+    buyingPower: null,
+    todaysPL: 120,
+    todaysPLPct: null,
+    objective: { kind: "unset", missing: [] },
+    requiredCagr: null,
+    probability: null,
+    holdings: [{ symbol: "ABC", quantity: 10, costBasis: 5, currentPrice: 8 }],
+    priorities: [],
+    userNotes: "",
+  };
+
+  const builders: Array<[string, (c: PromptContext) => string]> = [
+    ["v6", (c) => buildV6Prompt({ ...c, meeting: "Morning" })],
+    ["v5", (c) => buildV5Prompt({ ...c, meeting: "Morning" })],
+    ["universal", (c) => buildUniversalPrompt({ ...c, meeting: "Morning" })],
+    ["morning", buildMorningPrompt],
+    ["eod", (c) => buildEODPrompt({ ...c, tradesToday: "(none)" })],
+    ["weekly", buildWeeklyPrompt],
+    ["midday", buildMiddayPrompt],
+  ];
+
+  for (const [name, build] of builders) {
+    test(`${name}: says NOT KNOWN rather than $0.00`, () => {
+      const out = build(base);
+      expect(out).toContain("Cash: NOT KNOWN | Margin used: NOT KNOWN | Buying power: NOT KNOWN");
+      expect(out).toContain("Account value (NET, investments + cash − margin): NOT KNOWN");
+      expect(out).not.toContain("Cash: $0.00");
+      expect(out).not.toContain("Margin used: $0.00");
+    });
+
+    test(`${name}: states no concentration it cannot compute`, () => {
+      // Every position read "0.0% of acct", which tells the committee that
+      // nothing breaches the position cap — a governance conclusion drawn from
+      // an account value nobody supplied.
+      const out = build(base);
+      expect(out).toContain("(NOT KNOWN of acct)");
+      expect(out).not.toContain("(0.0% of acct)");
+    });
+
+    test(`${name}: known balances still render as figures`, () => {
+      // The unknown path must not swallow the normal one.
+      const out = build({
+        ...base,
+        portfolioValue: 80_000,
+        grossValue: 100_000,
+        cash: 2_500,
+        marginUsed: 20_000,
+        buyingPower: 5_000,
+        todaysPLPct: 0.0015,
+      });
+      expect(out).toContain("Cash: $2,500.00 | Margin used: $20,000.00 | Buying power: $5,000.00");
+      expect(out).not.toContain("NOT KNOWN of acct");
+      expect(out).toContain("Account equity: 80.0%");
+    });
+
+    test(`${name}: a real zero balance still renders as zero`, () => {
+      // The distinction is the point. If 0 also became NOT KNOWN, the fix would
+      // have destroyed the other half of it.
+      const out = build({
+        ...base,
+        portfolioValue: 100_000,
+        grossValue: 100_000,
+        cash: 0,
+        marginUsed: 0,
+        buyingPower: 0,
+      });
+      expect(out).toContain("Cash: $0.00 | Margin used: $0.00 | Buying power: $0.00");
+    });
+  }
 });

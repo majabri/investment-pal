@@ -10,7 +10,10 @@ export interface KidAccount {
   key: string;
   name: string;
   accountNumber: string;
-  cash: number;
+  /** NULL = not known. A database account that has never had a balance
+   *  imported does not report zero cash (Phase 1a, rule 13); the seed rows below
+   *  always carry a figure. */
+  cash: number | null;
   holdings: KidHolding[];
 }
 
