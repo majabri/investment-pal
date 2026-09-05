@@ -43,6 +43,9 @@ import { getEarningsCalendarFn } from "@/lib/calendarServer";
 import { computeSwing, tradingDaysUntil, type SwingResult } from "@/lib/swingScore";
 import { fmtChartUSD } from "@/lib/chartFormat";
 import { fmtUSD, fmtPct } from "@/lib/finance";
+// Unit prices go through `fmtPrice`, not `fmtUSD` (Phase 7, rule 33): a
+// crypto or penny price rendered to two decimals is erased, not rounded.
+import { fmtPrice } from "@/lib/finance";
 import {
   UNAVAILABLE,
   numberOrUnknown,
@@ -428,7 +431,7 @@ function PortfolioPage() {
                           <TableCell className="text-right tabular">
                             {unpriced ? (
                               h.current_price > 0 ? (
-                                fmtUSD(h.current_price, 2)
+                                fmtPrice(h.current_price)
                               ) : (
                                 "--"
                               )
@@ -471,7 +474,7 @@ function PortfolioPage() {
                             {h.quantity.toLocaleString("en-US")}
                           </TableCell>
                           <TableCell className="text-right tabular">
-                            {fmtUSD(h.cost_basis, 2)}
+                            {fmtPrice(h.cost_basis)}
                           </TableCell>
                           <TableCell className="text-right tabular">{fmtUSD(cost)}</TableCell>
                           <TableCell className="w-8 p-1" onClick={(e) => e.stopPropagation()}>
@@ -823,7 +826,7 @@ function PositionDetail({
       <SheetHeader>
         <SheetTitle className="text-2xl">{h.symbol}</SheetTitle>
         <SheetDescription>
-          {fmtUSD(h.quantity * h.current_price)} · cost {fmtUSD(h.cost_basis, 2)}/sh
+          {fmtUSD(h.quantity * h.current_price)} · cost {fmtPrice(h.cost_basis)}/sh
         </SheetDescription>
       </SheetHeader>
       <div className="grid grid-cols-3 gap-3">
