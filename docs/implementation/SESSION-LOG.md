@@ -512,6 +512,9 @@ Unchanged from 2026-09-03, plus two new items:
 - **NEW — `.github/dependabot.yml` still configures a `minor-and-patch` group.**
   #108 will keep coming back until that group is removed. The ban currently
   lives in an ADR and in triage; it should live in the config.
+  **RESOLVED 2026-09-05 by #127**, which removed the group and left a comment
+  in its place explaining why the absence is deliberate — so a future edit
+  re-adding it has to argue with the file rather than rediscover the reason.
 - **NEW — CI does not run lint, and `eslint src` reports 1402 problems**
   (1354 errors, 48 warnings, 1340 auto-fixable — almost entirely prettier).
   Identical under eslint 9 and 10. Either add lint to CI and pay the backlog
