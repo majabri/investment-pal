@@ -25,14 +25,7 @@ type LooseWrite<Row> = {
   Update: Record<string, unknown>;
   Relationships: [];
 };
-type PendingTable = LooseTable<Record<string, unknown>> extends never
-  ? never
-  : {
-      Row: Record<string, unknown>;
-      Insert: Record<string, unknown>;
-      Update: Record<string, unknown>;
-      Relationships: [];
-    };
+type PendingTable = LooseWrite<Record<string, unknown>>;
 
 type Database = Omit<GeneratedDatabase, "public"> & {
   public: Omit<GeneratedDatabase["public"], "Tables"> & {
