@@ -7,6 +7,13 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  vite: {
+    // Lovable refreshes the managed .env file while the preview is running.
+    // Vite normally watches that file and restarts immediately, aborting any
+    // in-flight SSR request and leaving the preview blank. Runtime variables
+    // are supplied by the preview process, so do not load or watch env files.
+    envDir: false,
+  },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
