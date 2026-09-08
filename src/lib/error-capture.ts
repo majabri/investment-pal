@@ -49,11 +49,35 @@ function isErrorLike(value: unknown): value is Error {
   return value instanceof Error;
 }
 
+// Node raises this when the browser/proxy closes an HTTP request before SSR
+// finishes. It is a transport cancellation, not an application failure.
+// Match narrowly so real AbortErrors from application work remain visible.
+export function isIncomingRequestAbort(value: unknown): boolean {
+  let current: unknown = value;
+  for (let depth = 0; depth < CAUSE_DEPTH_LIMIT && current != null; depth++) {
+    if (current instanceof Error) {
+      const stack = current.stack ?? "";
+      if (
+        current.message === "aborted" &&
+        stack.includes("abortIncoming") &&
+        stack.includes("socketOnClose")
+      ) {
+        return true;
+      }
+      current = current.cause;
+      continue;
+    }
+    break;
+  }
+  return false;
+}
+
 // Wrap console.error so errors logged by any layer — including h3's internal
 // unhandled-error logging, which this file cannot hook directly — are both
 // recorded for consumeLastCapturedError and expanded before serialization.
 const originalConsoleError = console.error.bind(console);
 console.error = (...args: unknown[]) => {
+  if (args.some(isIncomingRequestAbort)) return;
   const expanded = args.map((arg) => {
     if (!isErrorLike(arg)) return arg;
     record(arg);
