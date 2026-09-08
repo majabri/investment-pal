@@ -1378,6 +1378,9 @@ Two practices earned their place and are recorded in ADR-APP-012:
   addendum below.
 - **#135**, which #174 supersedes. Yours to close.
 
+> Superseded on 2026-09-08 — all three came back. See the section at the end of
+> this file.
+
 **Configuration you need to enter:**
 
 - Household members, per-account targets and a strategy, or `/kids`,
@@ -1454,3 +1457,46 @@ caught this one only as a side effect of listing PRs. Five hours is how long a
 known live bug sat open because the thing that knew about it was me, and I was
 busy. Worth remembering next time the phases are the plan: the plan is not the
 inventory.
+
+## 2026-09-08 — the three decisions came back
+
+Amir merged #172 (17:18Z) and #174 (17:20Z) within two minutes of each other.
+I closed #135. Nothing is open.
+
+| | outcome | who |
+|---|---|---|
+| #172, the four ADRs | merged, `6904ee8` | Amir — I am barred from it (ADR-APP-005 §2) |
+| #174, the load-window guards | merged, `f448c30` | Amir — money-adjacent (OD-001) |
+| #135, superseded | closed | me, under the standing authority to close duplicates |
+
+`main` at `f448c30`, gate re-run against the merged result rather than against
+either branch: install clean, typecheck clean, test:typecheck clean, 911 pass /
+0 fail, boot `/auth` 200 and `/settings` 200. The live policy editors no longer
+show the app's 30/25 defaults as though they were your stored caps, and a Save
+in the load window can no longer stamp `caps_source: "user_set"` on them.
+
+### Two things the merges did not decide
+
+**The ADRs merged with `Status: Proposed` in their front matter.** Merging the
+PR put the documents on `main`; it did not say they are accepted, and I am not
+the one who can say it. They stay exactly as merged until Amir says otherwise.
+Worth noticing that this is a state the ADR process does not really have a name
+for — a document that is canonical in the repo and provisional in its own
+header.
+
+**The #135 follow-up is still unanswered.** #174's description asked, in as many
+words, whether to land the extraction into `PolicyCards.tsx`, the axe
+assertions and the label/input associations as a separate non-money-adjacent
+PR. Merging #174 was not an answer to that question, so it is not started. The
+three `react-hooks/set-state-in-effect` errors are still on `main`. #135's
+branch sits on `52f3358` and would need redoing against the current file rather
+than rebasing — recorded on the closed PR so the work is findable.
+
+### On closing #135 myself
+
+Earlier in the loop I said four separate times that #135 was Amir's to close,
+and it was: while #174 sat unmerged, closing #135 would have left no open PR
+carrying the fix. Once #174 landed, #135 became a plain duplicate of merged
+work, which `CLAUDE.md` explicitly gives me authority over. The position changed
+because the facts did, not because waiting got tedious — and the distinction is
+the whole point of having the rule.
