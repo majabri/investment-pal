@@ -71,6 +71,45 @@ export type Database = {
         }
         Relationships: []
       }
+      decisions: {
+        Row: {
+          created_at: string
+          decided_on: string
+          decision: string
+          id: string
+          outcome: string | null
+          outcome_pl: number | null
+          recommendation: string
+          review_type: string
+          symbol: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_on?: string
+          decision?: string
+          id?: string
+          outcome?: string | null
+          outcome_pl?: number | null
+          recommendation: string
+          review_type?: string
+          symbol?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_on?: string
+          decision?: string
+          id?: string
+          outcome?: string | null
+          outcome_pl?: number | null
+          recommendation?: string
+          review_type?: string
+          symbol?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       goals: {
         Row: {
           created_at: string
