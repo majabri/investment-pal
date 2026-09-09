@@ -223,6 +223,36 @@ export type Database = {
         }
         Relationships: []
       }
+      portfolio_snapshots: {
+        Row: {
+          created_at: string
+          gross: number
+          id: string
+          margin_used: number
+          net: number
+          scope: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          gross?: number
+          id?: string
+          margin_used?: number
+          net?: number
+          scope?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          gross?: number
+          id?: string
+          margin_used?: number
+          net?: number
+          scope?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       priorities: {
         Row: {
           active: boolean
