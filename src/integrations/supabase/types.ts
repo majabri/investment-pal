@@ -223,6 +223,72 @@ export type Database = {
           },
         ]
       }
+      investment_universe: {
+        Row: {
+          business_quality: number | null
+          catalysts: string | null
+          company_name: string | null
+          created_at: string
+          geopolitical_exposure: number | null
+          growth: number | null
+          id: string
+          last_scored_at: string | null
+          macro_sensitivity: number | null
+          overall_conviction: number | null
+          relative_strength: number | null
+          replaces_symbol: string | null
+          risk: number | null
+          symbol: string
+          technical_strength: number | null
+          thesis: string | null
+          tier: string
+          user_id: string
+          valuation: number | null
+        }
+        Insert: {
+          business_quality?: number | null
+          catalysts?: string | null
+          company_name?: string | null
+          created_at?: string
+          geopolitical_exposure?: number | null
+          growth?: number | null
+          id?: string
+          last_scored_at?: string | null
+          macro_sensitivity?: number | null
+          overall_conviction?: number | null
+          relative_strength?: number | null
+          replaces_symbol?: string | null
+          risk?: number | null
+          symbol: string
+          technical_strength?: number | null
+          thesis?: string | null
+          tier?: string
+          user_id: string
+          valuation?: number | null
+        }
+        Update: {
+          business_quality?: number | null
+          catalysts?: string | null
+          company_name?: string | null
+          created_at?: string
+          geopolitical_exposure?: number | null
+          growth?: number | null
+          id?: string
+          last_scored_at?: string | null
+          macro_sensitivity?: number | null
+          overall_conviction?: number | null
+          relative_strength?: number | null
+          replaces_symbol?: string | null
+          risk?: number | null
+          symbol?: string
+          technical_strength?: number | null
+          thesis?: string | null
+          tier?: string
+          user_id?: string
+          valuation?: number | null
+        }
+        Relationships: []
+      }
       journal_entries: {
         Row: {
           ai_summary: string | null
