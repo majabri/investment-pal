@@ -116,6 +116,26 @@ const ALLOWED: Record<string, { why: string; needles: string[] }> = {
     why: "applied migration, superseded by 20260905190000; text kept as history",
     needles: ["the owner's first name"],
   },
+  // 2026-09-09: Lovable re-created four tables the LIVE database was missing —
+  // portfolio_snapshots, decisions, investment_universe, price_history — by
+  // authoring fresh migrations rather than applying the originals. The
+  // snapshots one is a verbatim copy of 20260725025027 above, personal scope
+  // default and all, so this guard caught it. Same reasoning as the two
+  // entries above: it has been applied (the generated types regenerated with
+  // the table), and editing an applied migration in place risks a checksum
+  // mismatch on the next `supabase db push`.
+  //
+  // Read this entry as narrower than the others. Those two are history whose
+  // default 20260905190000 has superseded. This one set the default on a table
+  // created AFTER that migration in filename order but BEFORE it in
+  // application order, because the live database is running the pending
+  // migrations out of sequence — so on the live database the personal default
+  // is CURRENT, not historical, until 20260905190000 is applied. The exemption
+  // is for the file's text. It is not a statement that the schema is clean.
+  "supabase/migrations/20260909144407_bb261240-3412-4832-b02b-a481bcb40ffa.sql": {
+    why: "applied migration duplicating 20260725025027; neutralised by 20260905190000 once that is applied",
+    needles: ["the owner's first name"],
+  },
   // Tier 3 is DONE: the templates carry a configurable office name and no
   // longer name a person. What remains are provenance comments recording who
   // supplied each constitution and when — project history, retained by design
