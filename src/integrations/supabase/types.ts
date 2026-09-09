@@ -358,6 +358,39 @@ export type Database = {
         }
         Relationships: []
       }
+      price_history: {
+        Row: {
+          close: number
+          created_at: string
+          date: string
+          id: string
+          source: string
+          symbol: string
+          user_id: string
+          volume: number | null
+        }
+        Insert: {
+          close: number
+          created_at?: string
+          date: string
+          id?: string
+          source?: string
+          symbol: string
+          user_id: string
+          volume?: number | null
+        }
+        Update: {
+          close?: number
+          created_at?: string
+          date?: string
+          id?: string
+          source?: string
+          symbol?: string
+          user_id?: string
+          volume?: number | null
+        }
+        Relationships: []
+      }
       priorities: {
         Row: {
           active: boolean
