@@ -73,36 +73,60 @@ export type Database = {
       }
       decisions: {
         Row: {
+          action: string | null
+          confidence: number | null
+          counterargument: string | null
           created_at: string
           decided_on: string
           decision: string
+          evidence: Json | null
           id: string
+          invalidation_conditions: Json | null
+          key_risks: Json | null
           outcome: string | null
           outcome_pl: number | null
+          portfolio_impact: Json | null
+          probability_impact: Json | null
           recommendation: string
           review_type: string
           symbol: string | null
           user_id: string
         }
         Insert: {
+          action?: string | null
+          confidence?: number | null
+          counterargument?: string | null
           created_at?: string
           decided_on?: string
           decision?: string
+          evidence?: Json | null
           id?: string
+          invalidation_conditions?: Json | null
+          key_risks?: Json | null
           outcome?: string | null
           outcome_pl?: number | null
+          portfolio_impact?: Json | null
+          probability_impact?: Json | null
           recommendation: string
           review_type?: string
           symbol?: string | null
           user_id: string
         }
         Update: {
+          action?: string | null
+          confidence?: number | null
+          counterargument?: string | null
           created_at?: string
           decided_on?: string
           decision?: string
+          evidence?: Json | null
           id?: string
+          invalidation_conditions?: Json | null
+          key_risks?: Json | null
           outcome?: string | null
           outcome_pl?: number | null
+          portfolio_impact?: Json | null
+          probability_impact?: Json | null
           recommendation?: string
           review_type?: string
           symbol?: string | null
