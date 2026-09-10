@@ -502,6 +502,7 @@ export type Database = {
       }
       ips_lite: {
         Row: {
+          caps_source: string | null
           created_at: string
           id: string
           margin_cap_pct: number
@@ -515,6 +516,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          caps_source?: string | null
           created_at?: string
           id?: string
           margin_cap_pct?: number
@@ -528,6 +530,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          caps_source?: string | null
           created_at?: string
           id?: string
           margin_cap_pct?: number
