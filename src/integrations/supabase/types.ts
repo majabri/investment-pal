@@ -83,7 +83,10 @@ export type Database = {
           grade: string | null
           id: string
           invalidation_conditions: Json | null
+          ips_version: string | null
           key_risks: Json | null
+          model_version: string | null
+          objective_id: string | null
           outcome: string | null
           outcome_1d: number | null
           outcome_1m: number | null
@@ -92,6 +95,7 @@ export type Database = {
           portfolio_impact: Json | null
           price_at_rec: number | null
           probability_impact: Json | null
+          prompt_version: string | null
           recommendation: string
           review_type: string
           symbol: string | null
@@ -108,7 +112,10 @@ export type Database = {
           grade?: string | null
           id?: string
           invalidation_conditions?: Json | null
+          ips_version?: string | null
           key_risks?: Json | null
+          model_version?: string | null
+          objective_id?: string | null
           outcome?: string | null
           outcome_1d?: number | null
           outcome_1m?: number | null
@@ -117,6 +124,7 @@ export type Database = {
           portfolio_impact?: Json | null
           price_at_rec?: number | null
           probability_impact?: Json | null
+          prompt_version?: string | null
           recommendation: string
           review_type?: string
           symbol?: string | null
@@ -133,7 +141,10 @@ export type Database = {
           grade?: string | null
           id?: string
           invalidation_conditions?: Json | null
+          ips_version?: string | null
           key_risks?: Json | null
+          model_version?: string | null
+          objective_id?: string | null
           outcome?: string | null
           outcome_1d?: number | null
           outcome_1m?: number | null
@@ -142,6 +153,7 @@ export type Database = {
           portfolio_impact?: Json | null
           price_at_rec?: number | null
           probability_impact?: Json | null
+          prompt_version?: string | null
           recommendation?: string
           review_type?: string
           symbol?: string | null
