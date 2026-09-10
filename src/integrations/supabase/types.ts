@@ -114,6 +114,7 @@ export type Database = {
           household_id: string | null
           id: string
           last_synced_at: string | null
+          lots_as_of: string | null
           margin_enabled: boolean | null
           margin_limit: number | null
           margin_used: number | null
@@ -148,6 +149,7 @@ export type Database = {
           household_id?: string | null
           id?: string
           last_synced_at?: string | null
+          lots_as_of?: string | null
           margin_enabled?: boolean | null
           margin_limit?: number | null
           margin_used?: number | null
@@ -182,6 +184,7 @@ export type Database = {
           household_id?: string | null
           id?: string
           last_synced_at?: string | null
+          lots_as_of?: string | null
           margin_enabled?: boolean | null
           margin_limit?: number | null
           margin_used?: number | null
@@ -601,6 +604,7 @@ export type Database = {
           filled_quantity: number | null
           id: string
           limit_price: number | null
+          lot_id: string | null
           notes: string | null
           oco_group: string | null
           order_type: string
@@ -626,6 +630,7 @@ export type Database = {
           filled_quantity?: number | null
           id?: string
           limit_price?: number | null
+          lot_id?: string | null
           notes?: string | null
           oco_group?: string | null
           order_type: string
@@ -651,6 +656,7 @@ export type Database = {
           filled_quantity?: number | null
           id?: string
           limit_price?: number | null
+          lot_id?: string | null
           notes?: string | null
           oco_group?: string | null
           order_type?: string
@@ -672,6 +678,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "position_lots"
             referencedColumns: ["id"]
           },
           {
@@ -720,6 +733,68 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "portfolio_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      position_lots: {
+        Row: {
+          account_id: string
+          acquired_at: string | null
+          as_of: string | null
+          broker_lot_id: string | null
+          closed_at: string | null
+          cost_per_share: number | null
+          created_at: string
+          id: string
+          notes: string | null
+          quantity: number | null
+          source: string
+          symbol: string
+          thesis: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          acquired_at?: string | null
+          as_of?: string | null
+          broker_lot_id?: string | null
+          closed_at?: string | null
+          cost_per_share?: number | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          quantity?: number | null
+          source: string
+          symbol: string
+          thesis?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          acquired_at?: string | null
+          as_of?: string | null
+          broker_lot_id?: string | null
+          closed_at?: string | null
+          cost_per_share?: number | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          quantity?: number | null
+          source?: string
+          symbol?: string
+          thesis?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "position_lots_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
