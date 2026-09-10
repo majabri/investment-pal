@@ -1797,3 +1797,94 @@ caveat reddens 2. Each restored and re-verified green.
 The migration is **not applied**. Until it is, `useCashFlows` errors on both
 selects and returns `unknown`, which is the correct answer and is what the panel
 already renders. Nothing regresses while it waits.
+
+---
+
+## 2026-09-10 — Task 5 of the 09-10 audit brief: canonical security master (UNIV-001 / DATA-001)
+
+### The ticker is the identity, everywhere
+
+    holdings              UNIQUE (user_id, account_id, symbol)
+    investment_universe   UNIQUE (user_id, symbol)
+    price_history         UNIQUE (user_id, symbol, date)
+    strategy_symbols      UNIQUE (strategy_id, symbol)
+    watchlist             UNIQUE (user_id, symbol)
+
+A ticker is a label, and labels are renamed and recycled:
+
+- **FB became META in 2022.** Same company; today the app holds two unrelated
+  rows with two unrelated price histories.
+- **A delisted shell's ticker is reissued**, and the old position's history
+  silently continues under a different company's prices.
+- The broker exports a **CUSIP** in one report and a ticker in another, and the
+  app holds the position twice.
+
+`securities.id` is an identity that does not move; `security_aliases` records
+every label that has pointed at it, **with dated windows**. The windows are what
+make FB → META a rename rather than two companies, and what stop a recycled
+ticker from inheriting a dead issuer's history. The gap between a closed window
+and a later open one resolves to **neither** — there is a test for that.
+
+### The refusal
+
+`resolveSecurity` returns `ambiguous`, never the newest match, when two
+securities claim one label on one date. The unique index on open windows makes
+that unreachable for current labels; it stays reachable for historical ones,
+where two closed windows can overlap because an import got a date wrong — which
+is exactly when it matters. Attaching one company's prices to another's position
+is invisible afterwards.
+
+### One classification
+
+There were two: `holdings.sector` and the built-in map in `data/sectors.ts`,
+resolved by `sectorFor(symbol, saved)`, which returned a bare string. A caller
+could not tell whether a classification came from a human or from a table, and a
+second call site with a different precedence would have been a third
+classification.
+
+`canonicalSector` is now the one resolver and returns the **source** with the
+sector: `user` → `provider` → `builtin_map`, with the order as data rather than
+as an `if` chain per call site. The legacy per-holding override is honoured at
+precedence 2 rather than dropped — discarding it on the day the securities table
+arrives would silently reclassify real positions.
+
+An unrecognised symbol is `Unclassified` with a **NULL** source, which is
+distinguishable from a human who looked and said Unclassified.
+
+`sectorFor` is **deleted**, not deprecated. A function with no callers that
+still answers the same question is how the second classification comes back.
+
+### Where the brief and `main` disagreed
+
+The brief asks to "separate price-mover screens from conviction ranking".
+**`main` already does this** — `/opportunities` sorts by `changePct` alone,
+carries none of the universe's conviction scores, and says so in its own copy:
+*"A price screen — not a committee view, and not ranked by conviction"*. So
+there was nothing to fix, and per the standing rule I am saying so rather than
+rebuilding it. What this PR adds is a guard, because the requirement is easy to
+satisfy today and easy to lose the next time somebody has universe scores in
+hand and an empty column to fill.
+
+### Nothing is re-keyed
+
+`security_id` is added NULLABLE to `holdings`, `investment_universe` and
+`price_history`. NULL means NOT YET RESOLVED, not "no security". Re-keying is a
+backfill with its own sign-off; doing it in the same step as introducing the
+identity would mean rewriting every holding against a schema nothing has
+exercised.
+
+### Verification
+
+Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
+`bun test` **1028 pass / 0 fail** · boot 200 on `/auth`, `/portfolio`,
+`/opportunities`, `/summary`.
+
+Fault injection: dropping the ambiguity refusal reddens 1; ignoring alias
+windows reddens 4; re-introducing a second sector resolver in a route reddens 2.
+Each restored and re-verified green.
+
+### Lovable checkpoint 3
+
+`20260910170000_security_master.sql` is not applied. Nothing reads the tables
+yet — `canonicalSector` takes an optional `security` argument that is simply
+absent today, so the built-in map answers exactly as it did before.

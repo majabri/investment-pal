@@ -1,5 +1,7 @@
-// Built-in sector classification for known symbols. A sector saved on the
-// holding (📄 dialog) always overrides. Unknown symbols stay Unclassified.
+// Built-in sector classification for known symbols — the LAST RESORT source
+// for `canonicalSector` (src/lib/securityMaster.ts), which owns the precedence
+// order and reports which source answered. A sector saved on the holding, or on
+// the security by a human, wins over everything here.
 export const SECTOR_MAP: Record<string, string> = {
   // Semiconductors & AI infrastructure
   NVDA: "Semiconductors",
@@ -52,9 +54,12 @@ export const SECTOR_MAP: Record<string, string> = {
   DJSP: "Legacy / delisted",
 };
 
-export const sectorFor = (symbol: string, saved?: string | null): string => {
-  if (saved && saved.trim()) return saved.trim();
-  if (SECTOR_MAP[symbol]) return SECTOR_MAP[symbol];
-  if (/^[0-9A-Z]{9}$/.test(symbol) && /\d/.test(symbol)) return "Legacy / delisted"; // CUSIP-shaped
-  return "Unclassified";
-};
+// `sectorFor` used to live here. It resolved a sector from two sources and
+// returned a bare string, so a caller could not tell whether a classification
+// came from a human or from the map below — and a second call site with a
+// different precedence would have been a second classification (UNIV-001).
+//
+// It is deleted rather than deprecated: a function with no callers that still
+// answers the same question is how the second classification comes back. The
+// one resolver is `canonicalSector` in `src/lib/securityMaster.ts`, which
+// returns the source alongside the sector. This map is its last resort.
