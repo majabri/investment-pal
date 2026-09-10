@@ -1797,3 +1797,53 @@ caveat reddens 2. Each restored and re-verified green.
 The migration is **not applied**. Until it is, `useCashFlows` errors on both
 selects and returns `unknown`, which is the correct answer and is what the panel
 already renders. Nothing regresses while it waits.
+
+---
+
+## 2026-09-10 — Task 7 of the 09-10 audit brief: PR #89 closed, its invariant salvaged
+
+PR #89 sat ~40 commits behind `main`. The brief says not to rebase it, and that
+is right — the branch's value was one file, and rebasing 40 commits of drift to
+recover 22 lines is the expensive way to copy them.
+
+### What was worth keeping
+
+`0a177cb` added the only assertion in the repo about what `import { z } from
+"zod"` actually **resolves** to. It never reached `main`.
+
+`bun.lock` carries both majors: zod **3.25.76** at the top level, and zod
+**4.4.3** nested under `@tanstack/start-plugin-core`,
+`@tanstack/router-generator`, `@tanstack/router-plugin` and
+`eslint-plugin-react-hooks`. `package.json` pins `^3.25.76` and Dependabot
+ignores the zod major — but a caret and an ignore rule constrain what is
+**requested**, not what is **resolved**. Hoisting, a transitive bump or a
+lockfile regeneration can move the top-level copy without either noticing.
+Incident #70 was exactly that: `tsc` clean, dead at boot on zod 4's `.prefault`.
+
+### Today made the case for it better than #89 could
+
+During the #190 merge, a half-completed `bun install` left the tree in a state
+where the dev server died with
+
+    pagePrerenderOptionsSchema.optional(...).prefault is not a function
+
+— `@tanstack/start-plugin-core` calling a zod-4 API on a zod-3 schema. A clean
+install fixed it and `main` was never affected. But for several minutes the only
+evidence available could not distinguish "my tree is broken" from "`main` is
+broken", and the way that was settled was cloning `main` and booting it. This
+test is what makes it distinguishable in one command.
+
+### Ported, not copied
+
+The original used `vitest`; the repo runs `bun test`. Beyond the translation it
+gained three assertions the original did not have:
+
+- the **resolved package version** is a 3.x, read from `require.resolve`. The
+  behavioural check proves the API surface; this proves the identity. A zod 4
+  that dropped `.prefault` would pass the first and fail this.
+- `package.json` still pins a 3.x range — a deliberate change there should not
+  be possible without this file going red.
+- a **negative control**. Five green assertions about an *absent* property prove
+  nothing unless the check can see the property when it is there.
+
+Fault injection: moving the pin to `^4.4.3` reddens 1. Restored.
