@@ -14,6 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_balances: {
+        Row: {
+          account_id: string
+          cash_market_value: number | null
+          committed_to_open_orders: number | null
+          created_at: string
+          day_change: number | null
+          equity_pct: number | null
+          id: string
+          imported_at: string
+          margin_buying_power: number | null
+          margin_interest_accrued_mtd: number | null
+          margin_interest_rate_pct: number | null
+          margin_market_value: number | null
+          net_debit: number | null
+          net_house_surplus: number | null
+          non_margin_buying_power: number | null
+          raw_text: string
+          total_account_value: number | null
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          cash_market_value?: number | null
+          committed_to_open_orders?: number | null
+          created_at?: string
+          day_change?: number | null
+          equity_pct?: number | null
+          id?: string
+          imported_at?: string
+          margin_buying_power?: number | null
+          margin_interest_accrued_mtd?: number | null
+          margin_interest_rate_pct?: number | null
+          margin_market_value?: number | null
+          net_debit?: number | null
+          net_house_surplus?: number | null
+          non_margin_buying_power?: number | null
+          raw_text: string
+          total_account_value?: number | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          cash_market_value?: number | null
+          committed_to_open_orders?: number | null
+          created_at?: string
+          day_change?: number | null
+          equity_pct?: number | null
+          id?: string
+          imported_at?: string
+          margin_buying_power?: number | null
+          margin_interest_accrued_mtd?: number | null
+          margin_interest_rate_pct?: number | null
+          margin_market_value?: number | null
+          net_debit?: number | null
+          net_house_surplus?: number | null
+          non_margin_buying_power?: number | null
+          raw_text?: string
+          total_account_value?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_balances_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       accounts: {
         Row: {
           account_type: string
@@ -80,13 +151,22 @@ export type Database = {
           decided_on: string
           decision: string
           evidence: Json | null
+          grade: string | null
           id: string
           invalidation_conditions: Json | null
+          ips_version: string | null
           key_risks: Json | null
+          model_version: string | null
+          objective_id: string | null
           outcome: string | null
+          outcome_1d: number | null
+          outcome_1m: number | null
+          outcome_1w: number | null
           outcome_pl: number | null
           portfolio_impact: Json | null
+          price_at_rec: number | null
           probability_impact: Json | null
+          prompt_version: string | null
           recommendation: string
           review_type: string
           symbol: string | null
@@ -100,13 +180,22 @@ export type Database = {
           decided_on?: string
           decision?: string
           evidence?: Json | null
+          grade?: string | null
           id?: string
           invalidation_conditions?: Json | null
+          ips_version?: string | null
           key_risks?: Json | null
+          model_version?: string | null
+          objective_id?: string | null
           outcome?: string | null
+          outcome_1d?: number | null
+          outcome_1m?: number | null
+          outcome_1w?: number | null
           outcome_pl?: number | null
           portfolio_impact?: Json | null
+          price_at_rec?: number | null
           probability_impact?: Json | null
+          prompt_version?: string | null
           recommendation: string
           review_type?: string
           symbol?: string | null
@@ -120,13 +209,22 @@ export type Database = {
           decided_on?: string
           decision?: string
           evidence?: Json | null
+          grade?: string | null
           id?: string
           invalidation_conditions?: Json | null
+          ips_version?: string | null
           key_risks?: Json | null
+          model_version?: string | null
+          objective_id?: string | null
           outcome?: string | null
+          outcome_1d?: number | null
+          outcome_1m?: number | null
+          outcome_1w?: number | null
           outcome_pl?: number | null
           portfolio_impact?: Json | null
+          price_at_rec?: number | null
           probability_impact?: Json | null
+          prompt_version?: string | null
           recommendation?: string
           review_type?: string
           symbol?: string | null
@@ -313,6 +411,48 @@ export type Database = {
         }
         Relationships: []
       }
+      ips_lite: {
+        Row: {
+          created_at: string
+          id: string
+          margin_cap_pct: number
+          margin_rate_annual_pct: number | null
+          margin_rate_as_of: string | null
+          margin_rate_is_floating: boolean
+          margin_rate_stale_days: number
+          position_cap_hard: boolean
+          position_cap_pct: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          margin_cap_pct?: number
+          margin_rate_annual_pct?: number | null
+          margin_rate_as_of?: string | null
+          margin_rate_is_floating?: boolean
+          margin_rate_stale_days?: number
+          position_cap_hard?: boolean
+          position_cap_pct?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          margin_cap_pct?: number
+          margin_rate_annual_pct?: number | null
+          margin_rate_as_of?: string | null
+          margin_rate_is_floating?: boolean
+          margin_rate_stale_days?: number
+          position_cap_hard?: boolean
+          position_cap_pct?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       journal_entries: {
         Row: {
           ai_summary: string | null
@@ -354,33 +494,47 @@ export type Database = {
       }
       portfolio_snapshots: {
         Row: {
+          account_id: string | null
           created_at: string
           gross: number
           id: string
           margin_used: number
           net: number
           scope: string
+          snapshot_date: string | null
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           created_at?: string
           gross?: number
           id?: string
           margin_used?: number
           net?: number
           scope?: string
+          snapshot_date?: string | null
           user_id: string
         }
         Update: {
+          account_id?: string | null
           created_at?: string
           gross?: number
           id?: string
           margin_used?: number
           net?: number
           scope?: string
+          snapshot_date?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       price_history: {
         Row: {
