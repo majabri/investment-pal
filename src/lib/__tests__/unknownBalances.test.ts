@@ -221,9 +221,17 @@ describe("an unknown balance reaches the committee as unknown", () => {
       // Every position read "0.0% of acct", which tells the committee that
       // nothing breaches the position cap — a governance conclusion drawn from
       // an account value nobody supplied.
+      //
+      // "of acct" is now spelled out per denominator (P0-05): the cap two
+      // blocks above is stated against gross assets while this figure was net
+      // equity, so an unlabelled "%" invited the committee to judge a breach
+      // against the wrong denominator.
       const out = build(base);
-      expect(out).toContain("(NOT KNOWN of acct)");
-      expect(out).not.toContain("(0.0% of acct)");
+      expect(out).toContain("(NOT KNOWN of net equity; NOT KNOWN of gross assets)");
+      expect(out).not.toContain("0.0% of net equity");
+      expect(out).not.toContain("0.0% of gross assets");
+      // And no bare, unattributed percentage survives on a holdings line.
+      expect(out).not.toContain("of acct");
     });
 
     test(`${name}: known balances still render as figures`, () => {
@@ -238,8 +246,15 @@ describe("an unknown balance reaches the committee as unknown", () => {
         todaysPLPct: 0.0015,
       });
       expect(out).toContain("Cash: $2,500.00 | Margin used: $20,000.00 | Buying power: $5,000.00");
-      expect(out).not.toContain("NOT KNOWN of acct");
+      expect(out).not.toContain("NOT KNOWN of net equity");
       expect(out).toContain("Account equity: 80.0%");
+      // P0-05: the same $80 holding, against both denominators, each named.
+      // 80 ÷ 80,000 = 0.1%; 80 ÷ 100,000 = 0.1% at one decimal — so assert the
+      // labels, and let concentration.test.ts carry the arithmetic.
+      expect(out).toContain("% of net equity; ");
+      expect(out).toContain("% of gross assets)");
+      // The cap the committee is asked to police names its denominator too.
+      expect(out).toContain("% of gross assets (soft");
     });
 
     test(`${name}: a real zero balance still renders as zero`, () => {

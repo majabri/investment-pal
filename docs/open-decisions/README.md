@@ -14,3 +14,4 @@ ADR (`../adr/`) and/or code.
 |---|---|---|
 | OD-001 | Governed co-specification (missing logic → mini-ADR; money-adjacent needs line-item sign-off) | **Approved** |
 | OD-002 | Free data sources only (Stooq / Yahoo daily closes; paid data is a Phase-2 gate) | **Approved** |
+| OD-003 | Which denominator the position and margin caps are enforced against (net equity / gross assets / invested assets) | **OPEN** |

@@ -31,6 +31,14 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useScopedHoldings, useScopedAccount, useLogSync, type Holding } from "@/hooks/useAppData";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
+import {
+  DENOMINATOR_DEFINITION,
+  DENOMINATOR_HEADING,
+  denominators,
+  weightOf,
+} from "@/lib/concentration";
+import type { Denominators } from "@/lib/concentration";
+import { ConcentrationBreakdown } from "@/components/app/ConcentrationBreakdown";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { PriceHistoryRecorder } from "@/components/app/PriceHistoryRecorder";
 import { SwingScoreBadge } from "@/components/app/SwingScoreBadge";
@@ -165,6 +173,10 @@ function PortfolioPage() {
     unrealizedPL: pl,
     unrealizedPLPct,
   } = totals;
+  // The three things a position can be a fraction of, computed once from the
+  // same totals (P0-05). Before this, the holdings table divided by net equity
+  // and the sector bars divided by positions value, and both printed "%".
+  const denoms = useMemo(() => denominators(totals), [totals]);
   // One state for the balance block, since the provenance is per block (Phase
   // 1d). Reported against the ACCOUNT VALUE because that is the figure a
   // decision rests on; the individual columns share its provenance.
@@ -335,7 +347,8 @@ function PortfolioPage() {
                       className="cursor-pointer select-none text-right"
                       onClick={() => togglePfSort("pct")}
                     >
-                      % of Acct{pfArrow("pct")}
+                      {DENOMINATOR_HEADING.netEquity}
+                      {pfArrow("pct")}
                     </TableHead>
                     <TableHead
                       className="cursor-pointer select-none text-right"
@@ -407,12 +420,12 @@ function PortfolioPage() {
                         q && q.prevClose > 0 ? h.quantity * (price - q.prevClose) : null;
                       const dayPct =
                         q && q.prevClose > 0 ? (price - q.prevClose) / q.prevClose : null;
-                      // Fidelity divides % of Acct by TOTAL ACCOUNT VALUE (net equity) —
-                      // verified against real statements (CRWD 32.24%, LRCX 26.84%, ...).
-                      const pctOfAcct =
-                        totalAccountValue !== null && totalAccountValue > 0
-                          ? value / totalAccountValue
-                          : null;
+                      // Fidelity divides this column by TOTAL ACCOUNT VALUE (net equity),
+                      // verified against real statements. The column heading now says so:
+                      // the same position is a different percentage of gross assets and a
+                      // different one again of invested assets, and the drawer shows all
+                      // three side by side (P0-05).
+                      const pctOfAcct = weightOf(value, denoms, "netEquity");
                       const unpriced = !q;
                       return (
                         <TableRow
@@ -557,7 +570,15 @@ function PortfolioPage() {
         </div>
 
         <div className="rounded-2xl border bg-card p-5">
-          <div className="mb-3 text-sm font-medium">Sector allocation</div>
+          <div className="mb-3 flex flex-wrap items-baseline gap-x-2">
+            <span className="text-sm font-medium">Sector allocation</span>
+            {/* These bars divide by POSITIONS VALUE, not by the account value the
+              holdings table uses. Same portfolio, different denominator, and
+              until now both printed a bare "%" (P0-05). */}
+            <span className="text-[11px] text-muted-foreground">
+              {DENOMINATOR_HEADING.investedAssets} · {DENOMINATOR_DEFINITION.investedAssets}
+            </span>
+          </div>
           {sectorData.length === 0 ? (
             <p className="text-sm text-muted-foreground">No data.</p>
           ) : (
@@ -628,6 +649,8 @@ function PortfolioPage() {
           {selected && (
             <PositionDetail
               holding={selected}
+              denoms={denoms}
+              livePrice={liveQuotes?.[selected.symbol]?.price ?? null}
               onSaved={() => {
                 setSelected(null);
                 qc.invalidateQueries({ queryKey: ["holdings"] });
@@ -782,10 +805,18 @@ function AccountForm({
 
 function PositionDetail({
   holding,
+  denoms,
+  livePrice,
   onSaved,
   onDeleted,
 }: {
   holding: Holding;
+  /** All three denominators for the account this holding sits in (P0-05). */
+  denoms: Denominators;
+  /** The live quote, where there is one — the table values the row with it, and
+   *  a drawer that valued the same position at the stored price would print a
+   *  different concentration for the same holding on the same screen. */
+  livePrice: number | null;
   onSaved: () => void;
   onDeleted: () => void;
 }) {
@@ -826,9 +857,13 @@ function PositionDetail({
       <SheetHeader>
         <SheetTitle className="text-2xl">{h.symbol}</SheetTitle>
         <SheetDescription>
-          {fmtUSD(h.quantity * h.current_price)} · cost {fmtPrice(h.cost_basis)}/sh
+          {fmtUSD(h.quantity * (livePrice ?? h.current_price))} · cost {fmtPrice(h.cost_basis)}/sh
         </SheetDescription>
       </SheetHeader>
+      <ConcentrationBreakdown
+        positionValue={h.quantity * (livePrice ?? h.current_price)}
+        denoms={denoms}
+      />
       <div className="grid grid-cols-3 gap-3">
         <div>
           <Label className="text-xs">Qty</Label>

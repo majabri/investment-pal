@@ -1554,3 +1554,85 @@ subprocess. Without it, twelve green tests would prove nothing.
 
 Verified by reverting each fix: the UTC form of `nextLocalDays` reddens three
 tests, the local-midnight `addDaysISO` reddens three others.
+
+---
+
+## 2026-09-10 — Task 2 of the 09-10 audit brief: labelled concentration denominators (P0-05 / RISK-001)
+
+### What the defect actually was
+
+Not an arithmetic error. Every division on `main` was correct; they were
+divisions by different things, all printed as `%`:
+
+| Where | Denominator | Printed as |
+|---|---|---|
+| `portfolio.tsx` holdings table | net equity | `% of Acct` |
+| `portfolio.tsx` sector bars | invested assets | bare `%` |
+| `index.tsx` position-cap check | net equity | bare `%` |
+| `index.tsx` margin-cap check | net equity | bare `%` |
+| `accountTotals.marginUtilisation` | gross assets | not rendered |
+| `prompts.ts` holdings block | net equity | `% of acct` |
+| **ADR-APP-004 C2 (the written policy)** | **gross** | — |
+
+Two live consequences, neither of them visible from any screen:
+
+1. **The written cap and the enforced cap are different numbers.** With
+   positions 80,000, cash 20,000 and a 30,000 debit, a 24,000 position is 24.0%
+   of gross assets and 34.3% of net equity — a pass under ADR-APP-004 as
+   written, a breach under what the dashboard enforces.
+2. **The committee was handed the mismatch.** The prompt says "Max single
+   position: N% of gross" and then lists every holding's weight against net
+   equity. The model was being asked to police a gross cap with net-equity
+   numbers, and did so confidently, in writing.
+
+### What changed
+
+`src/lib/concentration.ts` — all three denominators from the one `accountTotals`
+arithmetic, with `known` / `unknown` / `zero` kept apart. A zero denominator is
+not 0% and not Infinity: a position that is 100% of nothing is undefined, and a
+negative net equity (debit above assets) is refused too, because dividing by it
+flips the sign of every weight and would print a 24% position as −240%.
+
+Every displayed percentage now names its denominator **on screen**:
+
+- holdings column heading → `% of net equity`
+- sector bars → labelled `% of invested` with the arithmetic beside it
+- both constitution-check breach lines → `NVDA 34.3% of net equity > 30% cap`
+- a new `ConcentrationBreakdown` panel in the position drawer shows all three
+  side by side, so the spread between them is visible rather than a matter of
+  which screen you opened
+- the committee prompt gives each holding against **both** net equity and gross
+  assets, each labelled, and states the margin cap's denominator explicitly
+
+`labelledPct` takes the unknown marker from its caller: the em-dash is right on
+a dense screen and wrong in a prompt, where `NOT KNOWN of net equity` cannot be
+misread by a model.
+
+### What deliberately did NOT change
+
+The arithmetic. `POLICY_DENOMINATOR` and `MARGIN_CAP_DENOMINATOR` **record** what
+`main` already enforces — read off `index.tsx`, not chosen — so the decision has
+one site instead of four. Which denominator the caps *should* use is position
+sizing and margin math: money-adjacent under OD-001, filed as
+`docs/open-decisions/OD-003-concentration-denominator.md`, and the owner's
+line-item call. The ADR that answers it is drafted separately and is not
+self-merged (ADR-APP-005 §2).
+
+Margin utilisation got its own named denominator rather than inheriting the
+position cap's. It had inherited it only because both were written inline in the
+same block.
+
+### Verification
+
+Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
+`bun test` 957 pass / 0 fail · boot 200 on `/auth`, `/portfolio`, `/settings`,
+`/prompt-center`.
+
+Fault injection, three ways: removing the zero/unknown guard from `weightOf`
+reddens 7 tests; stripping the denominator from `labelledPct` reddens 18;
+blanking the heading in `ConcentrationBreakdown` reddens the component test.
+Each restored and re-verified green.
+
+The personal-data guard fired during this work — three new files carried the
+owner's first name in a comment. Rewritten to "the owner". That is the guard
+doing exactly what it is for.
