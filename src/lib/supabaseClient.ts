@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { brokeredPreviewStorage } from "@/integrations/supabase/previewAuthStorage";
 import type { Database } from "@/integrations/supabase/types";
 
-};
+
 
 // Public browser configuration. The literals are intentional fallbacks for
 // deployments where the build environment does not inject VITE_* values.
