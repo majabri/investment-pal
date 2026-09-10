@@ -40,6 +40,7 @@ import {
   conflictExplanation,
   targetLinkage,
   versionChanges,
+  versionSkipReason,
 } from "@/lib/goalVersion";
 
 export const Route = createFileRoute("/_authenticated/goals")({
@@ -53,8 +54,13 @@ export const Route = createFileRoute("/_authenticated/goals")({
 });
 
 function GoalsPage() {
-  const { data: goal, update, versions: versionsQuery } = useGoal();
-  const versions = versionsQuery.data;
+  const { data: goal, update, versions: versionsQuery, history } = useGoal();
+  // Three states, not two. `undefined` is still loading; `unknown` coverage is
+  // a read that failed and knows nothing; `known` with no rows is a genuinely
+  // empty history. The middle one used to be indistinguishable from the last.
+  const historyLoading = versionsQuery.data === undefined;
+  const historyKnown = history.coverage === "known";
+  const versions = historyKnown ? history.rows : null;
 
   const [name, setName] = useState("");
   const [starting, setStarting] = useState<number | null>(null);
@@ -92,9 +98,13 @@ function GoalsPage() {
 
   // Seeded from the most recent version, not from `goals` — the column only
   // exists there. Absent means the holder has never stated a target return,
-  // which is not the same as one of zero.
+  // which is not the same as one of zero, and neither is the same as a history
+  // that could not be read. Under UNKNOWN coverage the field is left untouched
+  // rather than blanked: blanking it would present "never stated" as fact, and
+  // the next save would write that fiction into a row nothing can edit.
   useEffect(() => {
-    const stated = versions?.[0]?.target_return_pct ?? null;
+    if (versions === null) return;
+    const stated = versions[0]?.target_return_pct ?? null;
     setReturnPct(stated === null ? null : Number(stated) * 100);
   }, [versions]);
 
@@ -213,7 +223,10 @@ function GoalsPage() {
           if (r?.versionRecorded) toast.success("Goal updated — version recorded");
           else
             toast.warning(
-              "Goal updated, but no version was recorded (goal_versions is not available yet).",
+              versionSkipReason({
+                historyKnown: r?.historyKnown ?? false,
+                inserted: false,
+              }) ?? "Goal updated, but no version was recorded.",
             );
         },
         onError: (e) => toast.error((e as Error).message),
@@ -303,6 +316,16 @@ function GoalsPage() {
                       ? "Target and return agree."
                       : "Leave blank to work from the target value alone."}
               </p>
+              {/* The previously stated return lives on the latest version and
+                  nowhere else. When the history cannot be read, this box is
+                  not evidence that none was stated — and the holder is told,
+                  because otherwise a blank field reads as an answer. */}
+              {!historyLoading && versions === null ? (
+                <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-500">
+                  A previously stated return could not be read. Blank here does not mean none
+                  was set.
+                </p>
+              ) : null}
             </div>
             <div className="sm:col-span-2">
               <Label className="text-xs" htmlFor="goal-version-note">
@@ -465,8 +488,16 @@ function GoalsPage() {
           Every save appends a version and nothing is ever edited. Each decision records the version
           it was taken under.
         </p>
-        {versions === undefined ? (
+        {historyLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : versions === null ? (
+          // A read that failed. NOT an empty history — the app does not know
+          // what is in the table and says so rather than reporting a count.
+          <p className="text-sm text-muted-foreground">
+            Goal history is unavailable — it could not be read, so what it holds is not
+            known. Saving still updates the goal, but no version will be appended until
+            the history can be read.
+          </p>
         ) : versions.length === 0 ? (
           // Not "no changes". Nobody has saved the goal since versioning
           // existed, which is a different fact and the one that is true today.

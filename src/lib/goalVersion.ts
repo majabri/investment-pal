@@ -230,6 +230,79 @@ export type GoalVersionRow = {
   note: string | null;
 };
 
+/**
+ * Whether the version history could be READ — not how many versions exist.
+ *
+ * These are different facts and the app had been collapsing them. A failed
+ * read returned an empty list, and an empty list renders as "no versions
+ * recorded yet", which is a claim ABOUT the table: it tells the holder their
+ * history is empty when the truth is that nobody knows. `useCashFlows` already
+ * draws this line for flows (PERF-001); goal history now draws the same one.
+ *
+ * The consequence is not cosmetic. The most recent version is where the
+ * holder's stated target RETURN lives — `goals` has no such column — so a
+ * silent empty history seeds that field to null, and the next save writes null
+ * into an append-only row. A stated 12% would be erased by a network blip, in
+ * a table whose whole point is that nothing in it can be edited afterwards.
+ */
+export type GoalHistory =
+  | { coverage: "known"; rows: GoalVersionRow[] }
+  | { coverage: "unknown"; rows: readonly [] };
+
+/** Coverage from a read's outcome. An error is UNKNOWN however plausible its cause. */
+export function goalHistory(failed: boolean, rows: GoalVersionRow[]): GoalHistory {
+  if (failed) return { coverage: "unknown", rows: [] };
+  return { coverage: "known", rows };
+}
+
+/**
+ * The most recent version, or null.
+ *
+ * Null under `unknown` means NOT KNOWN, and callers must not read it as "there
+ * is no predecessor" — which is why `canRecordVersion` exists rather than a
+ * null check at each call site.
+ */
+export function latestVersion(history: GoalHistory): GoalVersionRow | null {
+  return history.coverage === "known" ? (history.rows[0] ?? null) : null;
+}
+
+/**
+ * Whether a new version may be APPENDED.
+ *
+ * Not the same question as `canSaveVersion`, which asks whether the plan is
+ * coherent. This asks whether the predecessor is known. Appending without it
+ * would write `supersedes_id: null` — claiming to be the first version — and
+ * would carry forward a target return nobody could read. Refusing to append is
+ * recoverable; a wrong immutable row is not.
+ */
+export function canRecordVersion(history: GoalHistory): boolean {
+  return history.coverage === "known";
+}
+
+/**
+ * Why no version was recorded, in the holder's terms. Null when one was.
+ *
+ * The two failures are different and the holder is told which. A history that
+ * could not be READ means the app declined to append; an insert that failed
+ * means it tried and could not. Collapsing them into one apology would hide
+ * that the first is a deliberate refusal.
+ */
+export function versionSkipReason(outcome: {
+  historyKnown: boolean;
+  inserted: boolean;
+}): string | null {
+  if (!outcome.historyKnown) {
+    return (
+      "Goal updated, but no version was recorded — the existing history could not be " +
+      "read, and appending to a history you cannot see would lose what came before."
+    );
+  }
+  if (!outcome.inserted) {
+    return "Goal updated, but no version was recorded (goal_versions is not available yet).";
+  }
+  return null;
+}
+
 /** What changed between two versions, in the holder's terms. Empty = nothing. */
 export function versionChanges(
   older: GoalVersionRow | null,

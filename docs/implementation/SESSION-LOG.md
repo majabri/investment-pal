@@ -2478,3 +2478,77 @@ Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
 Fault injection: an unevaluable policy check raising nothing reddens 1; a null
 goal probability alerting as off-pace reddens 1; treating a noncritical input as
 blocking reddens 3.
+
+---
+
+## Session — 2026-09-10 — goal history: an unreadable history is not an empty one
+
+### What prompted it
+
+Not the brief. Every task in `AUDIT-AND-BRIEF-2026-09-10.md` is merged, and the
+three migrations behind Tasks 3/4/5 are still unapplied — which is a live
+condition worth reading rather than a queue to wait in. `main` deploys through
+Lovable, so those capabilities are **running against tables that do not exist**,
+and the standing rule is *unknown ≠ zero ≠ empty ≠ error ≠ stale*.
+
+Two of the three hold that line. `useCashFlows` returns `coverage: "unknown"`
+on any error and says so. The security master has no query path yet, so it
+cannot mislead. The third did not.
+
+### The defect
+
+`useAppData.ts` read `goal_versions` and, on any error, returned `[]`:
+
+```ts
+if (error) return [];
+```
+
+The comment defended it: today "no versions recorded" is true of every goal
+anyway. That is true today and stops being true the moment the migration lands
+— but the shape of the bug is wrong even now, because `[]` is not passed
+through as an absence. It is rendered as a **claim about the table**:
+
+> No versions recorded yet — the history starts at the next save.
+
+The app was in no position to say that. Worse, the most recent version is the
+only place the holder's stated **target return** lives — `goals` has no such
+column — so a failed read seeded that field to `null`, under a comment reading
+"Absent means the holder has never stated a target return, which is not the
+same as one of zero." The code made exactly the conflation its own comment
+forbade. The next save then wrote that `null` into `goal_versions`, whose whole
+premise is that nothing in it can be edited afterwards. **A stated 12% erased
+by a network blip, permanently.** The same read also supplies `supersedes_id`,
+so the row would additionally claim to be the first version of a goal that may
+already have ten.
+
+### The fix
+
+`GoalHistory` — `{ coverage: "known", rows }` or `{ coverage: "unknown", rows: [] }`
+— mirroring the `PerformanceFlows` shape that already works three hundred lines
+below it in the same file. Then:
+
+- The history panel gets **three** states, not two: loading, unreadable, and a
+  genuinely empty history. The middle one says what it does not know.
+- The target-return field is **left alone** under unknown coverage rather than
+  blanked, and carries a note that a blank box is not evidence.
+- `canRecordVersion` refuses to append when the predecessor is unknown. Not a
+  capability gate — refusing is recoverable, a wrong immutable row is not. The
+  goal itself still saves, and `versionSkipReason` tells the holder which of the
+  two failures happened: the append was **declined**, or it was **attempted and
+  failed**. Collapsing those would hide that the first is deliberate.
+
+### Verification
+
+Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
+`bun test` **1221 pass / 0 fail** · boot 200 on `/auth` and `/goals`.
+
+Fault injection: restoring the old behaviour exactly — `goalHistory` ignoring
+its `failed` argument — reddens 3.
+
+### Sign-off
+
+**Stopped at the PR, not self-merged.** The value at stake is a target return
+*rate*, and OD-001 makes any rate money-adjacent. Nothing here computes or
+changes a rate — `targetLinkage` is untouched — but this does change **when a
+row carrying one is written**, and the rule says that when in doubt it is
+money-adjacent. Awaiting Amir's line-item sign-off.
