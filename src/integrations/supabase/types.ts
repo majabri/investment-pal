@@ -87,13 +87,19 @@ export type Database = {
       }
       accounts: {
         Row: {
-          account_type: string
+          account_status: string | null
+          account_type: string | null
+          account_type_source: string | null
           broker: string | null
+          broker_account_id: string | null
           buying_power: number | null
           cash: number | null
           created_at: string
+          currency: string | null
+          household_id: string | null
           id: string
           last_synced_at: string | null
+          margin_enabled: boolean | null
           margin_limit: number | null
           margin_used: number | null
           name: string
@@ -101,17 +107,24 @@ export type Database = {
           starting_value: number
           target_date: string | null
           target_value: number | null
+          tax_treatment: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          account_type?: string
+          account_status?: string | null
+          account_type?: string | null
+          account_type_source?: string | null
           broker?: string | null
+          broker_account_id?: string | null
           buying_power?: number | null
           cash?: number | null
           created_at?: string
+          currency?: string | null
+          household_id?: string | null
           id?: string
           last_synced_at?: string | null
+          margin_enabled?: boolean | null
           margin_limit?: number | null
           margin_used?: number | null
           name?: string
@@ -119,17 +132,24 @@ export type Database = {
           starting_value?: number
           target_date?: string | null
           target_value?: number | null
+          tax_treatment?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
-          account_type?: string
+          account_status?: string | null
+          account_type?: string | null
+          account_type_source?: string | null
           broker?: string | null
+          broker_account_id?: string | null
           buying_power?: number | null
           cash?: number | null
           created_at?: string
+          currency?: string | null
+          household_id?: string | null
           id?: string
           last_synced_at?: string | null
+          margin_enabled?: boolean | null
           margin_limit?: number | null
           margin_used?: number | null
           name?: string
@@ -137,6 +157,7 @@ export type Database = {
           starting_value?: number
           target_date?: string | null
           target_value?: number | null
+          tax_treatment?: string | null
           updated_at?: string
           user_id?: string
         }
