@@ -46,8 +46,12 @@ money-adjacent:
 - Every displayed percentage now names its denominator, in the UI and in the
   prompt — the holdings column heading, the sector bars, both constitution-check
   breach lines, and a per-position breakdown panel showing all three.
-- The committee prompt now gives each holding against **both** net equity and
-  gross assets, each labelled, and states the margin cap's denominator.
+- The committee prompt change — each holding against **both** net equity and
+  gross assets, each labelled, with each cap's denominator stated — is written
+  and tested but held in a **separate PR**. The IPS block is the committee
+  mandate, and labelling it correctly changes which positions the committee
+  flags, so it needs the owner's line-item sign-off even though no threshold
+  moves.
 - `POLICY_DENOMINATOR` and `MARGIN_CAP_DENOMINATOR` record what `main` enforces
   today, in one place, so the decision below has a single site to land in.
 

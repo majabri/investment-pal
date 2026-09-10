@@ -1,7 +1,5 @@
 // Prompt templates for ChatGPT morning + end-of-day reviews.
 import { fmtPct, fmtUSD } from "./finance";
-import { labelledPct, weightOf } from "./concentration";
-import type { Denominators } from "./concentration";
 import { marginRatePromptLine, MARGIN_POLICY_UNSET, type MarginPolicy } from "./marginCost";
 import { isRealCalendarDate } from "./localDate";
 import { NOT_KNOWN, usdOrNotKnown } from "./unavailable";
@@ -313,14 +311,6 @@ function equityLine(ctx: PromptContext): string {
 }
 
 function dataBlock(ctx: PromptContext): string {
-  // Invested assets is summed here rather than passed in: the prompt context
-  // carries the holdings it is about, so the denominator and the numerators
-  // come from the same list and cannot describe different portfolios.
-  const denoms: Denominators = {
-    netEquity: ctx.portfolioValue,
-    grossAssets: ctx.grossValue ?? null,
-    investedAssets: ctx.holdings.reduce((sum, h) => sum + h.quantity * h.currentPrice, 0),
-  };
   const holdingsBlock = ctx.holdings.length
     ? ctx.holdings
         .map((h) => {
@@ -331,19 +321,11 @@ function dataBlock(ctx: PromptContext): string {
           // Without an account value this used to read "0.0% of acct" for every
           // holding — telling the committee that nothing breaches the cap,
           // computed from an account value nobody supplied.
-          //
-          // P0-05: "of acct" was net equity, while the cap two blocks up is
-          // stated against GROSS. The committee was being handed net-equity
-          // weights and a gross cap and asked to judge breaches — so it judged
-          // them against the wrong denominator, confidently, in writing. Both
-          // are given now, each one named.
-          const pctNet = labelledPct(weightOf(value, denoms, "netEquity"), "netEquity", {
-            unknown: NOT_KNOWN,
-          });
-          const pctGross = labelledPct(weightOf(value, denoms, "grossAssets"), "grossAssets", {
-            unknown: NOT_KNOWN,
-          });
-          return `- ${h.symbol}: ${h.quantity} sh @ avg ${fmtUSD(h.costBasis, 2)}, last ${fmtUSD(h.currentPrice, 2)}, value ${fmtUSD(value)} (${pctNet}; ${pctGross})${
+          const pct =
+            ctx.portfolioValue !== null && ctx.portfolioValue > 0
+              ? fmtPct(value / ctx.portfolioValue)
+              : NOT_KNOWN;
+          return `- ${h.symbol}: ${h.quantity} sh @ avg ${fmtUSD(h.costBasis, 2)}, last ${fmtUSD(h.currentPrice, 2)}, value ${fmtUSD(value)} (${pct} of acct)${
             gl != null ? `, total G/L ${gl >= 0 ? "+" : ""}${fmtPct(gl)}` : ""
           }${h.thesis ? ` — thesis: ${h.thesis}` : ""}`;
         })
@@ -371,8 +353,8 @@ ${readinessBlock(ctx.readiness)}
 
 INVESTMENT POLICY (IPS-lite) — HARD GOVERNANCE
 ${capsProvenanceLine(ctx.ipsCapsSource)}
-Max single position: ${ctx.ipsPositionCapPct}% of gross assets${ctx.ipsPositionCapHard ? " (HARD — do not exceed)" : " (soft — flag any breach; explicit justification required)"}.
-Max margin utilization: ${ctx.ipsMarginCapPct}% of net equity (margin debit \u00f7 net equity).
+Max single position: ${ctx.ipsPositionCapPct}% of gross${ctx.ipsPositionCapHard ? " (HARD — do not exceed)" : " (soft — flag any breach; explicit justification required)"}.
+Max margin utilization: ${ctx.ipsMarginCapPct}% of account value.
 The objective never justifies overriding risk limits or the evidence contract.
 
 HOLDINGS

@@ -1601,12 +1601,25 @@ Every displayed percentage now names its denominator **on screen**:
 - a new `ConcentrationBreakdown` panel in the position drawer shows all three
   side by side, so the spread between them is visible rather than a matter of
   which screen you opened
-- the committee prompt gives each holding against **both** net equity and gross
-  assets, each labelled, and states the margin cap's denominator explicitly
-
 `labelledPct` takes the unknown marker from its caller: the em-dash is right on
 a dense screen and wrong in a prompt, where `NOT KNOWN of net equity` cannot be
-misread by a model.
+misread by a model — the prompt half of that is the separate PR below.
+
+### The committee prompt was split out, and why
+
+The same change to `prompts.ts` was written, tested and then removed from this
+PR before merge. It labels each holding against both net equity and gross assets
+and states each cap's denominator — no threshold and no rate moves.
+
+But the IPS block is the **committee mandate**, which `CLAUDE.md` names in the
+merge-authority carve-out, and the honest description of the change is that it
+lets the committee apply the cap *as written* for the first time: some positions
+it wrongly flagged will stop being flagged, and others will start. That is a
+behavioural change to a governance check on a `main` that deploys live. "When in
+doubt, it is money-adjacent: open the PR and stop."
+
+So it goes in its own PR for line-item sign-off, and this one — module, UI labels,
+tests, OD-003 — stands on its own.
 
 ### What deliberately did NOT change
 
