@@ -1072,6 +1072,16 @@ export type Database = {
           retry_after_seconds: number
         }[]
       }
+      import_account_positions: {
+        Args: {
+          p_account_id: string
+          p_as_of: string
+          p_cash: number
+          p_rows: Json
+          p_source?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
