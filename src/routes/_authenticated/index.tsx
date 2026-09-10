@@ -21,7 +21,6 @@ import { WorkflowButtons } from "@/components/app/WorkflowButtons";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
-import { accountCategory, CATEGORY_ORDER } from "@/lib/data/accountGroups";
 import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
 import { AccountNotice } from "@/components/app/AccountNotice";
 import { ReconciliationPanel } from "@/components/app/ReconciliationPanel";
@@ -31,7 +30,13 @@ import { marginInterestFigure, rateStatus } from "@/lib/marginCost";
 import { balanceSeries, dayChange } from "@/lib/portfolioSummary";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
 import { constitutionCheck, positionsStaleDays } from "@/lib/constitutionCheck";
-import { BuybackStrip, TodaysPlanStrip } from "@/components/app/dashboard/DashboardStrips";
+import {
+  AlertChips,
+  BuybackStrip,
+  TodaysPlanStrip,
+} from "@/components/app/dashboard/DashboardStrips";
+import { HouseholdStrip } from "@/components/app/dashboard/HouseholdStrip";
+import { householdRollup } from "@/lib/householdTotals";
 import { CommandCenterStrip } from "@/components/app/dashboard/CommandCenterStrip";
 import {
   useGoal,
@@ -50,7 +55,6 @@ import {
   useIpsLite,
 } from "@/hooks/useAppData";
 import {
-  fmtUSD,
   fmtPct,
   requiredCAGRWithContrib,
   yearsBetween,
@@ -58,7 +62,6 @@ import {
   riskToVol,
   riskToExpectedReturn,
 } from "@/lib/finance";
-import { usdOrUnavailable } from "@/lib/unavailable";
 import { objectiveOf } from "@/lib/objective";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -172,7 +175,7 @@ function Dashboard() {
     queryFn: () => getEconCalendarFn({ data: { days: 7 } }),
     refetchInterval: 60 * 60 * 1000,
   });
-  const { data: liveEarn = [] } = useQuery({
+  const { data: liveEarn = [], isLoading: earningsLoading } = useQuery({
     queryKey: ["earn-cal-office", heldSymbols.join(",")],
     queryFn: () => getEarningsCalendarFn({ data: { symbols: heldSymbols, days: 7 } }),
     enabled: heldSymbols.length > 0,
@@ -322,80 +325,13 @@ function Dashboard() {
         noScope={noScope}
         scopeName={scopeName}
       />
-      {accountsList.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-sm">
-          {(() => {
-            // One engine (Phase 3a, rule 9) — this strip had its own copy of
-            // `positions + cash − debt`, and with it a Phase 1a site that was
-            // missed: `Number(a.cash ?? 0) - Number(a.margin_used ?? 0)` turned
-            // an unpopulated account's unknown balance into a real zero inside
-            // the HOUSEHOLD total, where it is least visible.
-            const statsOf = (a: (typeof accountsList)[number]) => {
-              const rows = allHoldings.filter((h) => h.account_id === a.id);
-              const day = rows.reduce((x, h) => {
-                const q = liveQuotes?.[h.symbol];
-                return q && q.prevClose > 0 ? x + h.quantity * (q.price - q.prevClose) : x;
-              }, 0);
-              return { net: accountTotals(rows, a, px).totalAccountValue, day };
-            };
-            // All-or-nothing per group, like every other blend since Phase 1a:
-            // a category total that silently omits one account is not that
-            // category's total. The day change is quote-derived and stays known.
-            const groups = new Map<string, { net: number | null; day: number }>();
-            let total: number | null = 0;
-            let totalDay = 0;
-            for (const a of accountsList) {
-              const { net, day } = statsOf(a);
-              totalDay += day;
-              total = total === null || net === null ? null : total + net;
-              const cat = accountCategory(a);
-              const g = groups.get(cat) ?? { net: 0, day: 0 };
-              g.net = g.net === null || net === null ? null : g.net + net;
-              g.day += day;
-              groups.set(cat, g);
-            }
-            const Day = ({ v }: { v: number }) =>
-              Math.abs(v) < 0.005 ? null : (
-                <span className={v >= 0 ? "text-emerald-500" : "text-red-500"}>
-                  {" "}
-                  {v >= 0 ? "+" : ""}
-                  {fmtUSD(v)}
-                </span>
-              );
-            return (
-              <>
-                <span className="font-medium">
-                  Household {usdOrUnavailable(total)}
-                  <Day v={totalDay} />
-                </span>
-                {CATEGORY_ORDER.filter((c) => groups.has(c)).map((c) => (
-                  <span key={c} className="text-muted-foreground">
-                    {c}{" "}
-                    <span className="tabular-nums text-foreground">
-                      {usdOrUnavailable(groups.get(c)!.net)}
-                    </span>
-                    <Day v={groups.get(c)!.day} />
-                  </span>
-                ))}
-              </>
-            );
-          })()}
-        </div>
-      )}
+      {/* Household and per-category totals. One account with an unknown
+          balance makes its category and the household UNKNOWN, not smaller —
+          the rule lives in `lib/householdTotals.ts` with its tests. */}
+      <HouseholdStrip rollup={householdRollup(accountsList, allHoldings, liveQuotes, px)} />
       <TodaysPlanStrip rows={todaysPlan} />
       <BuybackStrip plans={buybackPlans} />
-      {alerts.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {alerts.map((a) => (
-            <span
-              key={a.text + a.date}
-              className={`rounded-full border px-3 py-1 text-xs ${a.kind === "econ" ? "border-warning/40 bg-warning/10" : "border-primary/30 bg-primary/10"}`}
-            >
-              <span className="font-medium">{a.date.slice(5)}</span> · {a.text}
-            </span>
-          ))}
-        </div>
-      )}
+      <AlertChips alerts={alerts} />
       {/* The Portfolio Summary panels (Stage 5b), shared with /summary rather
           than re-implemented. The dashboard's own six stat cards said the same
           things in different words, and two wordings for one figure is how the
@@ -431,7 +367,12 @@ function Dashboard() {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <AllocationPanel positions={holdings} priceOf={px} noScope={noScope} />
-        <EventsPanel earnings={liveEarn} isLoading={false} heldCount={holdings.length} />
+        {/* The real flag, not a hardcoded `false`. While the query was in
+            flight this panel asserted "Nothing you hold reports in the next 30
+            days" — a claim about the calendar made before the calendar had
+            been read. `/summary` always passed the real one; the dashboard did
+            not, which is the load-window shape Task 6 exists to remove. */}
+        <EventsPanel earnings={liveEarn} isLoading={earningsLoading} heldCount={holdings.length} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">

@@ -2218,3 +2218,69 @@ Fault injection: making the unchecked state render as clean reddens 1; making
 
 Five inline blocks remain — the household strip, alert chips and three panels.
 Part 3 finishes them.
+
+---
+
+## 2026-09-10 — Task 6, part 3: household roll-up, alert chips, and a real load-window bug (G4)
+
+### A defect found by doing the extraction
+
+`index.tsx` passed **`isLoading={false}` as a literal** to `EventsPanel`. The
+earnings query defaults `liveEarn` to `[]`, so while it was in flight the panel
+rendered:
+
+> "Nothing you hold reports in the next 30 days."
+
+That is a claim about the earnings calendar made **before the calendar had been
+read**. `/summary` always passed the real `earningsLoading`; the dashboard never
+did.
+
+This is exactly the shape the brief names as Task 6's reason for existing —
+*"eighteen independent loading, error and empty states in one component … the
+same shape as the policy-editor load-window bug: something rendering before its
+data resolved"*. The extraction did not cause it; the extraction is how it was
+found.
+
+Fixed by passing the real flag. The test pins **the call site**, not only the
+component: `EventsPanel` already had a correct loading branch and its own tests
+would have stayed green through the entire bug.
+
+This is also the genuine **loading-state test** the brief asked for and that
+part 1 did not deliver. I had written empty-state tests and counted them as the
+same thing; they are not.
+
+### The household roll-up
+
+Extracted from a ~50-line IIFE into `lib/householdTotals.ts`, which had no
+tests. The rule worth testing is **all-or-nothing**: one account with an unknown
+balance makes its category — and the household — UNKNOWN, not smaller. A
+household total quietly missing an account is a plausible number with nothing
+marking it.
+
+The IIFE's own comment recorded why: this strip once held a private copy of
+`positions + cash − debt` containing `Number(a.cash ?? 0) - Number(a.margin_used ?? 0)`,
+which turned an unpopulated account's unknown balance into a real zero inside
+the household total. It goes through `accountTotals` now, so the coercion cannot
+return — but the roll-up rule on top of it was still untested. Eleven tests,
+including that a later known account does not restore an already-unknown total.
+
+The **day change is the deliberate exception**: it comes from live quotes rather
+than stored balances, so an account whose balance is unknown still has a known
+day change. Tested.
+
+`HouseholdStrip` renders it, and renders **nothing** when there are no accounts.
+One test pins a quirk found while writing it: the strip filters by
+`CATEGORY_ORDER`, so a category outside that list still counts toward the
+household total but is not displayed.
+
+### Verification
+
+`index.tsx` 597 → 538 lines (781 at the start of Task 6). Full gate:
+`bun install --frozen-lockfile` · `typecheck` · `test:typecheck` · `bun test`
+**1143 pass / 0 fail** · boot 200 on `/auth`, `/`, `/summary`, `/portfolio`.
+
+Fault injection: reverting `isLoading` to the hardcoded `false` reddens 1.
+
+Two panels remain inline — goal outlook and priorities. Both are presentation
+over already-resolved props with no loading state of their own, so they are
+lower value than what came out here.

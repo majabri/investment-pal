@@ -102,3 +102,33 @@ export function BuybackStrip({ plans }: { plans: readonly BuybackPlanRow[] }) {
     </section>
   );
 }
+
+/** An upcoming event worth a chip: an economic release or an earnings date. */
+export type AlertChip = { text: string; date: string; kind: string };
+
+/**
+ * Upcoming events, as chips.
+ *
+ * Renders nothing when there are none — not an empty row. The date is shown
+ * month-day only because the year is always the current one here and a full
+ * date crowds the chip; the underlying value keeps its year.
+ */
+export function AlertChips({ alerts }: { alerts: readonly AlertChip[] }) {
+  if (alerts.length === 0) return null;
+  return (
+    <section aria-label="Upcoming events" className="mb-4 flex flex-wrap gap-2">
+      {alerts.map((a) => (
+        <span
+          key={a.text + a.date}
+          className={`rounded-full border px-3 py-1 text-xs ${
+            a.kind === "econ"
+              ? "border-warning/40 bg-warning/10"
+              : "border-primary/30 bg-primary/10"
+          }`}
+        >
+          <span className="font-medium">{a.date.slice(5)}</span> · {a.text}
+        </span>
+      ))}
+    </section>
+  );
+}
