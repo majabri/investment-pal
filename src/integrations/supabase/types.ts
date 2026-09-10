@@ -20,6 +20,7 @@ export type Database = {
           cash_market_value: number | null
           committed_to_open_orders: number | null
           created_at: string
+          currency: string | null
           day_change: number | null
           equity_pct: number | null
           id: string
@@ -32,6 +33,8 @@ export type Database = {
           net_house_surplus: number | null
           non_margin_buying_power: number | null
           raw_text: string
+          source: string | null
+          source_type: string | null
           total_account_value: number | null
           user_id: string
         }
@@ -40,6 +43,7 @@ export type Database = {
           cash_market_value?: number | null
           committed_to_open_orders?: number | null
           created_at?: string
+          currency?: string | null
           day_change?: number | null
           equity_pct?: number | null
           id?: string
@@ -52,6 +56,8 @@ export type Database = {
           net_house_surplus?: number | null
           non_margin_buying_power?: number | null
           raw_text: string
+          source?: string | null
+          source_type?: string | null
           total_account_value?: number | null
           user_id: string
         }
@@ -60,6 +66,7 @@ export type Database = {
           cash_market_value?: number | null
           committed_to_open_orders?: number | null
           created_at?: string
+          currency?: string | null
           day_change?: number | null
           equity_pct?: number | null
           id?: string
@@ -72,6 +79,8 @@ export type Database = {
           net_house_surplus?: number | null
           non_margin_buying_power?: number | null
           raw_text?: string
+          source?: string | null
+          source_type?: string | null
           total_account_value?: number | null
           user_id?: string
         }
@@ -87,60 +96,119 @@ export type Database = {
       }
       accounts: {
         Row: {
-          account_type: string
+          account_status: string | null
+          account_type: string | null
+          account_type_source: string | null
+          balances_as_of: string | null
+          balances_source: string | null
+          balances_source_type: string | null
           broker: string | null
+          broker_account_id: string | null
           buying_power: number | null
           cash: number | null
+          contribution_amount: number | null
+          contribution_anchor_date: string | null
+          contribution_cadence_days: number | null
           created_at: string
+          currency: string | null
+          household_id: string | null
           id: string
           last_synced_at: string | null
+          lots_as_of: string | null
+          margin_enabled: boolean | null
           margin_limit: number | null
           margin_used: number | null
           name: string
           notes: string | null
+          orders_as_of: string | null
+          orders_source: string | null
+          owner_member_id: string | null
           starting_value: number
           target_date: string | null
           target_value: number | null
+          tax_treatment: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
-          account_type?: string
+          account_status?: string | null
+          account_type?: string | null
+          account_type_source?: string | null
+          balances_as_of?: string | null
+          balances_source?: string | null
+          balances_source_type?: string | null
           broker?: string | null
+          broker_account_id?: string | null
           buying_power?: number | null
           cash?: number | null
+          contribution_amount?: number | null
+          contribution_anchor_date?: string | null
+          contribution_cadence_days?: number | null
           created_at?: string
+          currency?: string | null
+          household_id?: string | null
           id?: string
           last_synced_at?: string | null
+          lots_as_of?: string | null
+          margin_enabled?: boolean | null
           margin_limit?: number | null
           margin_used?: number | null
-          name?: string
+          name: string
           notes?: string | null
+          orders_as_of?: string | null
+          orders_source?: string | null
+          owner_member_id?: string | null
           starting_value?: number
           target_date?: string | null
           target_value?: number | null
+          tax_treatment?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
-          account_type?: string
+          account_status?: string | null
+          account_type?: string | null
+          account_type_source?: string | null
+          balances_as_of?: string | null
+          balances_source?: string | null
+          balances_source_type?: string | null
           broker?: string | null
+          broker_account_id?: string | null
           buying_power?: number | null
           cash?: number | null
+          contribution_amount?: number | null
+          contribution_anchor_date?: string | null
+          contribution_cadence_days?: number | null
           created_at?: string
+          currency?: string | null
+          household_id?: string | null
           id?: string
           last_synced_at?: string | null
+          lots_as_of?: string | null
+          margin_enabled?: boolean | null
           margin_limit?: number | null
           margin_used?: number | null
           name?: string
           notes?: string | null
+          orders_as_of?: string | null
+          orders_source?: string | null
+          owner_member_id?: string | null
           starting_value?: number
           target_date?: string | null
           target_value?: number | null
+          tax_treatment?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "accounts_owner_member_id_fkey"
+            columns: ["owner_member_id"]
+            isOneToOne: false
+            referencedRelation: "household_members"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       decisions: {
         Row: {
@@ -345,6 +413,36 @@ export type Database = {
           },
         ]
       }
+      household_members: {
+        Row: {
+          birth_date: string | null
+          created_at: string
+          display_name: string
+          id: string
+          relationship: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          birth_date?: string | null
+          created_at?: string
+          display_name: string
+          id?: string
+          relationship?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          birth_date?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          relationship?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       investment_universe: {
         Row: {
           business_quality: number | null
@@ -413,6 +511,7 @@ export type Database = {
       }
       ips_lite: {
         Row: {
+          caps_source: string | null
           created_at: string
           id: string
           margin_cap_pct: number
@@ -426,6 +525,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          caps_source?: string | null
           created_at?: string
           id?: string
           margin_cap_pct?: number
@@ -439,6 +539,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          caps_source?: string | null
           created_at?: string
           id?: string
           margin_cap_pct?: number
@@ -492,6 +593,109 @@ export type Database = {
         }
         Relationships: []
       }
+      orders: {
+        Row: {
+          account_id: string
+          average_fill_price: number | null
+          broker_order_id: string | null
+          created_at: string
+          currency: string | null
+          execution_source: string
+          filled_quantity: number | null
+          id: string
+          limit_price: number | null
+          lot_id: string | null
+          notes: string | null
+          oco_group: string | null
+          order_type: string
+          parent_order_id: string | null
+          placed_at: string | null
+          quantity: number | null
+          side: string
+          status: string
+          status_as_of: string | null
+          stop_price: number | null
+          symbol: string
+          time_in_force: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          average_fill_price?: number | null
+          broker_order_id?: string | null
+          created_at?: string
+          currency?: string | null
+          execution_source: string
+          filled_quantity?: number | null
+          id?: string
+          limit_price?: number | null
+          lot_id?: string | null
+          notes?: string | null
+          oco_group?: string | null
+          order_type: string
+          parent_order_id?: string | null
+          placed_at?: string | null
+          quantity?: number | null
+          side: string
+          status: string
+          status_as_of?: string | null
+          stop_price?: number | null
+          symbol: string
+          time_in_force?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          average_fill_price?: number | null
+          broker_order_id?: string | null
+          created_at?: string
+          currency?: string | null
+          execution_source?: string
+          filled_quantity?: number | null
+          id?: string
+          limit_price?: number | null
+          lot_id?: string | null
+          notes?: string | null
+          oco_group?: string | null
+          order_type?: string
+          parent_order_id?: string | null
+          placed_at?: string | null
+          quantity?: number | null
+          side?: string
+          status?: string
+          status_as_of?: string | null
+          stop_price?: number | null
+          symbol?: string
+          time_in_force?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_lot_id_fkey"
+            columns: ["lot_id"]
+            isOneToOne: false
+            referencedRelation: "position_lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_parent_order_id_fkey"
+            columns: ["parent_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portfolio_snapshots: {
         Row: {
           account_id: string | null
@@ -529,6 +733,68 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "portfolio_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      position_lots: {
+        Row: {
+          account_id: string
+          acquired_at: string | null
+          as_of: string | null
+          broker_lot_id: string | null
+          closed_at: string | null
+          cost_per_share: number | null
+          created_at: string
+          id: string
+          notes: string | null
+          quantity: number | null
+          source: string
+          symbol: string
+          thesis: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          acquired_at?: string | null
+          as_of?: string | null
+          broker_lot_id?: string | null
+          closed_at?: string | null
+          cost_per_share?: number | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          quantity?: number | null
+          source: string
+          symbol: string
+          thesis?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          acquired_at?: string | null
+          as_of?: string | null
+          broker_lot_id?: string | null
+          closed_at?: string | null
+          cost_per_share?: number | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          quantity?: number | null
+          source?: string
+          symbol?: string
+          thesis?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "position_lots_account_id_fkey"
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
@@ -674,6 +940,71 @@ export type Database = {
         }
         Relationships: []
       }
+      strategies: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          parity_rule: string | null
+          speculative_max_pct: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          parity_rule?: string | null
+          speculative_max_pct?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          parity_rule?: string | null
+          speculative_max_pct?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      strategy_symbols: {
+        Row: {
+          bucket: string
+          created_at: string
+          id: string
+          strategy_id: string
+          symbol: string
+          user_id: string
+        }
+        Insert: {
+          bucket: string
+          created_at?: string
+          id?: string
+          strategy_id: string
+          symbol: string
+          user_id: string
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          id?: string
+          strategy_id?: string
+          symbol?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_symbols_strategy_id_fkey"
+            columns: ["strategy_id"]
+            isOneToOne: false
+            referencedRelation: "strategies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_log: {
         Row: {
           created_at: string
@@ -740,6 +1071,16 @@ export type Database = {
           remaining: number
           retry_after_seconds: number
         }[]
+      }
+      import_account_positions: {
+        Args: {
+          p_account_id: string
+          p_as_of: string
+          p_cash: number
+          p_rows: Json
+          p_source?: string
+        }
+        Returns: Json
       }
     }
     Enums: {
