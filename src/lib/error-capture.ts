@@ -86,11 +86,34 @@ console.error = (...args: unknown[]) => {
   originalConsoleError(...expanded);
 };
 
+function recordUnlessAbort(error: unknown) {
+  if (isIncomingRequestAbort(error)) return;
+  record(error);
+}
+
 if (typeof globalThis.addEventListener === "function") {
-  globalThis.addEventListener("error", (event) => record((event as ErrorEvent).error ?? event));
-  globalThis.addEventListener("unhandledrejection", (event) =>
-    record((event as PromiseRejectionEvent).reason),
+  globalThis.addEventListener("error", (event) =>
+    recordUnlessAbort((event as ErrorEvent).error ?? event),
   );
+  globalThis.addEventListener("unhandledrejection", (event) =>
+    recordUnlessAbort((event as PromiseRejectionEvent).reason),
+  );
+}
+
+// In dev the request-cancellation error surfaces on the Node process itself
+// (abortIncoming -> socketOnClose) and gets reported as a runtime error with a
+// blank screen, even though no application code failed. Swallow only that exact
+// shape; every other uncaught error is left to the default handler.
+const nodeProcess = (globalThis as { process?: NodeJS.Process }).process;
+if (nodeProcess && typeof nodeProcess.on === "function") {
+  nodeProcess.on("uncaughtException", (error) => {
+    if (isIncomingRequestAbort(error)) return;
+    throw error;
+  });
+  nodeProcess.on("unhandledRejection", (reason) => {
+    if (isIncomingRequestAbort(reason)) return;
+    recordUnlessAbort(reason);
+  });
 }
 
 export function consumeLastCapturedError(): unknown {
