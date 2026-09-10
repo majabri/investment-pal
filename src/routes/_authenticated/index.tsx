@@ -25,7 +25,6 @@ import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
 import { AccountNotice } from "@/components/app/AccountNotice";
 import { ReconciliationPanel } from "@/components/app/ReconciliationPanel";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { marginInterestFigure, rateStatus } from "@/lib/marginCost";
 import { balanceSeries, dayChange } from "@/lib/portfolioSummary";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
@@ -38,6 +37,8 @@ import {
 import { HouseholdStrip } from "@/components/app/dashboard/HouseholdStrip";
 import { householdRollup } from "@/lib/householdTotals";
 import { CommandCenterStrip } from "@/components/app/dashboard/CommandCenterStrip";
+import { GoalOutlookPanel } from "@/components/app/dashboard/GoalOutlookPanel";
+import { PrioritiesPanel } from "@/components/app/dashboard/PrioritiesPanel";
 import {
   useGoal,
   useProfile,
@@ -55,7 +56,6 @@ import {
   useIpsLite,
 } from "@/hooks/useAppData";
 import {
-  fmtPct,
   requiredCAGRWithContrib,
   yearsBetween,
   probabilityOfReachingTarget,
@@ -376,105 +376,8 @@ function Dashboard() {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border bg-card p-5 lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                Goal outlook
-              </div>
-              <div className="mt-1 text-lg font-semibold">{goal ? goal.name : "No goal"}</div>
-            </div>
-            <Link to="/goals" className="text-xs text-primary hover:underline">
-              Edit goal →
-            </Link>
-          </div>
-          {goal && goalMetrics ? (
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              <div>
-                <div className="text-xs text-muted-foreground">Required CAGR</div>
-                <div className="mt-1 text-xl font-semibold tabular">{fmtPct(goalMetrics.cagr)}</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Probability of success</div>
-                <div className="mt-1 text-xl font-semibold tabular text-primary">
-                  {fmtPct(goalMetrics.prob)}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Time remaining</div>
-                <div className="mt-1 text-xl font-semibold tabular">
-                  {goalMetrics.years.toFixed(2)} yrs
-                </div>
-              </div>
-              {goalMetrics.progress === null ? null : (
-                // No bar at all when progress cannot be computed. A bar at 0%
-                // is a claim of no progress, which is not what "unknown" means.
-                <div className="sm:col-span-3">
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full bg-primary transition-all"
-                      style={{ width: `${(goalMetrics.progress * 100).toFixed(1)}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-muted-foreground">
-              Head to{" "}
-              <Link to="/goals" className="text-primary hover:underline">
-                Goals
-              </Link>{" "}
-              to set your target.
-            </p>
-          )}
-        </div>
-
-        <div className="rounded-2xl border bg-card p-5">
-          <div className="flex items-center justify-between">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Today's priorities
-            </div>
-            <Link to="/settings" className="text-xs text-muted-foreground hover:text-foreground">
-              Manage
-            </Link>
-          </div>
-          <ul className="mt-3 space-y-2">
-            {priorities.length === 0 && (
-              <li className="text-sm text-muted-foreground">
-                Nothing flagged. Add priorities on the Settings page.
-              </li>
-            )}
-            {priorities.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-start justify-between gap-2 rounded-lg border bg-background/40 px-3 py-2"
-              >
-                <div className="flex items-start gap-2">
-                  <Badge
-                    variant="outline"
-                    className={
-                      p.severity === "critical"
-                        ? "border-destructive/40 text-destructive"
-                        : p.severity === "warning"
-                          ? "border-warning/40 text-warning"
-                          : "border-primary/30 text-primary"
-                    }
-                  >
-                    {p.severity}
-                  </Badge>
-                  <span className="text-sm">{p.label}</span>
-                </div>
-                <button
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => dismissPriority.mutate(p.id)}
-                >
-                  Done
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <GoalOutlookPanel goalName={goal ? goal.name : null} metrics={goalMetrics} />
+        <PrioritiesPanel priorities={priorities} onDismiss={(id) => dismissPriority.mutate(id)} />
       </div>
 
       <div className="mt-4 rounded-2xl border bg-card p-5">

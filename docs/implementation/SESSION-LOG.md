@@ -2284,3 +2284,47 @@ Fault injection: reverting `isLoading` to the hardcoded `false` reddens 1.
 Two panels remain inline — goal outlook and priorities. Both are presentation
 over already-resolved props with no loading state of their own, so they are
 lower value than what came out here.
+
+---
+
+## 2026-09-10 — Task 6, part 4: the last two panels (G4)
+
+`index.tsx` **441 lines**, from 781 at the start of Task 6. What remains is
+hooks, scope resolution and composition — which is what the brief asked for.
+
+### Two panels, two opposite rules
+
+They are separate components because their empty states must behave in
+*opposite* ways, and a shared "render nothing when empty" policy would have got
+one of them wrong.
+
+**`GoalOutlookPanel`** — no progress bar at all when progress is `null`. A bar
+at 0% is a **claim of no progress**, and unknown is not zero. A *real* zero
+still renders a bar, because zero is a fact; there is a test for each.
+
+**`PrioritiesPanel`** — an empty list **says** it is empty. This is the
+exception to the advisory strips' behaviour: a panel that vanishes when there is
+nothing to show cannot be told apart from one that failed to load.
+
+### Two small fixes taken while extracting
+
+The progress bar had no `role="progressbar"` and no `aria-valuenow`, so its only
+information was pixel width. Six identical "Done" buttons had no accessible
+name; each now says what it dismisses (#135's scope). Both are additive.
+
+An unknown severity now renders with the neutral outline rather than falling
+through — a severity added server-side will appear rather than silently losing
+its badge.
+
+### Verification
+
+Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
+`bun test` **1155 pass / 0 fail** · boot 200 on `/auth`, `/`, `/summary`,
+`/goals`.
+
+Fault injection: rendering the bar at 0% when progress is unknown reddens 1;
+making the priorities panel vanish when empty reddens 1; dropping the dismiss
+button labels reddens 1.
+
+**Task 6 is now complete against the brief's wording**, including the
+loading-state requirement (part 3) and #135's axe and label scope (part 1).
