@@ -44,7 +44,7 @@ import { PriceHistoryRecorder } from "@/components/app/PriceHistoryRecorder";
 import { SwingScoreBadge } from "@/components/app/SwingScoreBadge";
 import { ThesisDialog } from "@/components/app/ThesisDialog";
 import { MarginCard } from "@/components/app/MarginCard";
-import { sectorFor } from "@/lib/data/sectors";
+import { canonicalSector } from "@/lib/securityMaster";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import { getEarningsCalendarFn } from "@/lib/calendarServer";
@@ -669,7 +669,10 @@ function PortfolioPage() {
           const total = liveHoldings.reduce((s2, h) => s2 + h.quantity * h.current_price, 0);
           const bySector = new Map<string, number>();
           for (const h of liveHoldings) {
-            const k = sectorFor(h.symbol, h.sector);
+            // UNIV-001: one classification, resolved in one place, with the
+            // source it came from. `sectorFor` had two sources and no way to
+            // say which had answered.
+            const k = canonicalSector(h.symbol, { holdingSector: h.sector }).sector;
             bySector.set(k, (bySector.get(k) ?? 0) + h.quantity * h.current_price);
           }
           const rows = [...bySector.entries()].sort((a, b) => b[1] - a[1]);
