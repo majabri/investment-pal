@@ -345,6 +345,10 @@ export type Database = {
           created_at: string
           id: string
           margin_cap_pct: number
+          margin_rate_annual_pct: number | null
+          margin_rate_as_of: string | null
+          margin_rate_is_floating: boolean
+          margin_rate_stale_days: number
           position_cap_hard: boolean
           position_cap_pct: number
           updated_at: string
@@ -354,6 +358,10 @@ export type Database = {
           created_at?: string
           id?: string
           margin_cap_pct?: number
+          margin_rate_annual_pct?: number | null
+          margin_rate_as_of?: string | null
+          margin_rate_is_floating?: boolean
+          margin_rate_stale_days?: number
           position_cap_hard?: boolean
           position_cap_pct?: number
           updated_at?: string
@@ -363,6 +371,10 @@ export type Database = {
           created_at?: string
           id?: string
           margin_cap_pct?: number
+          margin_rate_annual_pct?: number | null
+          margin_rate_as_of?: string | null
+          margin_rate_is_floating?: boolean
+          margin_rate_stale_days?: number
           position_cap_hard?: boolean
           position_cap_pct?: number
           updated_at?: string
