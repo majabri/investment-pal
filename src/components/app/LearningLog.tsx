@@ -270,6 +270,7 @@ export function LearningLog() {
         <div className="flex flex-wrap items-end gap-2">
           <div className="w-24">
             <Input
+              aria-label="Symbol"
               placeholder="Symbol"
               value={f.symbol}
               onChange={(e) => setF({ ...f, symbol: e.target.value })}
@@ -277,6 +278,7 @@ export function LearningLog() {
           </div>
           <div className="min-w-48 flex-1">
             <Input
+              aria-label="Recommendation (e.g. TRIM CRWD to 20%)"
               placeholder="Recommendation (e.g. TRIM CRWD to 20%)"
               value={f.recommendation}
               onChange={(e) => setF({ ...f, recommendation: e.target.value })}
@@ -338,6 +340,7 @@ export function LearningLog() {
                 ) : (
                   <span className="flex items-center gap-1">
                     <Input
+                      aria-label="Outcome $"
                       className="h-7 w-24 text-xs"
                       placeholder="Outcome $"
                       onKeyDown={(e) => {
