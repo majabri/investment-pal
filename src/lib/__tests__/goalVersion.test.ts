@@ -11,13 +11,17 @@ import { describe, expect, test } from "bun:test";
 import {
   LINKAGE_TOLERANCE,
   PERIODS_PER_YEAR,
+  canRecordVersion,
   canSaveVersion,
   conflictExplanation,
+  goalHistory,
   goalVersionInsert,
+  latestVersion,
   targetLinkage,
   versionChanges,
+  versionSkipReason,
 } from "@/lib/goalVersion";
-import type { GoalVersionInput, GoalVersionRow } from "@/lib/goalVersion";
+import type { GoalHistory, GoalVersionInput, GoalVersionRow } from "@/lib/goalVersion";
 import { fvWithContributions } from "@/lib/objectiveMath";
 
 const NOW = new Date("2026-01-01T12:00:00Z");
@@ -350,5 +354,103 @@ describe("goalVersionInsert", () => {
     // The percentage-to-fraction conversion happens once, at the form, and a
     // second conversion here would divide it twice.
     expect(row().target_return_pct).toBe(0.12);
+  });
+});
+
+// An unreadable history is not an empty one.
+//
+// This is the distinction the goal page had been collapsing: a failed read
+// returned `[]`, the panel rendered "no versions recorded yet", and the most
+// recent version's target RETURN — which lives nowhere else — seeded to null.
+// The next save would then write that null into a row nothing can edit.
+describe("goalHistory — unknown is not empty", () => {
+  const row = (over: Partial<GoalVersionRow> = {}): GoalVersionRow => ({
+    id: "v1",
+    effective_at: "2026-01-01T00:00:00Z",
+    baseline_type: "manual_plan",
+    baseline_value: 100_000,
+    target_date: "2027-12-31",
+    target_value: 150_000,
+    target_return_pct: 0.12,
+    contribution_plan: null,
+    note: null,
+    ...over,
+  });
+
+  test("a failed read is unknown, whatever came back with it", () => {
+    expect(goalHistory(true, []).coverage).toBe("unknown");
+    // Even rows alongside an error do not promote coverage: a partial answer
+    // to a query that failed is not the history.
+    expect(goalHistory(true, [row()]).coverage).toBe("unknown");
+  });
+
+  test("a successful read of nothing is a KNOWN empty history", () => {
+    const h = goalHistory(false, []);
+    expect(h.coverage).toBe("known");
+    expect(h.rows).toEqual([]);
+  });
+
+  // The negative control for the whole change. Before it, both of these were
+  // `[]` and no caller could tell them apart.
+  test("known-empty and unknown are distinguishable", () => {
+    expect(goalHistory(false, []).coverage).not.toBe(goalHistory(true, []).coverage);
+  });
+
+  test("latestVersion is null under unknown — and that null means NOT KNOWN", () => {
+    expect(latestVersion(goalHistory(true, []))).toBeNull();
+    expect(latestVersion(goalHistory(false, []))).toBeNull();
+    // Which is exactly why the null cannot be the thing callers branch on.
+    expect(canRecordVersion(goalHistory(true, []))).toBe(false);
+    expect(canRecordVersion(goalHistory(false, []))).toBe(true);
+  });
+
+  test("latestVersion returns the newest row of a known history", () => {
+    const newest = row({ id: "v2", effective_at: "2026-06-01T00:00:00Z" });
+    // The query orders descending, so the newest is first.
+    expect(latestVersion(goalHistory(false, [newest, row()]))?.id).toBe("v2");
+  });
+
+  test("a stated return survives a known history and is not read out of an unknown one", () => {
+    const known = goalHistory(false, [row({ target_return_pct: 0.12 })]);
+    expect(latestVersion(known)?.target_return_pct).toBe(0.12);
+    // Under unknown there is nothing to read, so nothing may be seeded — the
+    // page leaves the field alone rather than blanking it to null.
+    expect(latestVersion(goalHistory(true, []))).toBeNull();
+  });
+
+  test("appending is refused when the predecessor is unknown", () => {
+    // Not a capability gate. A version written now would carry
+    // `supersedes_id: null`, claiming to be the first version of a goal that
+    // may already have ten.
+    expect(canRecordVersion({ coverage: "unknown", rows: [] } as GoalHistory)).toBe(false);
+  });
+});
+
+describe("versionSkipReason", () => {
+  test("a recorded version has nothing to explain", () => {
+    expect(versionSkipReason({ historyKnown: true, inserted: true })).toBeNull();
+  });
+
+  test("an unreadable history says the append was declined, not that it failed", () => {
+    const msg = versionSkipReason({ historyKnown: false, inserted: false });
+    expect(msg).toContain("could not be read");
+    // The holder is told the goal itself did save. Half-saves are the thing
+    // this message exists to rule out.
+    expect(msg).toContain("Goal updated");
+  });
+
+  test("a failed insert reads differently from a declined one", () => {
+    const declined = versionSkipReason({ historyKnown: false, inserted: false });
+    const failed = versionSkipReason({ historyKnown: true, inserted: false });
+    expect(failed).not.toBeNull();
+    expect(failed).not.toBe(declined);
+  });
+
+  test("an unreadable history wins over the insert flag", () => {
+    // Nothing was attempted, so `inserted: true` cannot arise — but if a caller
+    // ever passed it, the message must not claim a version exists.
+    expect(versionSkipReason({ historyKnown: false, inserted: true })).toContain(
+      "could not be read",
+    );
   });
 });

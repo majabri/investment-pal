@@ -9,8 +9,8 @@ import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 import { localIsoDate } from "@/lib/localDate";
 import { flowCoverage } from "@/lib/cashFlows";
 import type { CashFlowRow } from "@/lib/cashFlows";
-import { goalVersionInsert } from "@/lib/goalVersion";
-import type { GoalVersionRow } from "@/lib/goalVersion";
+import { canRecordVersion, goalHistory, goalVersionInsert, latestVersion } from "@/lib/goalVersion";
+import type { GoalHistory, GoalVersionRow } from "@/lib/goalVersion";
 import type { PerformanceFlows } from "@/lib/portfolioSummary";
 import { isUniqueViolation } from "@/lib/postgresError";
 import type { HouseholdMember } from "@/lib/household";
@@ -201,24 +201,27 @@ export function useGoal() {
     },
   });
 
-  // The immutable history behind `goals` (GOAL-001). Errors — including the
-  // table not existing until the migration is applied — read as an EMPTY
-  // history rather than as a failure, because "no versions recorded" is the
-  // honest state of every goal today and is what the UI already says.
+  // The immutable history behind `goals` (GOAL-001).
+  //
+  // A failed read is UNKNOWN coverage, never an empty history. It used to
+  // return `[]`, which the panel renders as "no versions recorded yet" — a
+  // statement about the table that the app was in no position to make. The
+  // table not existing until the migration is applied is the common cause
+  // today; a policy refusal or a network failure is the same answer.
   const versions = useQuery({
     queryKey: ["goal_versions", query.data?.id ?? null],
     enabled: Boolean(query.data?.id),
-    queryFn: async (): Promise<GoalVersionRow[]> => {
+    queryFn: async (): Promise<GoalHistory> => {
       const { data, error } = await supabase
         .from("goal_versions" as never)
         .select("id,effective_at,baseline_type,baseline_value,target_date,target_value,target_return_pct,contribution_plan,note")
         .eq("goal_id", query.data!.id)
         .order("effective_at", { ascending: false });
-      if (error) return [];
-      return (data ?? []) as unknown as GoalVersionRow[];
+      return goalHistory(Boolean(error), (data ?? []) as unknown as GoalVersionRow[]);
     },
   });
-  const latestVersionId = versions.data?.[0]?.id ?? null;
+  const history: GoalHistory = versions.data ?? { coverage: "unknown", rows: [] };
+  const latestVersionId = latestVersion(history)?.id ?? null;
 
   const update = useMutation({
     mutationFn: async (
@@ -237,6 +240,15 @@ export function useGoal() {
       // the migration is applied the insert errors, and failing the save would
       // break goal editing to gain a history row. What is NOT acceptable is
       // failing silently, so the caller is told through `versionRecorded`.
+      //
+      // And when the EXISTING history could not be read, no version is
+      // attempted at all. Such a row would carry `supersedes_id: null` —
+      // claiming to be the first — and a target return read from an absence.
+      // The row can never be edited afterwards, so not writing one is the only
+      // recoverable answer.
+      if (!canRecordVersion(history)) {
+        return { versionRecorded: false, historyKnown: false };
+      }
       const merged = { ...(query.data ?? {}), ...rest } as Partial<Goal>;
       const contribution =
         merged.monthly_contribution === null || merged.monthly_contribution === undefined
@@ -265,7 +277,7 @@ export function useGoal() {
           note: versionNote ?? null,
         }) as never,
       );
-      return { versionRecorded: !versionError };
+      return { versionRecorded: !versionError, historyKnown: true };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["goal"] });
@@ -273,7 +285,7 @@ export function useGoal() {
     },
   });
 
-  return { ...query, update, versions, latestVersionId };
+  return { ...query, update, versions, history, latestVersionId };
 }
 
 /**
