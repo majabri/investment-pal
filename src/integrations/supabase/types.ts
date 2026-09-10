@@ -20,6 +20,7 @@ export type Database = {
           cash_market_value: number | null
           committed_to_open_orders: number | null
           created_at: string
+          currency: string | null
           day_change: number | null
           equity_pct: number | null
           id: string
@@ -32,6 +33,8 @@ export type Database = {
           net_house_surplus: number | null
           non_margin_buying_power: number | null
           raw_text: string
+          source: string | null
+          source_type: string | null
           total_account_value: number | null
           user_id: string
         }
@@ -40,6 +43,7 @@ export type Database = {
           cash_market_value?: number | null
           committed_to_open_orders?: number | null
           created_at?: string
+          currency?: string | null
           day_change?: number | null
           equity_pct?: number | null
           id?: string
@@ -52,6 +56,8 @@ export type Database = {
           net_house_surplus?: number | null
           non_margin_buying_power?: number | null
           raw_text: string
+          source?: string | null
+          source_type?: string | null
           total_account_value?: number | null
           user_id: string
         }
@@ -60,6 +66,7 @@ export type Database = {
           cash_market_value?: number | null
           committed_to_open_orders?: number | null
           created_at?: string
+          currency?: string | null
           day_change?: number | null
           equity_pct?: number | null
           id?: string
@@ -72,6 +79,8 @@ export type Database = {
           net_house_surplus?: number | null
           non_margin_buying_power?: number | null
           raw_text?: string
+          source?: string | null
+          source_type?: string | null
           total_account_value?: number | null
           user_id?: string
         }
@@ -90,6 +99,9 @@ export type Database = {
           account_status: string | null
           account_type: string | null
           account_type_source: string | null
+          balances_as_of: string | null
+          balances_source: string | null
+          balances_source_type: string | null
           broker: string | null
           broker_account_id: string | null
           buying_power: number | null
@@ -115,6 +127,9 @@ export type Database = {
           account_status?: string | null
           account_type?: string | null
           account_type_source?: string | null
+          balances_as_of?: string | null
+          balances_source?: string | null
+          balances_source_type?: string | null
           broker?: string | null
           broker_account_id?: string | null
           buying_power?: number | null
@@ -140,6 +155,9 @@ export type Database = {
           account_status?: string | null
           account_type?: string | null
           account_type_source?: string | null
+          balances_as_of?: string | null
+          balances_source?: string | null
+          balances_source_type?: string | null
           broker?: string | null
           broker_account_id?: string | null
           buying_power?: number | null
