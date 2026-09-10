@@ -494,33 +494,47 @@ export type Database = {
       }
       portfolio_snapshots: {
         Row: {
+          account_id: string | null
           created_at: string
           gross: number
           id: string
           margin_used: number
           net: number
           scope: string
+          snapshot_date: string | null
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           created_at?: string
           gross?: number
           id?: string
           margin_used?: number
           net?: number
           scope?: string
+          snapshot_date?: string | null
           user_id: string
         }
         Update: {
+          account_id?: string | null
           created_at?: string
           gross?: number
           id?: string
           margin_used?: number
           net?: number
           scope?: string
+          snapshot_date?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       price_history: {
         Row: {
