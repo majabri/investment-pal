@@ -328,6 +328,36 @@ export type Database = {
         }
         Relationships: []
       }
+      ips_lite: {
+        Row: {
+          created_at: string
+          id: string
+          margin_cap_pct: number
+          position_cap_hard: boolean
+          position_cap_pct: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          margin_cap_pct?: number
+          position_cap_hard?: boolean
+          position_cap_pct?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          margin_cap_pct?: number
+          position_cap_hard?: boolean
+          position_cap_pct?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       journal_entries: {
         Row: {
           ai_summary: string | null
