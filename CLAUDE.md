@@ -27,13 +27,18 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 
 - **GitHub `main` is the single source of truth.** Branch → PR → merge. Small PRs,
   one capability each.
-- **Merge authority (Amir, 2026-08-30).** Claude Code may merge its own PRs once
-  CI is green, and may close superseded or duplicate PRs, *except* where the
-  change is **money-adjacent** — margin math, position sizing, tax lots,
-  cash/order math, the committee mandate or any threshold/rate. Those still stop
-  for Amir's explicit line-item sign-off (OD-001), because `main` deploys live
-  through Lovable the moment it merges. When in doubt, it is money-adjacent:
-  open the PR and stop.
+- **Merge authority (Amir, 2026-08-30; line narrowed 2026-09-10).** Claude Code
+  may merge its own PRs once CI is green, and may close superseded or duplicate
+  PRs, *except* where the change **computes or alters a figure Amir would act
+  on** — position sizing, margin math, tax lots, cash/order math, a threshold or
+  rate the app itself computes or applies, or the committee mandate. Those stop
+  for his explicit line-item sign-off (OD-001), because `main` deploys live
+  through Lovable the moment it merges.
+  The test is what a change **produces**, not what it touches: handling,
+  storing, displaying, validating or protecting a rate is ordinary work and
+  merges on a green gate (OD-001 Amendment 1). Doubt about whether a change
+  computes a figure still stops; a rate merely being nearby does not.
+  **ADRs are never self-merged** regardless (ADR-APP-005 §2).
 - **Never rewrite pushed history** (no force-push / rebase / amend / squash of
   pushed commits) — Lovable syncs from the branch and would lose history
   (see `AGENTS.md`).
