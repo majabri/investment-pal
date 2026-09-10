@@ -241,9 +241,9 @@ export type Database = {
           monthly_contribution: number
           name: string
           risk_preference: string
-          starting_value: number
-          target_date: string
-          target_value: number
+          starting_value: number | null
+          target_date: string | null
+          target_value: number | null
           updated_at: string
           user_id: string
         }
@@ -255,9 +255,9 @@ export type Database = {
           monthly_contribution?: number
           name?: string
           risk_preference?: string
-          starting_value?: number
-          target_date?: string
-          target_value?: number
+          starting_value?: number | null
+          target_date?: string | null
+          target_value?: number | null
           updated_at?: string
           user_id: string
         }
@@ -269,9 +269,9 @@ export type Database = {
           monthly_contribution?: number
           name?: string
           risk_preference?: string
-          starting_value?: number
-          target_date?: string
-          target_value?: number
+          starting_value?: number | null
+          target_date?: string | null
+          target_value?: number | null
           updated_at?: string
           user_id?: string
         }
