@@ -23,7 +23,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  // Sign-up mode temporarily disabled — sign-in only.
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -43,8 +43,18 @@ function AuthPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      if (mode === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin },
+        });
+        if (error) throw error;
+        toast.success("Account created — you're signed in.");
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Something went wrong";
       toast.error(message);
@@ -100,13 +110,13 @@ function AuthPage() {
                 type="password"
                 required
                 minLength={8}
-                autoComplete="current-password"
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Working..." : "Sign in"}
+              {submitting ? "Working..." : mode === "signin" ? "Sign in" : "Create account"}
             </Button>
           </form>
 
@@ -120,6 +130,13 @@ function AuthPage() {
             Continue with Google
           </Button>
 
+          <button
+            type="button"
+            onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+            className="mt-4 w-full text-center text-xs text-muted-foreground hover:text-foreground"
+          >
+            {mode === "signin" ? "Need an account? Create one" : "Have an account? Sign in"}
+          </button>
         </div>
       </div>
     </div>
