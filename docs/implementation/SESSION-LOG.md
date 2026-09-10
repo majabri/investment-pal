@@ -2105,3 +2105,58 @@ Each restored and re-verified green.
 `20260910170000_security_master.sql` is not applied. Nothing reads the tables
 yet — `canonicalSector` takes an optional `security` argument that is simply
 absent today, so the built-in map answers exactly as it did before.
+
+---
+
+## 2026-09-10 — Task 8 of the 09-10 audit brief: ADR-APP-014, Lovable's direct-to-`main` path
+
+Proposed, not decided. The brief says not to choose unilaterally and not to
+implement branch protection without the owner, and it is right about why:
+protecting `main` without checking whether Lovable can be pointed elsewhere
+could lock the agent out in the middle of a migration sequence, which is worse
+than the problem being solved.
+
+### The brief's numbers had moved, and the direction is the finding
+
+The brief reported the last 120 commits as **62 Claude / 41 majabri / 17
+Lovable**. Measured today over the same window (2026-09-05 → 2026-09-10):
+
+| Author | Commits |
+|---|---|
+| `gpt-engineer-app[bot]` | **46** |
+| Claude | 37 |
+| majabri | 32 |
+| dependabot | 5 |
+
+Lovable is now the **largest** single author of recent history, not the
+smallest — 29 of those 46 landed today. Thirty-five are single-parent commits
+straight onto `main`; the other 11 are Lovable merging `main` into its own line.
+Per the standing rule, `main` wins over the brief, and the direction of travel is
+the material fact: the ungated path is growing.
+
+### It is the only path for migrations
+
+Of the last 120 commits touching `supabase/migrations`: **25 Lovable, 20 Claude,
+9 Amir.** Lovable authors more migration commits than the agent does, because it
+is the only way a migration reaches Lovable Cloud. A migration merged through a
+PR and never run through Lovable is a file in the repository and nothing in the
+database — which is where `20260910150000_cash_flows.sql` still sits.
+
+### What the ADR is careful NOT to claim
+
+`main` has been green at every point measured this session, and every red `main`
+this week was caught by a guard within minutes. `personalData.test.ts` and
+`generatedDatabaseTypes.test.ts` were written for this path and have done their
+job. The case for changing anything rests on the trend and on the absent boot
+gate — **not** on a history of undetected damage, and the ADR says so rather
+than overstating the evidence to make its recommendation land.
+
+### The recommendation, and the question underneath it
+
+**D — a post-hoc boot gate on `push: main`** — because it is the only option
+with zero lockout risk and it closes the gap the evidence supports.
+
+A, B and C all turn on one thing the repository cannot answer: **can Lovable be
+pointed at a branch other than `main`?** That is a Lovable project-settings
+question. Until it is answered, option C is a plan with an untested premise at
+its centre, and the ADR says that instead of quietly assuming it works.
