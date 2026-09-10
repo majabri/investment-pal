@@ -28,17 +28,10 @@ import { ReconciliationPanel } from "@/components/app/ReconciliationPanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { interestProvenanceShort, marginInterestFigure, rateStatus } from "@/lib/marginCost";
-import { policyIsConfirmed } from "@/lib/policy";
 import { balanceSeries, dayChange } from "@/lib/portfolioSummary";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
-import {
-  MARGIN_CAP_DENOMINATOR,
-  POLICY_DENOMINATOR,
-  denominators,
-  labelledPct,
-  marginUtilisationOf,
-  weightOf,
-} from "@/lib/concentration";
+import { constitutionCheck, positionsStaleDays } from "@/lib/constitutionCheck";
+import { BuybackStrip, TodaysPlanStrip } from "@/components/app/dashboard/DashboardStrips";
 import {
   useGoal,
   useProfile,
@@ -316,69 +309,21 @@ function Dashboard() {
         // Same `totals` as the stat cards — recomputing here is how the strip
         // and the cards used to disagree about the same account.
         const scopedHoldings = holdings;
-        const gross = grossValue;
-        const net = portfolioValue;
-        // NOT `?? 1`. Assuming full equity when it is unknown makes the
-        // "equity below 50%" breach unfireable on exactly the accounts whose
-        // data is missing — a governance check that passes because it checked
-        // nothing is worse than one that fails.
+        // One copy of the governance arithmetic, in `lib/constitutionCheck.ts`
+        // where it can be asserted (audit brief G4). It used to live here, in
+        // this IIFE, mixed with the markup it produced and with no tests — for
+        // a check that accuses the holder of breaking their own commitment,
+        // the wrong way round.
+        const verdict = constitutionCheck(
+          scopedHoldings.map((h) => ({ symbol: h.symbol, quantity: h.quantity, price: px(h) })),
+          totals,
+          ipsLite,
+        );
+        const breaches = verdict.breaches;
+        const checkable = verdict.checkable;
         const equityPct = totals.equityPct;
-        // Whether the constitution can be checked at all. Every limit below is
-        // a fraction of the account value, so an unknown value means unchecked,
-        // not clean.
-        const checkable = net !== null && marginUsed !== null;
         const rateState = rateStatus(ipsLite);
-        const lastUpdate = scopedHoldings.reduce<string | null>((m, h) => {
-          const u = (h as { updated_at?: string }).updated_at ?? null;
-          return u && (!m || u > m) ? u : m;
-        }, null);
-        const staleDays = lastUpdate
-          ? Math.floor((Date.now() - new Date(lastUpdate).getTime()) / 86400000)
-          : null;
-        const breaches: string[] = [];
-        // IPS-lite (ADR-APP-004): configurable soft/hard position cap + margin cap.
-        //
-        // Rule 15: these are the USER'S RISK POLICY, and until somebody saves
-        // the Settings form they are the app's defaults rather than anybody's
-        // choice. "⚠ NVDA 34.2% > 30% cap" read as the user breaching their
-        // own commitment either way; the qualifier below is the difference.
-        const capsConfirmed = policyIsConfirmed(ipsLite.caps_source);
-        const capNote = capsConfirmed ? "" : " (default, not your setting)";
-        const posCap = ipsLite.position_cap_pct / 100;
-        // P0-05: the cap is enforced against NET EQUITY here, against invested
-        // assets on the portfolio page's sector bars, and ADR-APP-004 C2 states
-        // it against GROSS. Three denominators, one "%" — so "NVDA 34.2% > 30%
-        // cap" was unfalsifiable without reading the source.
-        //
-        // The arithmetic below is unchanged; which denominator the cap SHOULD
-        // use is money-adjacent (OD-001) and is the owner's line-item call, proposed
-        // in OD-003. What changes is that the breach line now says which
-        // denominator produced the number it is accusing the user with.
-        const denoms = denominators(totals);
-        for (const h of scopedHoldings) {
-          const v = h.quantity * px(h);
-          const w = weightOf(v, denoms, POLICY_DENOMINATOR);
-          if (w !== null && w > posCap)
-            breaches.push(
-              `${h.symbol} ${labelledPct(w, POLICY_DENOMINATOR)} > ${ipsLite.position_cap_pct}% cap${ipsLite.position_cap_hard ? " (HARD)" : ""}${capNote}`,
-            );
-        }
-        // Margin utilisation has its own denominator rather than inheriting the
-        // position cap's. `accountTotals.marginUtilisation` is debit ÷ gross;
-        // the cap enforced here is debit ÷ net equity. Both are printed with
-        // their denominator attached now, so the two can be told apart on sight.
-        const marginUtil = marginUtilisationOf(marginUsed, denoms, MARGIN_CAP_DENOMINATOR);
-        if (marginUsed !== null && marginUsed > 0 && marginUtil !== null)
-          if (marginUtil > ipsLite.margin_cap_pct / 100)
-            breaches.push(
-              `Margin util ${labelledPct(marginUtil, MARGIN_CAP_DENOMINATOR)} > ${ipsLite.margin_cap_pct}% cap${capNote}`,
-            );
-        // Not a user policy and deliberately not labelled as one: 50% is the
-        // Reg-T maintenance floor. Rule 21 — a constraint the user cannot move
-        // must not read like a preference they set, and this one carries no
-        // "(default, not your setting)" note because it is neither.
-        if (marginUsed !== null && marginUsed > 0 && equityPct !== null && equityPct < 0.5)
-          breaches.push(`Equity ${fmtPct(equityPct)} < 50% (regulatory minimum)`);
+        const staleDays = positionsStaleDays(scopedHoldings);
         return (
           <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-xs">
             <span
@@ -519,55 +464,8 @@ function Dashboard() {
           })()}
         </div>
       )}
-      {todaysPlan.length > 0 && (
-        <div className="mb-4 rounded-xl border bg-card/60 px-4 py-3">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Today's Plan — committee Action Sheet
-          </div>
-          <ul className="space-y-0.5 text-sm">
-            {todaysPlan.map((d) => (
-              <li key={d.id} className="flex items-center gap-2">
-                <span className={d.decision === "pending" ? "text-amber-500" : "text-emerald-500"}>
-                  ●
-                </span>
-                <span>{d.recommendation}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {buybackPlans.length > 0 && (
-        <div className="mb-4 rounded-xl border bg-card/60 px-4 py-3">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Buy-back zones — re-entry ladder after trims (advisory)
-          </div>
-          <ul className="space-y-1 text-sm">
-            {buybackPlans.map((p) => (
-              <li key={p.symbol} className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                <span className="font-medium">{p.symbol}</span>
-                <span className="text-xs text-muted-foreground">
-                  trim {p.decidedOn.slice(5)} @ ~{fmtUSD(p.anchor, 2)}
-                </span>
-                {p.zones.map((z) => (
-                  <span
-                    key={z.pct}
-                    className={
-                      z.status === "hit" ? "font-medium text-emerald-500" : "text-muted-foreground"
-                    }
-                  >
-                    {z.pct}% {fmtUSD(z.price, 2)}
-                    {z.status === "hit" ? " ✓ reached" : ""}
-                  </span>
-                ))}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            Anchor ≈ logged trim price (your broker's fill may differ). Advisory only — you execute.
-            Expires after 30 days or when the thesis invalidates.
-          </p>
-        </div>
-      )}
+      <TodaysPlanStrip rows={todaysPlan} />
+      <BuybackStrip plans={buybackPlans} />
       {alerts.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2">
           {alerts.map((a) => (
