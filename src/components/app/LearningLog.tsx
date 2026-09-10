@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabaseClient";
+import { localIsoDate } from "@/lib/localDate";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { getQuotesFn } from "@/lib/marketServer";
 import { computeOutcome, type Grade, type Close } from "@/lib/outcomeGrade";
@@ -203,7 +204,7 @@ export function LearningLog() {
   const since = (days: number) => {
     const d = new Date();
     d.setDate(d.getDate() - days);
-    const cut = d.toISOString().slice(0, 10);
+    const cut = localIsoDate(d);
     return rows.filter((r) => r.decided_on >= cut);
   };
   const scorecard = (set: Decision[]) => {
