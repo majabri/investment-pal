@@ -49,7 +49,10 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 
 - **Money-adjacent logic** — margin math, position sizing, tax lots, cash/order
   math — requires the owner's **explicit line-item sign-off** before merge
-  (OD-001). Storing/measuring is not computing a trade; when in doubt, ask.
+  (OD-001). Storing/measuring is not computing a trade, and neither is
+  protecting a stored figure from being lost: the line is what a change
+  **produces** (OD-001 Amendment 1). Doubt about whether it computes a figure
+  still stops it.
 - **Evidence contract** is mandatory on material recommendations;
   **confidence ≠ probability** (separate fields, never conflated).
 - **Simulation/what-if never mutates live tables.** No silent self-modification.
