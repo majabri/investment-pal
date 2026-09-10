@@ -7,6 +7,9 @@ import { sumField } from "@/lib/accountAggregate";
 import { scopedRows, type AccountScope } from "@/lib/accountTotals";
 import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 import { localIsoDate } from "@/lib/localDate";
+import { flowCoverage } from "@/lib/cashFlows";
+import type { CashFlowRow } from "@/lib/cashFlows";
+import type { PerformanceFlows } from "@/lib/portfolioSummary";
 import { isUniqueViolation } from "@/lib/postgresError";
 import type { HouseholdMember } from "@/lib/household";
 import { policySourceOf, type PolicySource } from "@/lib/policy";
@@ -788,6 +791,50 @@ export function useSnapshots(scope: AccountScope, limit = 400) {
         .limit(limit);
       if (error) throw error;
       return (data ?? []) as unknown as SnapshotRow[];
+    },
+  });
+}
+
+/**
+ * This account's cash flows, and whether its flow history is known (PERF-001).
+ *
+ * Returns UNKNOWN coverage on any error — including the table not existing yet,
+ * which is its state until the migration is applied. That is not a degraded
+ * mode to apologise for: unknown is the correct answer, and it is what stops a
+ * time-weighted return being computed out of an absence. An empty result under
+ * a NULL `cash_flows_as_of` is unknown too; only the account saying somebody
+ * looked can promote it.
+ */
+export function useCashFlows(scope: AccountScope) {
+  const accountId = scope.kind === "account" ? scope.accountId : null;
+  return useQuery({
+    queryKey: ["cash_flows", accountId],
+    enabled: accountId !== null,
+    queryFn: async (): Promise<PerformanceFlows> => {
+      // `cash_flows_as_of` is read here rather than through `useAccounts` so
+      // the one cast this feature needs lives in one place. The column does not
+      // exist in the generated types until the migration is applied through
+      // Lovable, and until then this select errors — which is UNKNOWN, which is
+      // the right answer.
+      const asOfQuery = await supabase
+        .from("accounts")
+        .select("cash_flows_as_of" as never)
+        .eq("id", accountId!)
+        .maybeSingle();
+      if (asOfQuery.error) return { coverage: "unknown", rows: [] };
+      const asOf =
+        (asOfQuery.data as { cash_flows_as_of?: string | null } | null)?.cash_flows_as_of ?? null;
+
+      const { data, error } = await supabase
+        .from("cash_flows" as never)
+        .select("flow_date,amount,kind,treatment")
+        .eq("account_id", accountId!)
+        .order("flow_date", { ascending: true });
+      // A missing table, a policy refusal, a network failure — all of them mean
+      // the flow history is NOT KNOWN. None of them means there were no flows.
+      if (error) return { coverage: "unknown", rows: [] };
+      const rows = (data ?? []) as unknown as CashFlowRow[];
+      return { coverage: flowCoverage(asOf, rows.length), rows };
     },
   });
 }

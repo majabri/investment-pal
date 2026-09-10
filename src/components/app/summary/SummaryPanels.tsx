@@ -38,12 +38,15 @@ import {
   allocation,
   goalProgress,
   performance,
+  METHOD_LABEL,
+  PERFORMANCE_WINDOWS,
   seriesInRange,
   summaryMetrics,
   summaryReadiness,
   CHART_RANGES,
   EVENT_SOURCES,
   type AllocatablePosition,
+  type PerformanceFlows,
   type BalancePoint,
   type ChartRange,
   type DayChange,
@@ -292,12 +295,15 @@ export function PerformancePanel({
   series,
   totals,
   objective,
+  flows = { coverage: "unknown", rows: [] },
 }: {
   series: BalancePoint[];
   totals: AccountTotals | null;
   objective: { starting_value: number; target_value: number; target_date: string } | null;
+  /** Defaults to UNKNOWN, so a caller that forgets cannot obtain a return. */
+  flows?: PerformanceFlows;
 }) {
-  const entries = performance(series);
+  const entries = performance(series, PERFORMANCE_WINDOWS, flows);
   const readiness = summaryReadiness(series);
   const progress = goalProgress(totals?.totalAccountValue ?? null, objective);
 
@@ -311,6 +317,21 @@ export function PerformancePanel({
           Change in total account value — net of the margin loan, so borrowing to buy does not
           register as a gain.
         </p>
+        {/* PERF-001. Without a flow history, a deposit is indistinguishable from
+            investment return, and this panel was reporting it as one. The
+            caveat is the panel's most important line until flows are recorded,
+            so it goes above the numbers rather than under them. */}
+        {flows.coverage === "unknown" ? (
+          <p className="mb-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-2.5 py-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+            No cash-flow history is recorded for this account, so these are changes in value, not
+            returns. A deposit reads here as a gain and a withdrawal as a loss.
+          </p>
+        ) : (
+          <p className="mb-2 text-[11px] text-muted-foreground">
+            Returns are {METHOD_LABEL.twr} — deposits and withdrawals removed. The value change is
+            shown beside each one.
+          </p>
+        )}
         <dl className="divide-y text-sm">
           {entries.map((p) => (
             <div key={p.label} className="flex items-center justify-between py-1.5">
@@ -324,11 +345,42 @@ export function PerformancePanel({
                 {p.change === null ? (
                   <span className="text-muted-foreground">—</span>
                 ) : (
-                  <span className={moneyTone(p.change)}>
-                    {p.change >= 0 ? "+" : ""}
-                    {fmtUSD(p.change)}
-                    {p.changePct === null ? "" : ` (${fmtPct(p.changePct)})`}
-                  </span>
+                  <>
+                    {/* The return leads when there is one, because it is the
+                        figure the panel's title promises. The value change
+                        stays beneath it: with a flow in the window the two
+                        differ, and hiding the difference is what made the
+                        deposit invisible. */}
+                    {p.returnPct !== null && (
+                      <span className={`block ${moneyTone(p.returnPct)}`}>
+                        {p.returnPct >= 0 ? "+" : ""}
+                        {fmtPct(p.returnPct)}
+                        <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                          {METHOD_LABEL[p.method]}
+                        </span>
+                      </span>
+                    )}
+                    <span
+                      className={
+                        p.returnPct === null
+                          ? moneyTone(p.change)
+                          : "text-[11px] text-muted-foreground"
+                      }
+                    >
+                      {p.change >= 0 ? "+" : ""}
+                      {fmtUSD(p.change)}
+                      {p.changePct === null ? "" : ` (${fmtPct(p.changePct)})`}
+                      {p.returnPct !== null && " in value"}
+                    </span>
+                    {/* The flow itself, so the gap between the two figures can
+                        be checked rather than taken on trust. */}
+                    {p.netFlow !== null && p.netFlow !== 0 && (
+                      <span className="block text-[10px] text-muted-foreground">
+                        includes {p.netFlow > 0 ? "+" : ""}
+                        {fmtUSD(p.netFlow)} deposited/withdrawn
+                      </span>
+                    )}
+                  </>
                 )}
               </dd>
             </div>

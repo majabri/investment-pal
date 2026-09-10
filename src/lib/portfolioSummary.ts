@@ -10,6 +10,9 @@
 // no data for is a claim the portfolio did not move.
 
 import type { AccountTotals } from "./accountTotals";
+import { externalFlows } from "./cashFlows";
+import type { CashFlowRow, FlowCoverage } from "./cashFlows";
+import { moneyWeightedReturn, timeWeightedReturn } from "./returnMath";
 
 /** A recorded snapshot, in the shape the summary needs. */
 export type SnapshotLike = {
@@ -97,12 +100,47 @@ export const PERFORMANCE_WINDOWS: PerformanceWindow[] = [
   { label: "All time", kind: "all" },
 ];
 
+/**
+ * Which question a reported percentage answers.
+ *
+ * `value_change` is NOT a return, and is the only honest answer when the flow
+ * history is unknown: it is `latest − start`, which equals a return only if
+ * nothing crossed the boundary. Reporting it as one was PERF-001.
+ */
+export type PerformanceMethod = "twr" | "mwr" | "value_change";
+
+/** What each method is called on screen. Never omitted from a percentage. */
+export const METHOD_LABEL: Record<PerformanceMethod, string> = {
+  twr: "time-weighted return",
+  // Annualised, because that is what XIRR solves for. Said out loud because a
+  // 10% one-month TWR beside a 214% annualised MWR is two different units in
+  // one row, which is the same defect as an unlabelled denominator.
+  mwr: "money-weighted return (annualised)",
+  value_change: "change in value (not a return)",
+};
+
 export type PerformanceEntry = {
   label: string;
   /** Change in net account value, or null when the window has no earlier point. */
   change: number | null;
-  /** Fractional change, or null when there is nothing to divide by. */
+  /**
+   * Fractional change in VALUE — `change / start`. Not a return.
+   *
+   * Kept, and kept under this name, because it is the figure the app has been
+   * showing. What changed is that it is no longer presented as performance when
+   * money crossed the boundary: `returnPct` below is the return, and `method`
+   * says which kind.
+   */
   changePct: number | null;
+  /**
+   * The return over the window, by `method`. `null` whenever it cannot be
+   * computed honestly — an unknown flow history above all.
+   */
+  returnPct: number | null;
+  /** Which measure `returnPct` is, or `value_change` when there is none. */
+  method: PerformanceMethod;
+  /** Net external flow across the window, or null when the history is unknown. */
+  netFlow: number | null;
   /** The day the comparison starts from, so the figure can be checked. */
   from: string | null;
   to: string | null;
@@ -126,6 +164,7 @@ export type PerformanceEntry = {
 export function performance(
   series: readonly BalancePoint[],
   windows: readonly PerformanceWindow[] = PERFORMANCE_WINDOWS,
+  flowInput: PerformanceFlows = { coverage: "unknown", rows: [] },
 ): PerformanceEntry[] {
   const latest = series.at(-1);
   const earliest = series.at(0);
@@ -135,11 +174,19 @@ export function performance(
       label: w.label,
       change: null,
       changePct: null,
+      returnPct: null,
+      method: "value_change" as const,
+      netFlow: null,
       from: null,
       to: null,
       truncated: false,
     }));
   }
+  // `unknown` is the default for a reason: it is the state of every account
+  // until somebody records a flow history, and it is what keeps a return from
+  // being computed out of an absence (PERF-001).
+  const flowsKnown = flowInput.coverage !== "unknown";
+  const allFlows = flowsKnown ? externalFlows(flowInput.rows) : [];
 
   const latestMs = Date.parse(`${latest.date}T00:00:00Z`);
   const spanDays = Math.round((latestMs - Date.parse(`${earliest.date}T00:00:00Z`)) / 86_400_000);
@@ -167,6 +214,9 @@ export function performance(
         label: w.label,
         change: null,
         changePct: null,
+        returnPct: null,
+        method: "value_change" as const,
+        netFlow: null,
         from: null,
         to: latest.date,
         truncated,
@@ -174,15 +224,62 @@ export function performance(
     }
 
     const change = latest.net - start.net;
+    const windowFlows = allFlows.filter((f) => f.date > start.date && f.date <= latest.date);
+    const netFlow = flowsKnown ? windowFlows.reduce((sum, f) => sum + f.amount, 0) : null;
+
+    // The return, and which kind it is. TWR is the default: it answers "how did
+    // the investments do", which is what a performance panel is read as. MWR is
+    // offered alongside it by `moneyWeighted()` below rather than replacing it —
+    // they are different questions and picking one silently is how a percentage
+    // stops meaning anything.
+    //
+    // With the flow history unknown there is no return to report at all, and
+    // the entry falls back to a change in value that SAYS it is not a return.
+    const inWindow = series.filter((p) => p.date >= start.date && p.date <= latest.date);
+    const twr = flowsKnown ? timeWeightedReturn(inWindow, windowFlows) : null;
+
     return {
       label: w.label,
       change,
       changePct: start.net > 0 ? change / start.net : null,
+      returnPct: twr,
+      method: twr === null ? ("value_change" as const) : ("twr" as const),
+      netFlow,
       from: start.date,
       to: latest.date,
       truncated,
     };
   });
+}
+
+/** What `performance()` needs to know about the flows, and whether it knows it. */
+export type PerformanceFlows = {
+  coverage: FlowCoverage;
+  rows: readonly CashFlowRow[];
+};
+
+/**
+ * The money-weighted return over the same window, reported beside TWR.
+ *
+ * Separate from `performance()` because it is a different question — what the
+ * money earned, timing included — and because it needs the window's endpoints
+ * as values rather than as a linked series. `null` under an unknown flow
+ * history, exactly as TWR is.
+ */
+export function moneyWeighted(
+  series: readonly BalancePoint[],
+  entry: PerformanceEntry,
+  flowInput: PerformanceFlows,
+): number | null {
+  if (flowInput.coverage === "unknown") return null;
+  if (entry.from === null || entry.to === null) return null;
+  const start = series.find((p) => p.date === entry.from);
+  const end = series.find((p) => p.date === entry.to);
+  if (!start || !end) return null;
+  const windowFlows = externalFlows(flowInput.rows).filter(
+    (f) => f.date > start.date && f.date <= end.date,
+  );
+  return moneyWeightedReturn(start.net, start.date, end.net, end.date, windowFlows);
 }
 
 export type AllocationSlice = {
