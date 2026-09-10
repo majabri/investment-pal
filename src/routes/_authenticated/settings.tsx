@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Field } from "@/components/app/Field";
+import { SourceHealthCard } from "@/components/app/SourceHealthCard";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -886,6 +887,13 @@ function SettingsPage() {
       <MarginRateCard />
       <StrategyCard />
       <HouseholdCard />
+      {/* OBS-001: which free sources answered on this page load. It lives on
+          Settings because that is where the other diagnostics are, and because
+          a health banner on the dashboard would compete with the governance
+          strip for the same glance. */}
+      <div className="mt-4">
+        <SourceHealthCard />
+      </div>
       {/* ACCOUNTS */}
       <section className="rounded-2xl border bg-card p-5">
         <div className="mb-3 flex items-center justify-between">

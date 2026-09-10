@@ -2328,3 +2328,74 @@ button labels reddens 1.
 
 **Task 6 is now complete against the brief's wording**, including the
 loading-state requirement (part 3) and #135's axe and label scope (part 1).
+
+---
+
+## 2026-09-10 — OBS-001: a source-health surface, without a fourth migration
+
+§4 of the brief defers this to "after Task 6". Task 6 is done, so this is now.
+
+### The finding was two things, and only one needed a table
+
+The audit said "no `data_source_health`, no health surface".
+
+- A **health surface** — did each source answer? — needs **no table**. The app
+  already draws LOADING / AVAILABLE / UNAVAILABLE per query in `coverage.ts`;
+  nothing gathered those into one place a person could look at.
+- A **health history** — uptime over days, which source fails most — genuinely
+  needs persistence, and is deliberately **not built**. Adding a fourth
+  unapplied migration to answer a question nobody has asked, while three
+  migrations already wait on Lovable, is worse than answering the one being
+  asked now.
+
+The panel says which half it is: *"live state for this page load; no history is
+recorded yet."*
+
+### The distinctions it holds
+
+**One failure is `degraded`, not `down`.** The free feeds (OD-002) fail
+independently and routinely; colouring one dead headline source like an outage
+trains the eye to skip the banner, which costs more than the source did.
+
+**`loading` only while NOTHING has answered.** Six live sources and one in
+flight is not "loading". A failure already observed is not erased by something
+else still running.
+
+**Impact is shown only for a failing source.** The impact of a working source is
+not information; the impact of a broken one is the whole point.
+
+### Four of seven, said out loud
+
+The card can only probe the sources that take no arguments. Quotes, daily closes
+and the earnings calendar all need a symbol list, and a health card that
+invented one would be reporting on a request no screen makes.
+
+So they are listed under **"Not checked here"** with the reason. Showing four of
+seven as though four were all is the same defect this panel exists to fix, one
+level up: a complete-looking list that is quietly partial. An unprobed source
+counts toward neither the ok nor the failing tally — it was not asked.
+
+The card reuses the app's own query keys, so opening Settings serves from cache
+rather than hammering seven free endpoints.
+
+### An axe finding worth keeping
+
+The first version used `<dl>` with `<dt>`/`<dd>` nested below a wrapper div —
+axe flagged `definition-list` and `dlitem`, correctly. The rows carry four
+things (label, state, provider, impact), so the term/definition pairing was a
+lie about the structure. It is a `<ul>` now. Fixed rather than suppressed.
+
+A test assertion also had to be narrowed: the news source's impact line quotes
+the phrase "no news" precisely to say what the app must not conclude, and a
+substring scan over the whole panel cannot tell a warning against a wording from
+the wording itself. It asserts on the state labels instead.
+
+### Verification
+
+Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
+`bun test` **1182 pass / 0 fail** · boot 200 on `/auth`, `/settings`, `/`,
+`/summary`.
+
+Fault injection: letting one failure read as ok reddens 6; summarising a
+degraded state as "all answered" reddens 2; hiding the impact of a failing
+source reddens 1.
