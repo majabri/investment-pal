@@ -111,6 +111,7 @@ function JournalPage() {
       <div className="mb-4 flex items-center gap-2 rounded-xl border bg-card px-3">
         <Search className="h-4 w-4 text-muted-foreground" />
         <Input
+          aria-label="Search journal by title or body"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search title or body…"
@@ -176,12 +177,21 @@ function JournalPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Title (optional)</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Label className="text-xs" htmlFor="journal-title-optional">
+                Title (optional)
+              </Label>
+              <Input
+                id="journal-title-optional"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
             </div>
             <div>
-              <Label className="text-xs">Tickers (comma-separated)</Label>
+              <Label className="text-xs" htmlFor="journal-tickers-comma-separated">
+                Tickers (comma-separated)
+              </Label>
               <Input
+                id="journal-tickers-comma-separated"
                 value={tickers}
                 onChange={(e) => setTickers(e.target.value)}
                 placeholder="AAPL, NVDA"

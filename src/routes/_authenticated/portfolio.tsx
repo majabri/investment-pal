@@ -866,24 +866,33 @@ function PositionDetail({
       />
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <Label className="text-xs">Qty</Label>
+          <Label className="text-xs" htmlFor="portfolio-qty">
+            Qty
+          </Label>
           <Input
+            id="portfolio-qty"
             type="number"
             value={h.quantity}
             onChange={(e) => setH({ ...h, quantity: +e.target.value })}
           />
         </div>
         <div>
-          <Label className="text-xs">Cost</Label>
+          <Label className="text-xs" htmlFor="portfolio-cost">
+            Cost
+          </Label>
           <Input
+            id="portfolio-cost"
             type="number"
             value={h.cost_basis}
             onChange={(e) => setH({ ...h, cost_basis: +e.target.value })}
           />
         </div>
         <div>
-          <Label className="text-xs">Price</Label>
+          <Label className="text-xs" htmlFor="portfolio-price">
+            Price
+          </Label>
           <Input
+            id="portfolio-price"
             type="number"
             value={h.current_price}
             onChange={(e) => setH({ ...h, current_price: +e.target.value })}
@@ -891,8 +900,14 @@ function PositionDetail({
         </div>
       </div>
       <div>
-        <Label className="text-xs">Sector</Label>
-        <Input value={h.sector ?? ""} onChange={(e) => setH({ ...h, sector: e.target.value })} />
+        <Label className="text-xs" htmlFor="portfolio-sector">
+          Sector
+        </Label>
+        <Input
+          id="portfolio-sector"
+          value={h.sector ?? ""}
+          onChange={(e) => setH({ ...h, sector: e.target.value })}
+        />
       </div>
       <div>
         <Label className="text-xs">Original thesis</Label>
