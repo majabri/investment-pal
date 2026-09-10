@@ -2399,3 +2399,82 @@ Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
 Fault injection: letting one failure read as ok reddens 6; summarising a
 degraded state as "all answered" reddens 2; hiding the impact of a failing
 source reddens 1.
+
+---
+
+## 2026-09-10 — §23: alerts and the four-state Readiness Gate
+
+The last of §4's deferred items. **No migration**, and that is the finding
+rather than a shortcut.
+
+### I read §23 rather than inferring it
+
+The audit brief says only *"Alerts / notifications (§23) — No table, no service,
+not built."* Building from that alone would have meant inventing a spec. The
+blueprint itself was in Drive; §23 turns out to specify **eleven alert types**
+and a **four-state readiness gate**, and the second is the more valuable half.
+
+### §23.2 — the state that did not exist
+
+`readiness.ts` answers "may this capability run?" as a **boolean**. §23.2 asks
+for READY / DEGRADED / BLOCKED / ERROR, and **DEGRADED** — *"some noncritical
+inputs unavailable; bounded conclusions allowed"* — had no representation.
+
+Without it the choice is a full answer or no answer, and a user facing no answer
+goes and gets one somewhere less careful. A committee brief without open-order
+status is still worth writing **provided it says so**, which is exactly what
+§23.2 requires: *"the output must clearly state what is unavailable and which
+conclusions are blocked."*
+
+`CRITICAL_INPUTS` splits each capability's dependencies into blocking and
+degrading, **per capability** rather than globally — the same input carries
+different weight in different answers. `open_orders` is critical to position
+sizing (an unseen working order is size the user already has) and merely
+degrading to a brief a human reads. Position sizing treats **every** input as
+critical: a share count computed around a gap is still a share count.
+
+**ERROR is separate from BLOCKED**, and names no input. A gate reporting
+"blocked on quotes" after a crash names a cause nobody established — §23.2's
+*"no implied all-clear"*.
+
+A test pins that every id in `CRITICAL_INPUTS` is a real dependency of its
+capability. A typo there would silently downgrade a critical input to
+noncritical, turning a BLOCKED into a DEGRADED — the failure mode with stakes.
+
+### §23.1 — the conditions mostly existed; the surface did not
+
+Seven of the eleven types are already computed somewhere and rendered on one
+screen each — source failure, stale quote, missing valuation, event proximity,
+goal pace, concentration breach, margin threshold. What was missing is that **no
+one place answers "what needs my attention?"**, and each condition is visible
+only to somebody already on the screen that renders it.
+
+`alerts.ts` is that place: a typed aggregation over evaluators that already run.
+The rule it guards hardest is that **an empty list means every evaluator RAN and
+found nothing** — never that nothing was checked. So an unevaluable constitution
+check raises a critical alert of its own, rather than contributing zero
+breaches. And an **uncomputable** goal probability raises **nothing**: it is not
+a low one, and alerting on it would be a claim about the plan the app cannot
+make.
+
+The four types it cannot raise — decision trigger, invalidation reached,
+reconciliation needed, model health — are declared in `UNBUILT_ALERT_TYPES`
+**with reasons** rather than omitted. A list of seven that looks like a list of
+eleven is the same defect as a health panel showing four sources of seven.
+
+### What is deliberately not built
+
+**Persistence** (acknowledging an alert so it stops nagging) and **delivery**
+(push, email). Three migrations already wait on Lovable; a fourth to hold
+dismissal state for a surface nobody has used yet is the wrong order. Delivery
+needs a channel the app does not have, which is a secrets and scope question,
+not a coding one.
+
+### Verification
+
+Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
+`bun test` **1210 pass / 0 fail** · boot 200 on `/auth`, `/`, `/settings`.
+
+Fault injection: an unevaluable policy check raising nothing reddens 1; a null
+goal probability alerting as off-pace reddens 1; treating a noncritical input as
+blocking reddens 3.
