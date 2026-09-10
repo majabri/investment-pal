@@ -7,6 +7,7 @@ import { sumField } from "@/lib/accountAggregate";
 import { scopedRows, type AccountScope } from "@/lib/accountTotals";
 import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 import { localIsoDate } from "@/lib/localDate";
+import type { GoalVersionRow } from "@/lib/goalVersion";
 import { isUniqueViolation } from "@/lib/postgresError";
 import type { HouseholdMember } from "@/lib/household";
 import { policySourceOf, type PolicySource } from "@/lib/policy";
@@ -196,16 +197,68 @@ export function useGoal() {
     },
   });
 
+  // The immutable history behind `goals` (GOAL-001). Errors — including the
+  // table not existing until the migration is applied — read as an EMPTY
+  // history rather than as a failure, because "no versions recorded" is the
+  // honest state of every goal today and is what the UI already says.
+  const versions = useQuery({
+    queryKey: ["goal_versions", query.data?.id ?? null],
+    enabled: Boolean(query.data?.id),
+    queryFn: async (): Promise<GoalVersionRow[]> => {
+      const { data, error } = await supabase
+        .from("goal_versions" as never)
+        .select("id,effective_at,baseline_type,baseline_value,target_date,target_value,target_return_pct,contribution_plan,note")
+        .eq("goal_id", query.data!.id)
+        .order("effective_at", { ascending: false });
+      if (error) return [];
+      return (data ?? []) as unknown as GoalVersionRow[];
+    },
+  });
+  const latestVersionId = versions.data?.[0]?.id ?? null;
+
   const update = useMutation({
-    mutationFn: async (patch: Partial<Goal> & { id: string }) => {
-      const { id, ...rest } = patch;
+    mutationFn: async (patch: Partial<Goal> & { id: string; versionNote?: string }) => {
+      const { id, versionNote, ...rest } = patch;
       const { error } = await supabase.from("goals").update(rest).eq("id", id);
       if (error) throw error;
+
+      // GOAL-002: every save appends an immutable version. `goals` stays the
+      // CURRENT goal — this records what it was, so a decision taken last month
+      // still cites the goal that was in force last month rather than whatever
+      // this save just made it.
+      //
+      // Deliberately after the `goals` write and deliberately not fatal. Until
+      // the migration is applied the insert errors, and failing the save would
+      // break goal editing to gain a history row. What is NOT acceptable is
+      // failing silently, so the caller is told through `versionRecorded`.
+      const merged = { ...(query.data ?? {}), ...rest } as Partial<Goal>;
+      const previous = latestVersionId;
+      const { error: versionError } = await supabase.from("goal_versions" as never).insert({
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        goal_id: id,
+        // GOAL-003: a goal edited in Settings is a PLANNING baseline. The
+        // broker's equity is a different number that nobody chose, and the two
+        // must not merge into one starting point.
+        baseline_type: "manual_plan",
+        baseline_value: merged.starting_value ?? null,
+        target_date: merged.target_date ?? null,
+        target_value: merged.target_value ?? null,
+        contribution_plan:
+          merged.monthly_contribution === null || merged.monthly_contribution === undefined
+            ? null
+            : { amountUsd: Number(merged.monthly_contribution), cadence: "monthly" },
+        supersedes_id: previous,
+        note: versionNote ?? null,
+      } as never);
+      return { versionRecorded: !versionError };
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["goal"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["goal"] });
+      qc.invalidateQueries({ queryKey: ["goal_versions"] });
+    },
   });
 
-  return { ...query, update };
+  return { ...query, update, versions, latestVersionId };
 }
 
 /**
