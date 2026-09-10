@@ -14,6 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_balances: {
+        Row: {
+          account_id: string
+          cash_market_value: number | null
+          committed_to_open_orders: number | null
+          created_at: string
+          day_change: number | null
+          equity_pct: number | null
+          id: string
+          imported_at: string
+          margin_buying_power: number | null
+          margin_interest_accrued_mtd: number | null
+          margin_interest_rate_pct: number | null
+          margin_market_value: number | null
+          net_debit: number | null
+          net_house_surplus: number | null
+          non_margin_buying_power: number | null
+          raw_text: string
+          total_account_value: number | null
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          cash_market_value?: number | null
+          committed_to_open_orders?: number | null
+          created_at?: string
+          day_change?: number | null
+          equity_pct?: number | null
+          id?: string
+          imported_at?: string
+          margin_buying_power?: number | null
+          margin_interest_accrued_mtd?: number | null
+          margin_interest_rate_pct?: number | null
+          margin_market_value?: number | null
+          net_debit?: number | null
+          net_house_surplus?: number | null
+          non_margin_buying_power?: number | null
+          raw_text: string
+          total_account_value?: number | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          cash_market_value?: number | null
+          committed_to_open_orders?: number | null
+          created_at?: string
+          day_change?: number | null
+          equity_pct?: number | null
+          id?: string
+          imported_at?: string
+          margin_buying_power?: number | null
+          margin_interest_accrued_mtd?: number | null
+          margin_interest_rate_pct?: number | null
+          margin_market_value?: number | null
+          net_debit?: number | null
+          net_house_surplus?: number | null
+          non_margin_buying_power?: number | null
+          raw_text?: string
+          total_account_value?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_balances_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       accounts: {
         Row: {
           account_type: string
