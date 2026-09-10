@@ -116,6 +116,7 @@ export type Database = {
           margin_used: number | null
           name: string
           notes: string | null
+          owner_member_id: string | null
           starting_value: number
           target_date: string | null
           target_value: number | null
@@ -144,6 +145,7 @@ export type Database = {
           margin_used?: number | null
           name: string
           notes?: string | null
+          owner_member_id?: string | null
           starting_value?: number
           target_date?: string | null
           target_value?: number | null
@@ -172,6 +174,7 @@ export type Database = {
           margin_used?: number | null
           name?: string
           notes?: string | null
+          owner_member_id?: string | null
           starting_value?: number
           target_date?: string | null
           target_value?: number | null
@@ -179,7 +182,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "accounts_owner_member_id_fkey"
+            columns: ["owner_member_id"]
+            isOneToOne: false
+            referencedRelation: "household_members"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       decisions: {
         Row: {
@@ -383,6 +394,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      household_members: {
+        Row: {
+          birth_date: string | null
+          created_at: string
+          display_name: string
+          id: string
+          relationship: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          birth_date?: string | null
+          created_at?: string
+          display_name: string
+          id?: string
+          relationship?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          birth_date?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          relationship?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       investment_universe: {
         Row: {
