@@ -9,9 +9,14 @@ import type { Database as GeneratedDatabase } from "@/integrations/supabase/type
 // The generated types reflect the LIVE database, which is behind the repo:
 // the migrations under supabase/migrations/20260903*–20260905* create the
 // tables household_members / strategies / strategy_symbols / orders /
-// position_lots / account_balances and add provenance + nullable columns to
-// accounts and goals. Until they are applied and the generated types
-// regenerate, the code that already targets the new schema cannot typecheck.
+// position_lots and add provenance + nullable columns to accounts and goals.
+// Until they are applied and the generated types regenerate, the code that
+// already targets the new schema cannot typecheck.
+//
+// 2026-09-10: account_balances landed and left this list — its generated type
+// now governs those writes. accounts and goals stay loosened: their provenance
+// and nullability migrations are still pending, and the generated types still
+// show the financial columns as NOT NULL.
 //
 // This shim keeps SELECT row typing for existing tables, loosens writes on
 // accounts/goals (new columns + NULL-as-unknown), and declares the pending
@@ -37,7 +42,6 @@ type Database = Omit<GeneratedDatabase, "public"> & {
       strategy_symbols: PendingTable;
       orders: PendingTable;
       position_lots: PendingTable;
-      account_balances: PendingTable;
     };
   };
 };

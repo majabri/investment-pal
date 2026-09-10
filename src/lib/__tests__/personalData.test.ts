@@ -116,26 +116,15 @@ const ALLOWED: Record<string, { why: string; needles: string[] }> = {
     why: "applied migration, superseded by 20260905190000; text kept as history",
     needles: ["the owner's first name"],
   },
-  // 2026-09-09: Lovable re-created four tables the LIVE database was missing —
-  // portfolio_snapshots, decisions, investment_universe, price_history — by
-  // authoring fresh migrations rather than applying the originals. The
-  // snapshots one is a verbatim copy of 20260725025027 above, personal scope
-  // default and all, so this guard caught it. Same reasoning as the two
-  // entries above: it has been applied (the generated types regenerated with
-  // the table), and editing an applied migration in place risks a checksum
-  // mismatch on the next `supabase db push`.
+  // 2026-09-09 and 2026-09-10: applying the pending migrations through Lovable
+  // re-authors each one as a fresh file, so verbatim copies of the two entries
+  // above keep appearing under new timestamps. They are NOT listed here — see
+  // `inheritedExemption` below, which exempts an exact copy and nothing else.
   //
-  // Read this entry as narrower than the others. Those two are history whose
-  // default 20260905190000 has superseded. This one set the default on a table
-  // created AFTER that migration in filename order but BEFORE it in
-  // application order, because the live database is running the pending
-  // migrations out of sequence — so on the live database the personal default
-  // is CURRENT, not historical, until 20260905190000 is applied. The exemption
-  // is for the file's text. It is not a statement that the schema is clean.
-  "supabase/migrations/20260909144407_bb261240-3412-4832-b02b-a481bcb40ffa.sql": {
-    why: "applied migration duplicating 20260725025027; neutralised by 20260905190000 once that is applied",
-    needles: ["the owner's first name"],
-  },
+  // Worth keeping in view while those copies exist: 20260725025027's personal
+  // scope default is history that 20260905190000 supersedes, but a copy of it
+  // CREATEd the table on the live database out of sequence, so until that
+  // migration is applied the default there is current, not historical.
   // Tier 3 is DONE: the templates carry a configurable office name and no
   // longer name a person. What remains are provenance comments recording who
   // supplied each constitution and when — project history, retained by design
@@ -147,11 +136,53 @@ const ALLOWED: Record<string, { why: string; needles: string[] }> = {
   },
 };
 
+/** Text with trailing whitespace and the final newline normalised away. */
+function normalise(text: string): string {
+  return text
+    .split("\n")
+    .map((l) => l.replace(/\s+$/, ""))
+    .join("\n")
+    .replace(/\n+$/, "");
+}
+
+const normalised = (file: string) => normalise(readFileSync(file, "utf8"));
+
+/**
+ * Applying a pending migration through Lovable re-authors it as a NEW file with
+ * a fresh timestamp rather than running the one already in the repo, so an
+ * allowlisted migration reappears verbatim under a new name and trips this
+ * guard again — twice in two days (#178, and again on 2026-09-10). Adding an
+ * entry per copy would turn the allowlist into a changelog of Lovable's file
+ * naming, and each entry would have to be read to learn it says nothing new.
+ *
+ * So a file that is byte-for-byte an allowlisted file, modulo trailing
+ * whitespace, inherits that file's exemption and nothing more. This is narrow
+ * on purpose: the moment a copy diverges by one character it is a new file
+ * again, exempt from nothing, and this guard has its say. It exempts no needle
+ * that was not already exempted on identical text by a decision recorded above.
+ */
+function inheritedExemptionOf(text: string): string[] | undefined {
+  const want = normalise(text);
+  for (const [allowed, entry] of Object.entries(ALLOWED)) {
+    try {
+      if (normalised(allowed) === want) return entry.needles;
+    } catch {
+      // An allowlisted path that no longer exists is caught by its own test.
+    }
+  }
+  return undefined;
+}
+
+function inheritedExemption(file: string): string[] | undefined {
+  if (file in ALLOWED) return undefined;
+  return inheritedExemptionOf(readFileSync(file, "utf8"));
+}
+
 describe("personal data does not reappear in src/ or supabase/", () => {
   test("no file carries a real name or a real balance figure", () => {
     const offenders: string[] = [];
     for (const file of scanned) {
-      const exempt = ALLOWED[file]?.needles ?? [];
+      const exempt = ALLOWED[file]?.needles ?? inheritedExemption(file) ?? [];
       const text = readFileSync(file, "utf8");
       for (const { label, re } of FORBIDDEN) {
         if (exempt.includes(label)) continue;
@@ -174,6 +205,33 @@ describe("personal data does not reappear in src/ or supabase/", () => {
     for (const ext of ["tsx", "ts", "sql", "css", "toml", "md"]) {
       expect([...exts]).toContain(ext);
     }
+  });
+
+  test("an exact copy of an allowlisted migration inherits its exemption", () => {
+    // The live case this mechanism exists for: Lovable re-authored
+    // 20260903020000 as a new file when applying it. Both carry the owner's
+    // name in the same explanatory comment.
+    const copy =
+      "supabase/migrations/20260910003812_ccf8f659-1403-4190-a70a-5ebe8620f8a8.sql";
+    const original = "supabase/migrations/20260903020000_ips_lite_margin_rate.sql";
+    expect(scanned).toContain(copy);
+    expect(ALLOWED[copy]).toBeUndefined();
+    expect(ALLOWED[original]).toBeDefined();
+    expect(inheritedExemption(copy)).toEqual(ALLOWED[original].needles);
+  });
+
+  test("a copy that differs by one character inherits nothing", () => {
+    // The whole safety of the mechanism. If near-matches inherited, editing a
+    // personal value inside a copy would keep the copy exempt.
+    const original = "supabase/migrations/20260903020000_ips_lite_margin_rate.sql";
+    const text = readFileSync(original, "utf8");
+    expect(inheritedExemptionOf(text)).toEqual(ALLOWED[original].needles);
+    expect(inheritedExemptionOf(text + "x")).toBeUndefined();
+    expect(inheritedExemptionOf(text.replace("11.825", "11.826"))).toBeUndefined();
+  });
+
+  test("a file that copies nothing inherits nothing", () => {
+    expect(inheritedExemptionOf("-- a migration nobody has written")).toBeUndefined();
   });
 
   test("the account-number needle actually matches that shape", () => {
