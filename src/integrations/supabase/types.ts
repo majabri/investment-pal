@@ -119,6 +119,8 @@ export type Database = {
           margin_used: number | null
           name: string
           notes: string | null
+          orders_as_of: string | null
+          orders_source: string | null
           owner_member_id: string | null
           starting_value: number
           target_date: string | null
@@ -151,6 +153,8 @@ export type Database = {
           margin_used?: number | null
           name: string
           notes?: string | null
+          orders_as_of?: string | null
+          orders_source?: string | null
           owner_member_id?: string | null
           starting_value?: number
           target_date?: string | null
@@ -183,6 +187,8 @@ export type Database = {
           margin_used?: number | null
           name?: string
           notes?: string | null
+          orders_as_of?: string | null
+          orders_source?: string | null
           owner_member_id?: string | null
           starting_value?: number
           target_date?: string | null
@@ -583,6 +589,99 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      orders: {
+        Row: {
+          account_id: string
+          average_fill_price: number | null
+          broker_order_id: string | null
+          created_at: string
+          currency: string | null
+          execution_source: string
+          filled_quantity: number | null
+          id: string
+          limit_price: number | null
+          notes: string | null
+          oco_group: string | null
+          order_type: string
+          parent_order_id: string | null
+          placed_at: string | null
+          quantity: number | null
+          side: string
+          status: string
+          status_as_of: string | null
+          stop_price: number | null
+          symbol: string
+          time_in_force: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          average_fill_price?: number | null
+          broker_order_id?: string | null
+          created_at?: string
+          currency?: string | null
+          execution_source: string
+          filled_quantity?: number | null
+          id?: string
+          limit_price?: number | null
+          notes?: string | null
+          oco_group?: string | null
+          order_type: string
+          parent_order_id?: string | null
+          placed_at?: string | null
+          quantity?: number | null
+          side: string
+          status: string
+          status_as_of?: string | null
+          stop_price?: number | null
+          symbol: string
+          time_in_force?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          average_fill_price?: number | null
+          broker_order_id?: string | null
+          created_at?: string
+          currency?: string | null
+          execution_source?: string
+          filled_quantity?: number | null
+          id?: string
+          limit_price?: number | null
+          notes?: string | null
+          oco_group?: string | null
+          order_type?: string
+          parent_order_id?: string | null
+          placed_at?: string | null
+          quantity?: number | null
+          side?: string
+          status?: string
+          status_as_of?: string | null
+          stop_price?: number | null
+          symbol?: string
+          time_in_force?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_parent_order_id_fkey"
+            columns: ["parent_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       portfolio_snapshots: {
         Row: {
