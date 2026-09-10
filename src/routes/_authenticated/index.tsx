@@ -27,11 +27,12 @@ import { AccountNotice } from "@/components/app/AccountNotice";
 import { ReconciliationPanel } from "@/components/app/ReconciliationPanel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { interestProvenanceShort, marginInterestFigure, rateStatus } from "@/lib/marginCost";
+import { marginInterestFigure, rateStatus } from "@/lib/marginCost";
 import { balanceSeries, dayChange } from "@/lib/portfolioSummary";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
 import { constitutionCheck, positionsStaleDays } from "@/lib/constitutionCheck";
 import { BuybackStrip, TodaysPlanStrip } from "@/components/app/dashboard/DashboardStrips";
+import { CommandCenterStrip } from "@/components/app/dashboard/CommandCenterStrip";
 import {
   useGoal,
   useProfile,
@@ -57,7 +58,7 @@ import {
   riskToVol,
   riskToExpectedReturn,
 } from "@/lib/finance";
-import { UNAVAILABLE, usdOrUnavailable } from "@/lib/unavailable";
+import { usdOrUnavailable } from "@/lib/unavailable";
 import { objectiveOf } from "@/lib/objective";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -304,106 +305,23 @@ function Dashboard() {
       <div className="mb-4">
         <WorkflowButtons symbols={holdings.map((h) => h.symbol)} />
       </div>
-      {(() => {
-        // ── Command-center strip: freshness · margin meter · constitution check ──
-        // Same `totals` as the stat cards — recomputing here is how the strip
-        // and the cards used to disagree about the same account.
-        const scopedHoldings = holdings;
-        // One copy of the governance arithmetic, in `lib/constitutionCheck.ts`
-        // where it can be asserted (audit brief G4). It used to live here, in
-        // this IIFE, mixed with the markup it produced and with no tests — for
-        // a check that accuses the holder of breaking their own commitment,
-        // the wrong way round.
-        const verdict = constitutionCheck(
-          scopedHoldings.map((h) => ({ symbol: h.symbol, quantity: h.quantity, price: px(h) })),
+      {/* The governance strip. Its arithmetic is `lib/constitutionCheck.ts`
+          and its rendering is the component — this route resolves the inputs
+          and nothing else (audit brief G4). */}
+      <CommandCenterStrip
+        verdict={constitutionCheck(
+          holdings.map((h) => ({ symbol: h.symbol, quantity: h.quantity, price: px(h) })),
           totals,
           ipsLite,
-        );
-        const breaches = verdict.breaches;
-        const checkable = verdict.checkable;
-        const equityPct = totals.equityPct;
-        const rateState = rateStatus(ipsLite);
-        const staleDays = positionsStaleDays(scopedHoldings);
-        return (
-          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-xs">
-            <span
-              className={
-                staleDays != null && staleDays >= 1
-                  ? "font-medium text-amber-500"
-                  : "text-muted-foreground"
-              }
-            >
-              Positions:{" "}
-              {staleDays == null
-                ? "never imported"
-                : staleDays === 0
-                  ? "imported today"
-                  : `imported ${staleDays}d ago`}
-            </span>
-            <span className="text-muted-foreground">·</span>
-            <span className="text-muted-foreground">
-              Margin{" "}
-              {/* Provenance wording comes from marginCost, never from here —
-                  a call site that writes its own is how "(estimate)" quietly
-                  stops appearing on one screen. */}
-              {marginUsed === null
-                ? "not known"
-                : marginUsed > 0
-                  ? `${fmtUSD(marginUsed)} · ${
-                    interest.kind === "actual"
-                      ? `${fmtUSD(interest.accruedMtd, 2)} interest this month`
-                      : interest.kind === "estimate"
-                        ? `~${fmtUSD(interest.daily, 2)}/day interest`
-                        : "no interest figure"
-                    } (${interestProvenanceShort(interest)}) · equity ${
-                      equityPct === null ? UNAVAILABLE : fmtPct(equityPct)
-                    }`
-                  : "not set"}
-            </span>
-            <span className="text-muted-foreground">·</span>
-            {/* Rate staleness, flagged only when there is a margin balance for
-                it to matter to. Amber, not red: an ageing rate is a prompt to
-                re-check, not a policy breach — those keep red to themselves. */}
-            {marginUsed !== null && marginUsed > 0 && rateState.kind === "stale" ? (
-              <>
-                <span className="font-medium text-amber-500">
-                  Margin rate {rateState.ageDays}d old
-                </span>
-                <span className="text-muted-foreground">·</span>
-              </>
-            ) : null}
-            {marginUsed !== null && marginUsed > 0 && rateState.kind === "unset" ? (
-              <>
-                <Link to="/settings" className="font-medium text-amber-500 hover:underline">
-                  Set margin rate →
-                </Link>
-                <span className="text-muted-foreground">·</span>
-              </>
-            ) : null}
-            {/* "Constitution: clean" over an unresolved scope asserts that
-                nothing breached, having checked nothing. Say which scope
-                instead. */}
-            {noScope ? (
-              <span className="text-muted-foreground">Constitution: {scopeName.toLowerCase()}</span>
-            ) : !checkable ? (
-              /* "clean" here would assert that nothing breached, having been
-                 unable to evaluate a single limit. */
-              <span className="font-medium text-amber-500">
-                Constitution: not checked — account value unknown
-              </span>
-            ) : breaches.length === 0 ? (
-              <span className="text-emerald-500">Constitution: clean</span>
-            ) : (
-              <span className="font-medium text-red-500">⚠ {breaches.join(" · ")}</span>
-            )}
-            {(staleDays == null || staleDays >= 1) && (
-              <Link to="/settings" className="ml-auto font-medium text-primary hover:underline">
-                Import now →
-              </Link>
-            )}
-          </div>
-        );
-      })()}
+        )}
+        equityPct={totals.equityPct}
+        marginUsed={marginUsed}
+        interest={interest}
+        rateState={rateStatus(ipsLite)}
+        staleDays={positionsStaleDays(holdings)}
+        noScope={noScope}
+        scopeName={scopeName}
+      />
       {accountsList.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border bg-card/60 px-4 py-2 text-sm">
           {(() => {

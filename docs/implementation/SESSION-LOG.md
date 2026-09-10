@@ -2160,3 +2160,61 @@ A, B and C all turn on one thing the repository cannot answer: **can Lovable be
 pointed at a branch other than `main`?** That is a Lovable project-settings
 question. Until it is answered, option C is a plan with an untested premise at
 its centre, and the ADR says that instead of quietly assuming it works.
+
+---
+
+## 2026-09-10 — Task 6, part 2: the governance strip becomes a component (G4)
+
+Task 6 was reported complete when it was not. `index.tsx` was 679 lines against a
+brief asking for "composition and scope resolution only", and the largest
+remaining block was the ~100-line IIFE rendering the Constitution Check. Its
+arithmetic came out earlier; its **rendering** stayed inline, and the rendering
+is where the governance claim is actually made.
+
+`CommandCenterStrip` takes resolved props. The route now computes the verdict and
+passes it; it renders nothing itself.
+
+### The three states, and why they are a component rather than a ternary
+
+| Input | What it must say |
+|---|---|
+| no scope resolved | which scope — evaluate nothing |
+| scope, unknown account value | "not checked — account value unknown" |
+| checked | "clean", or every breach |
+
+**"Constitution: clean" over an unevaluated account asserts that nothing
+breached, having checked nothing.** That is the failure the strip exists to
+avoid and the one a refactor is most likely to flatten, because all three states
+are falsy-adjacent. There is now a test per state, and the injection that makes
+`!checkable` unreachable reddens.
+
+The same distinction runs through the other two lines: `staleDays === null` is
+"never imported", not "imported today"; `marginUsed === null` is "not known",
+not "not set". Both have tests, both fault-injected.
+
+### Rendering a `<Link>` in a component test
+
+The strip links to Settings. Standing up a real router renders asynchronously,
+so every assertion ran against an empty DOM — eleven of twelve tests failed on
+the first run. `mock.module` replaces `Link` with a plain anchor instead: the
+strip's job is what it SAYS, and routing is the router's test. Verified the mock
+does not leak into the sibling test file.
+
+Fixtures use the real `InterestFigure` and `RateStatus` shapes rather than
+`as` casts. My first version cast `{ kind: "none" }` and `{ kind: "ok" }` —
+neither is in either union, and `tsc` caught both. A cast there would let a
+fixture drift out of the union the component actually receives and still
+compile.
+
+### Verification
+
+`index.tsx` 679 → 597 lines. Full gate: `bun install --frozen-lockfile` ·
+`typecheck` · `test:typecheck` · `bun test` **1113 pass / 0 fail** · boot 200 on
+`/auth`, `/`, `/portfolio`.
+
+Fault injection: making the unchecked state render as clean reddens 1; making
+"never imported" read as today reddens 1; making an unknown debit read as
+"not set" reddens 1. Each restored.
+
+Five inline blocks remain — the household strip, alert chips and three panels.
+Part 3 finishes them.
