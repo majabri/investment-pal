@@ -99,7 +99,7 @@ export const Route = createFileRoute("/_authenticated/prompt-center")({
 });
 
 function PromptCenter() {
-  const { data: goal } = useGoal();
+  const { data: goal, latestVersionId: goalVersionId } = useGoal();
   const { selectedAccount, status: accountStatus } = useAccountContext();
   // The prompt describes one account to the committee. `useAccount()` — the
   // household aggregate — was read here and passed into the memo's dependency
@@ -416,6 +416,11 @@ function PromptCenter() {
         // Outcome grading: anchor the live price now so the decision can be
         // graded at 1d/1w/1m later (null if the symbol has no live quote).
         price_at_rec: a.symbol ? (liveQuotes?.[a.symbol]?.price ?? null) : null,
+        // GOAL-002: which goal these recommendations were produced under. The
+        // committee prompt carries the objective, so a decision read back in
+        // six months has to be readable against the goal that was IN the
+        // prompt, not against whatever the goal has since become.
+        goal_version_id: goalVersionId,
       }));
       // Rule 18: AI is downstream. Every row here is derived from the model's
       // text, so it passes the boundary before it reaches the database. The
