@@ -80,12 +80,17 @@ export type Database = {
           decided_on: string
           decision: string
           evidence: Json | null
+          grade: string | null
           id: string
           invalidation_conditions: Json | null
           key_risks: Json | null
           outcome: string | null
+          outcome_1d: number | null
+          outcome_1m: number | null
+          outcome_1w: number | null
           outcome_pl: number | null
           portfolio_impact: Json | null
+          price_at_rec: number | null
           probability_impact: Json | null
           recommendation: string
           review_type: string
@@ -100,12 +105,17 @@ export type Database = {
           decided_on?: string
           decision?: string
           evidence?: Json | null
+          grade?: string | null
           id?: string
           invalidation_conditions?: Json | null
           key_risks?: Json | null
           outcome?: string | null
+          outcome_1d?: number | null
+          outcome_1m?: number | null
+          outcome_1w?: number | null
           outcome_pl?: number | null
           portfolio_impact?: Json | null
+          price_at_rec?: number | null
           probability_impact?: Json | null
           recommendation: string
           review_type?: string
@@ -120,12 +130,17 @@ export type Database = {
           decided_on?: string
           decision?: string
           evidence?: Json | null
+          grade?: string | null
           id?: string
           invalidation_conditions?: Json | null
           key_risks?: Json | null
           outcome?: string | null
+          outcome_1d?: number | null
+          outcome_1m?: number | null
+          outcome_1w?: number | null
           outcome_pl?: number | null
           portfolio_impact?: Json | null
+          price_at_rec?: number | null
           probability_impact?: Json | null
           recommendation?: string
           review_type?: string
