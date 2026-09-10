@@ -6,6 +6,7 @@
 // Renders nothing. Free source only — reuses the existing Yahoo quote layer (OD-002).
 import { useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { localIsoDate } from "@/lib/localDate";
 
 type QuoteMap = Record<string, { price: number }> | undefined;
 
@@ -18,7 +19,7 @@ export function PriceHistoryRecorder({ quotes }: { quotes: QuoteMap }) {
     const symbols = Object.keys(quotes);
     if (symbols.length === 0) return;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localIsoDate();
     if (doneForDay.current === today) return;
     doneForDay.current = today; // optimistic; reset on failure so it can retry
 

@@ -33,6 +33,7 @@ import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
 import { useJournal } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { supabase } from "@/lib/supabaseClient";
+import { localIsoDate } from "@/lib/localDate";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 import { objectiveOf } from "@/lib/objective";
 import { accountTotals } from "@/lib/accountTotals";
@@ -400,7 +401,7 @@ function PromptCenter() {
     try {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("Not signed in");
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localIsoDate();
       const rows = actions.map((a) => ({
         user_id: auth.user!.id,
         decided_on: today,

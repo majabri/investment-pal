@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 import { nextContributionDate } from "@/lib/accountObjective";
 import { kidAccounts, holderLabel } from "@/lib/kidAccounts";
+import { localIsoDate } from "@/lib/localDate";
 import {
   useAccounts,
   useAllHoldings,
@@ -88,7 +89,7 @@ function Page() {
     const next =
       nextTimes.length === 0
         ? NOT_KNOWN
-        : new Date(Math.min(...nextTimes)).toISOString().slice(0, 10);
+        : localIsoDate(new Date(Math.min(...nextTimes)));
 
     // Each account's OWN objective, stated per account. A single global
     // "$200,000 by 2036" was one household's target asserted to the model as

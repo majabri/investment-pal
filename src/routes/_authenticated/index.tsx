@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { supabase } from "@/lib/supabaseClient";
 import { activeBuybackBySymbol, type TrimDecision } from "@/lib/buybackZones";
+import { localIsoDate } from "@/lib/localDate";
 import {
   AllocationPanel,
   BalanceOverTime,
@@ -119,12 +120,12 @@ function Dashboard() {
     liveQuotes?.[h.symbol]?.price ?? h.current_price;
   const week = new Date();
   week.setDate(week.getDate() + 7);
-  const weekEnd = week.toISOString().slice(0, 10);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const weekEnd = localIsoDate(week);
+  const todayStr = localIsoDate();
   const { data: todaysPlan = [] } = useQuery({
     queryKey: ["decisions-today"],
     queryFn: async () => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localIsoDate();
       const { data } = await supabase
         .from("decisions" as never)
         .select("id,recommendation,decision")
@@ -144,7 +145,7 @@ function Dashboard() {
       const { data } = await supabase
         .from("decisions" as never)
         .select("id,symbol,action,recommendation,price_at_rec,decided_on")
-        .gte("decided_on", cutoff.toISOString().slice(0, 10))
+        .gte("decided_on", localIsoDate(cutoff))
         .not("price_at_rec", "is", null)
         .order("decided_on", { ascending: false })
         .limit(100);

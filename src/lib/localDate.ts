@@ -44,3 +44,20 @@ export function isRealCalendarDate(iso: string): boolean {
   if (Number.isNaN(parsed.getTime())) return false;
   return parsed.toISOString().slice(0, 10) === iso;
 }
+
+/**
+ * `n` consecutive local calendar dates, starting today.
+ *
+ * The calendar feeds ask an upstream API for one date at a time and label the
+ * rows with the date they asked for, so this list IS the user's "today and the
+ * next n-1 days". Built from `toISOString()` it was the UTC window instead:
+ * every evening after 20:00 Eastern the whole range slid one day forward and
+ * today's events silently became tomorrow's (P0-04).
+ */
+export function nextLocalDays(n: number, now: Date = new Date()): string[] {
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() + i);
+    return localIsoDate(d);
+  });
+}

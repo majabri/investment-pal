@@ -34,10 +34,18 @@ export function closeOnOrAfter(closes: Close[], targetISO: string): number | nul
   return null;
 }
 
-/** Add calendar days to a YYYY-MM-DD date, returning YYYY-MM-DD. */
+/**
+ * Add calendar days to a YYYY-MM-DD date, returning YYYY-MM-DD.
+ *
+ * Anchored in UTC at both ends. It previously parsed `iso + "T00:00:00"` —
+ * LOCAL midnight — and formatted with `toISOString()`, so east of Greenwich the
+ * instant fell back into the previous UTC day and every horizon came out a day
+ * short. Date-only in, date-only out: the value never means an instant, so it
+ * must never round-trip through one.
+ */
 export function addDaysISO(iso: string, days: number): string {
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() + days);
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 

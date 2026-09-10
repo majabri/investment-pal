@@ -3,6 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { ECON_EVENTS, EARNINGS_EVENTS, type EconEvent, type EarningsEvt } from "./data/calendars";
+import { localIsoDate, nextLocalDays } from "./localDate";
 import { economicCalendarInputSchema, earningsCalendarInputSchema } from "./serverInput";
 import { enforceProviderRateLimit } from "./serverRateLimit";
 
@@ -16,14 +17,6 @@ async function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const data = await fn();
   cache.set(key, { at: Date.now(), data });
   return data;
-}
-
-function nextDays(n: number): string[] {
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    return d.toISOString().slice(0, 10);
-  });
 }
 
 export interface LiveEarnings extends EarningsEvt {
@@ -49,7 +42,7 @@ export const getEarningsCalendarFn = createServerFn({ method: "POST" })
     try {
       const all = await cached(`earn:${days}`, async () => {
         const out: { date: string; symbol: string; time: string; name: string }[] = [];
-        for (const date of nextDays(days)) {
+        for (const date of nextLocalDays(days)) {
           const res = await fetch(`https://api.nasdaq.com/api/calendar/earnings?date=${date}`, {
             headers: HDRS,
           });
@@ -77,7 +70,7 @@ export const getEarningsCalendarFn = createServerFn({ method: "POST" })
         companyName: r.name,
       }));
     } catch {
-      const t = new Date().toISOString().slice(0, 10);
+      const t = localIsoDate();
       return EARNINGS_EVENTS.filter((e) => e.date >= t && want.has(e.symbol)).map((e) => ({
         ...e,
         source: "seed" as const,
@@ -99,7 +92,7 @@ export const getEconCalendarFn = createServerFn({ method: "POST" })
     try {
       const rows = await cached(`econ:${days}`, async () => {
         const out: LiveEcon[] = [];
-        for (const date of nextDays(days)) {
+        for (const date of nextLocalDays(days)) {
           const res = await fetch(
             `https://api.nasdaq.com/api/calendar/economicevents?date=${date}`,
             { headers: HDRS },
@@ -126,7 +119,7 @@ export const getEconCalendarFn = createServerFn({ method: "POST" })
       if (!rows.length) throw new Error("empty");
       return rows;
     } catch {
-      const t = new Date().toISOString().slice(0, 10);
+      const t = localIsoDate();
       return ECON_EVENTS.filter((e) => e.date >= t).map((e) => ({ ...e, source: "seed" as const }));
     }
   });

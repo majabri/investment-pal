@@ -1500,3 +1500,57 @@ carrying the fix. Once #174 landed, #135 became a plain duplicate of merged
 work, which `CLAUDE.md` explicitly gives me authority over. The position changed
 because the facts did, not because waiting got tedious — and the distinction is
 the whole point of having the rule.
+
+## 2026-09-10 — Task 1 of the 09-10 audit brief: local calendar dates (P0-04)
+
+### The confirmed bug
+
+`calendarServer.ts` built its date window with `new Date().toISOString().slice(0, 10)`.
+`toISOString()` converts to UTC first, so from about 20:00 Eastern the whole
+"today and the next n days" window slid one day forward: today's economic
+events and earnings became tomorrow's. The seed fallback was worse in kind —
+it filtered `date >= t` with `t` already set to tomorrow, so on an unreachable
+source it dropped today's events entirely rather than shifting them.
+
+### The audit found nine more
+
+The brief asked me to look for the same pattern elsewhere. Twelve sites in all
+took a *local instant* and derived a *calendar date* through UTC. Two of them
+write that date to the database rather than merely displaying it:
+
+- `PriceHistoryRecorder.tsx` — the `date` column of `price_history`, which is
+  also the upsert conflict key, so an evening capture wrote tomorrow's row and
+  then collided with the real one the next day.
+- `prompt-center.tsx` — `decided_on` on every decision logged from an Action
+  Sheet, which the learning engine then grades against.
+
+The rest are read paths: the dashboard's today/week/45-day windows, the
+learning log's "since N days" edge, the kids' next-contribution date.
+
+`outcomeGrade.addDaysISO` is the same defect mirrored: it parsed **local**
+midnight and formatted UTC, so east of Greenwich every grading horizon landed a
+day short. Opposite sign, same cause — a date-only value round-tripping through
+an instant.
+
+### Two sites are safe, and I checked rather than assumed
+
+`portfolioSummary.ts:155` and `:311` also call `toISOString().slice(0, 10)`, and
+both are correct. `latestMs` is `Date.parse(\`${'${latest.date}'}T00:00:00Z\`)` and the
+month arithmetic uses `setUTCMonth`: UTC-anchored at both ends, date-only in,
+date-only out, compared against date-only strings. Nothing local enters, so
+nothing local can shift. Left alone.
+
+### The test spawns subprocesses, and that is the point
+
+The runner and CI both run in UTC, where local and UTC dates are identical and
+this entire class of bug is invisible. An in-process test could not have caught
+it and could not catch its return. `calendarDateBoundary.test.ts` runs the real
+modules under `America/New_York` and `Europe/Berlin` — both signs of the
+meridian — at 00:30 and 21:30 local, and across both US DST boundaries.
+
+Its first assertion is a control proving the harness reaches a non-UTC zone:
+the same expression gives `2026-09-10` in the runner and `2026-09-11` in the
+subprocess. Without it, twelve green tests would prove nothing.
+
+Verified by reverting each fix: the UTC form of `nextLocalDays` reddens three
+tests, the local-midnight `addDaysISO` reddens three others.
