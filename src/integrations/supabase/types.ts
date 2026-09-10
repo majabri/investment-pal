@@ -127,7 +127,7 @@ export type Database = {
           margin_enabled?: boolean | null
           margin_limit?: number | null
           margin_used?: number | null
-          name?: string
+          name: string
           notes?: string | null
           starting_value?: number
           target_date?: string | null
