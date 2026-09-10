@@ -1797,3 +1797,82 @@ caveat reddens 2. Each restored and re-verified green.
 The migration is **not applied**. Until it is, `useCashFlows` errors on both
 selects and returns `unknown`, which is the correct answer and is what the panel
 already renders. Nothing regresses while it waits.
+
+---
+
+## 2026-09-10 — Task 6 of the 09-10 audit brief: dashboard hierarchy (G4) + #135's accessibility scope
+
+### What actually mattered in the extraction
+
+`index.tsx` was 781 lines with eighteen hooks in one `Dashboard()`. The valuable
+part was not the line count: a **150-line immediately-invoked function inside
+the JSX** computed the Constitution Check — the surface that tells the holder
+they have breached their own risk policy — and it had **no tests at all**. For a
+check that accuses somebody of breaking their own commitment, that is the wrong
+way round.
+
+`lib/constitutionCheck.ts` now holds it as arithmetic. Not one comparison
+changed; twenty tests now pin what `main` already did, including the three
+distinctions the inline version got right and nothing recorded:
+
+- the position and margin caps are the **user's** policy and carry
+  "(default, not your setting)" until somebody saves the Settings form (rule 15);
+- the 50% equity floor is **Reg-T**, carries no such qualifier, and must not
+  read like a preference (rule 21);
+- **`checkable` is separate from `breaches.length === 0`.** A check that could
+  not run produces an empty breach list, and rendering that as "within policy"
+  is a governance check passing because it checked nothing.
+
+`positionsStaleDays` returns `null` for "never imported" rather than 0, because
+0 means the positions are fresh and the line says so.
+
+The advisory strips moved to `components/app/dashboard/DashboardStrips.tsx`
+following the `summary/` pattern. Each renders **nothing** when it has no rows —
+tested explicitly, because that is the case most accounts hit most days.
+
+### #135's accessibility scope, folded in
+
+The app shipped **59 `<Input>` elements with 6 accessible names.** A screen
+reader announced the rest as "edit text", and clicking a visible label did not
+focus its field — including on the Settings forms that write balances.
+
+- 22 `<Label>`/`<Input>` pairs joined by `htmlFor`/`id`.
+- 13 placeholder-only inputs given an `aria-label`. A placeholder is not a
+  label: it disappears the moment somebody types.
+- `Field` lifted out of `settings.tsx` to `components/app/Field.tsx` and made to
+  associate its label **once**, via `useId` + `cloneElement`. That covers
+  fifteen Settings controls at a stroke — and the association is made in one
+  place because the next field added at a call site would forget, which is how
+  it got to fifteen.
+
+### The scan that lied to me, and the fix
+
+My first source scan used `<Input[^>]*>`. The `>` in `onChange={(e) => …}`
+terminates that match, so it reported four already-labelled inputs as
+unlabelled. I added a duplicate `aria-label` to `decisions.tsx` on the strength
+of it, and only `tsc` caught it.
+
+`inputLabels.test.ts` therefore carries a brace- and quote-aware parser rather
+than a regex, with three negative controls — including one asserting it can see
+past an arrow function. A guard built on the scan that produced the false
+positives would have been worse than none.
+
+### Evidence that the axe assertions mean something
+
+Every axe assertion is paired with a negative control that renders the defect
+and asserts axe reports it. `field.test.tsx` renders a bare label beside a bare
+input — the exact shape `Field` used to produce — and asserts the `label`
+violation fires. Without that, five green axe assertions prove only that axe ran.
+
+### Verification
+
+`index.tsx` 781 → 679 lines. Full gate: `bun install --frozen-lockfile` ·
+`typecheck` · `test:typecheck` · `bun test` **1041 pass / 0 fail** · boot 200 on
+`/auth`, `/`, `/settings`, `/portfolio`, `/goals`, `/journal`, `/decisions`.
+
+Fault injection: forcing `checkable` true reddens 4; dropping the
+"(default, not your setting)" qualifier reddens 2; removing `htmlFor` from
+`Field` reddens 2; making an empty strip render a box reddens 1. Each restored
+and re-verified green.
+
+No migration. Nothing here needs Lovable.

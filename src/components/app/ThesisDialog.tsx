@@ -80,8 +80,15 @@ export function ThesisDialog({ holding }: { holding: H }) {
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label className="text-xs">Sector</Label>
-            <Input value={f.sector} onChange={set("sector")} placeholder="e.g. Cybersecurity" />
+            <Label className="text-xs" htmlFor="thesisdialog-sector">
+              Sector
+            </Label>
+            <Input
+              id="thesisdialog-sector"
+              value={f.sector}
+              onChange={set("sector")}
+              placeholder="e.g. Cybersecurity"
+            />
           </div>
           <div>
             <Label className="text-xs">Original thesis (why bought)</Label>

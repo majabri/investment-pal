@@ -163,32 +163,50 @@ function GoalsPage() {
           <div className="mb-4 text-sm font-medium">Primary goal</div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <Label className="text-xs">Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
+              <Label className="text-xs" htmlFor="goals-name">
+                Name
+              </Label>
+              <Input id="goals-name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div>
-              <Label className="text-xs">Starting value</Label>
+              <Label className="text-xs" htmlFor="goals-starting-value">
+                Starting value
+              </Label>
               <Input
+                id="goals-starting-value"
                 type="number"
                 value={starting ?? ""}
                 onChange={(e) => setStarting(e.target.value === "" ? null : +e.target.value)}
               />
             </div>
             <div>
-              <Label className="text-xs">Target value</Label>
+              <Label className="text-xs" htmlFor="goals-target-value">
+                Target value
+              </Label>
               <Input
+                id="goals-target-value"
                 type="number"
                 value={target ?? ""}
                 onChange={(e) => setTarget(e.target.value === "" ? null : +e.target.value)}
               />
             </div>
             <div>
-              <Label className="text-xs">Target date</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <Label className="text-xs" htmlFor="goals-target-date">
+                Target date
+              </Label>
+              <Input
+                id="goals-target-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
             </div>
             <div>
-              <Label className="text-xs">Monthly contribution</Label>
+              <Label className="text-xs" htmlFor="goals-monthly-contribution">
+                Monthly contribution
+              </Label>
               <Input
+                id="goals-monthly-contribution"
                 type="number"
                 value={monthly ?? ""}
                 onChange={(e) => setMonthly(e.target.value === "" ? null : +e.target.value)}

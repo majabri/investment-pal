@@ -91,6 +91,7 @@ export function MarginCard({
       {editing ? (
         <div className="mt-1 flex items-center gap-2">
           <Input
+            aria-label="Margin loan"
             autoFocus
             value={val}
             onChange={(e) => setVal(e.target.value)}
