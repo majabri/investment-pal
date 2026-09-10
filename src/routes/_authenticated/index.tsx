@@ -32,6 +32,14 @@ import { policyIsConfirmed } from "@/lib/policy";
 import { balanceSeries, dayChange } from "@/lib/portfolioSummary";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
 import {
+  MARGIN_CAP_DENOMINATOR,
+  POLICY_DENOMINATOR,
+  denominators,
+  labelledPct,
+  marginUtilisationOf,
+  weightOf,
+} from "@/lib/concentration";
+import {
   useGoal,
   useProfile,
   useAllHoldings,
@@ -332,19 +340,33 @@ function Dashboard() {
         const capsConfirmed = policyIsConfirmed(ipsLite.caps_source);
         const capNote = capsConfirmed ? "" : " (default, not your setting)";
         const posCap = ipsLite.position_cap_pct / 100;
+        // P0-05: the cap is enforced against NET EQUITY here, against invested
+        // assets on the portfolio page's sector bars, and ADR-APP-004 C2 states
+        // it against GROSS. Three denominators, one "%" — so "NVDA 34.2% > 30%
+        // cap" was unfalsifiable without reading the source.
+        //
+        // The arithmetic below is unchanged; which denominator the cap SHOULD
+        // use is money-adjacent (OD-001) and is the owner's line-item call, proposed
+        // in OD-003. What changes is that the breach line now says which
+        // denominator produced the number it is accusing the user with.
+        const denoms = denominators(totals);
         for (const h of scopedHoldings) {
           const v = h.quantity * px(h);
-          if (net !== null && net > 0 && v / net > posCap)
+          const w = weightOf(v, denoms, POLICY_DENOMINATOR);
+          if (w !== null && w > posCap)
             breaches.push(
-              `${h.symbol} ${fmtPct(v / net)} > ${ipsLite.position_cap_pct}% cap${ipsLite.position_cap_hard ? " (HARD)" : ""}${capNote}`,
+              `${h.symbol} ${labelledPct(w, POLICY_DENOMINATOR)} > ${ipsLite.position_cap_pct}% cap${ipsLite.position_cap_hard ? " (HARD)" : ""}${capNote}`,
             );
         }
-        const marginUtil =
-          net !== null && net > 0 && marginUsed !== null ? marginUsed / net : null;
+        // Margin utilisation has its own denominator rather than inheriting the
+        // position cap's. `accountTotals.marginUtilisation` is debit ÷ gross;
+        // the cap enforced here is debit ÷ net equity. Both are printed with
+        // their denominator attached now, so the two can be told apart on sight.
+        const marginUtil = marginUtilisationOf(marginUsed, denoms, MARGIN_CAP_DENOMINATOR);
         if (marginUsed !== null && marginUsed > 0 && marginUtil !== null)
           if (marginUtil > ipsLite.margin_cap_pct / 100)
             breaches.push(
-              `Margin util ${fmtPct(marginUtil)} > ${ipsLite.margin_cap_pct}% cap${capNote}`,
+              `Margin util ${labelledPct(marginUtil, MARGIN_CAP_DENOMINATOR)} > ${ipsLite.margin_cap_pct}% cap${capNote}`,
             );
         // Not a user policy and deliberately not labelled as one: 50% is the
         // Reg-T maintenance floor. Rule 21 — a constraint the user cannot move
