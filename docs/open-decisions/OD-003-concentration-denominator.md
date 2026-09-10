@@ -69,8 +69,19 @@ money-adjacent:
 debit ÷ gross assets (today's `accountTotals` definition), or a third
 definition of the owner's choosing. It should not simply inherit A.
 
+Note that B is the *narrower* of the two questions: ADR-APP-004 **C3** states
+the margin cap as "25% **of account value**", and "account value" is defined in
+the prompt's own data block as NET (investments + cash − margin). So the written
+policy and the enforced code already agree on the margin cap — what is
+unreconciled is `accountTotals.marginUtilisation`, a debit ÷ gross figure that
+nothing renders and that no policy references. The conflict in **A** is the real
+one: **C2 is the only line where the written policy and the enforced code
+disagree.**
+
 **C. Whether ADR-APP-004 C2 is amended, or the code is changed to match it.**
-Whichever way A resolves, one of the two has to move.
+Whichever way A resolves, one of the two has to move. C2 was signed off as
+"30% gross"; the dashboard has been enforcing 30% of net equity since it was
+written, which on a levered account is the tighter of the two.
 
 ## Why this is not Claude's to decide
 
