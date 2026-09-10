@@ -1649,3 +1649,54 @@ Each restored and re-verified green.
 The personal-data guard fired during this work — three new files carried the
 owner's first name in a comment. Rewritten to "the owner". That is the guard
 doing exactly what it is for.
+
+---
+
+## 2026-09-10 — Task 2, held half: the committee prompt's denominators
+
+Split out of the labelling PR before merge and opened separately, because the
+IPS block is the **committee mandate** — named in `CLAUDE.md`'s merge-authority
+carve-out — and correcting its labels changes which positions the committee
+flags.
+
+### What the prompt said
+
+```
+Max single position: 30% of gross
+...
+- ABC: 100 sh @ avg $50.00, last $80.00, value $8,000.00 (11.4% of acct)
+```
+
+The cap is stated against **gross**. The weight beside every holding was
+computed against **net equity**. The committee was being asked to police a gross
+cap using net-equity numbers, and had no way to tell — "of acct" names nothing.
+On a levered account the two differ by the whole margin debit.
+
+### What it says now
+
+```
+Max single position: 30% of gross assets
+Max margin utilization: 25% of net equity (margin debit ÷ net equity).
+...
+- ABC: 100 sh @ avg $50.00, last $80.00, value $8,000.00 (11.4% of net equity; 8.0% of gross assets)
+```
+
+Both denominators, each named, so the cap can be applied as written for the
+first time. Unknown renders as `NOT KNOWN of net equity`, not an em-dash: the
+em-dash is right on a dense screen and unreadable to a model.
+
+Invested assets is summed from `ctx.holdings` inside `dataBlock`, so the
+denominator and the numerators come from the same list and cannot describe
+different portfolios.
+
+### Why it is not self-merged
+
+No threshold moves and no rate moves — but the honest description is that
+positions the committee wrongly flagged will stop being flagged and others will
+start. That is a behavioural change to a governance check on a `main` that
+deploys live the moment it merges. OD-001, and "when in doubt, it is
+money-adjacent: open the PR and stop."
+
+The `unknownBalances` guard was updated with it: it asserted `(NOT KNOWN of
+acct)`, and now asserts the labelled form plus `not.toContain("of acct")` — no
+bare, unattributed percentage survives on a holdings line.
