@@ -258,3 +258,41 @@ export function versionChanges(
     );
   return out;
 }
+
+/**
+ * The row an immutable version is written as.
+ *
+ * A pure function rather than an object literal in the hooks module, for two
+ * reasons. It is testable — the shape of what gets written to an append-only
+ * table is worth pinning, because a wrong value there can never be edited out.
+ * And `promptMandate.test.ts` asserts that `useAppData.ts` only ever DECLARES
+ * objective fields, never assigns them: the objective has one home per scope,
+ * and a payload built in the hooks module is how a second one starts.
+ */
+export function goalVersionInsert(input: {
+  userId: string | undefined;
+  goalId: string;
+  accountId?: string | null;
+  baselineType: BaselineType;
+  baselineValue: number | null;
+  targetDate: string | null;
+  targetValue: number | null;
+  targetReturnPct: number | null;
+  contributionPlan: FlowPlan | null;
+  supersedesId: string | null;
+  note: string | null;
+}): Record<string, unknown> {
+  return {
+    user_id: input.userId,
+    goal_id: input.goalId,
+    account_id: input.accountId ?? null,
+    baseline_type: input.baselineType,
+    baseline_value: input.baselineValue,
+    target_date: input.targetDate,
+    target_value: input.targetValue,
+    target_return_pct: input.targetReturnPct,
+    contribution_plan: input.contributionPlan,
+    supersedes_id: input.supersedesId,
+    note: input.note,
+  };
+}

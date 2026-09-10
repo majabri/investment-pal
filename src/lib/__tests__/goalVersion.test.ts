@@ -13,9 +13,11 @@ import {
   PERIODS_PER_YEAR,
   canSaveVersion,
   conflictExplanation,
+  goalVersionInsert,
   targetLinkage,
+  versionChanges,
 } from "@/lib/goalVersion";
-import type { GoalVersionInput } from "@/lib/goalVersion";
+import type { GoalVersionInput, GoalVersionRow } from "@/lib/goalVersion";
 import { fvWithContributions } from "@/lib/objectiveMath";
 
 const NOW = new Date("2026-01-01T12:00:00Z");
@@ -238,5 +240,125 @@ describe("targetLinkage — nothing stated", () => {
     // The CHECK constraint refuses a row with neither target; this module's
     // refusal is only about the two of them disagreeing.
     expect(canSaveVersion(targetLinkage(base, NOW))).toBe(true);
+  });
+});
+
+describe("versionChanges", () => {
+  const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  const v = (over: Partial<GoalVersionRow>): GoalVersionRow => ({
+    id: "v",
+    effective_at: "2026-01-01T00:00:00Z",
+    baseline_type: "manual_plan",
+    baseline_value: 100_000,
+    target_date: "2027-12-31",
+    target_value: 150_000,
+    target_return_pct: null,
+    contribution_plan: null,
+    note: null,
+    ...over,
+  });
+
+  test("the first version says so rather than diffing against nothing", () => {
+    expect(versionChanges(null, v({}), usd)).toEqual(["first recorded version"]);
+  });
+
+  test("an unchanged save lists nothing", () => {
+    expect(versionChanges(v({}), v({}), usd)).toEqual([]);
+  });
+
+  test("a moved target reads as a move, in both directions", () => {
+    const out = versionChanges(v({}), v({ target_value: 120_000 }), usd);
+    expect(out).toEqual(["target $150,000 → $120,000"]);
+  });
+
+  test("a moved date is named separately from a moved target", () => {
+    const out = versionChanges(v({}), v({ target_value: 120_000, target_date: "2028-12-31" }), usd);
+    expect(out).toHaveLength(2);
+    expect(out.join(" ")).toContain("2027-12-31 → 2028-12-31");
+  });
+
+  test("a baseline that becomes unknown says so — it does not read as zero", () => {
+    const out = versionChanges(v({}), v({ baseline_value: null }), usd);
+    expect(out).toEqual(["baseline $100,000 → not known"]);
+    expect(out.join(" ")).not.toContain("$0");
+  });
+
+  test("switching baseline kind is a change worth naming (GOAL-003)", () => {
+    // A goal replanned from the broker's equity instead of a planning figure
+    // is a different plan, even at the same number.
+    const out = versionChanges(v({}), v({ baseline_type: "broker_equity" }), usd);
+    expect(out).toEqual(["baseline kind manual_plan → broker_equity"]);
+  });
+
+  test("a contribution change is named, including to and from nothing", () => {
+    const withPlan = v({ contribution_plan: { amountUsd: 500, cadence: "monthly" } });
+    expect(versionChanges(v({}), withPlan, usd)).toEqual([
+      "contribution not known → $500",
+    ]);
+    expect(versionChanges(withPlan, v({}), usd)).toEqual([
+      "contribution $500 → not known",
+    ]);
+  });
+});
+
+describe("goalVersionInsert", () => {
+  const row = () =>
+    goalVersionInsert({
+      userId: "u-1",
+      goalId: "g-1",
+      baselineType: "manual_plan",
+      baselineValue: 100_000,
+      targetDate: "2027-12-31",
+      targetValue: 150_000,
+      targetReturnPct: 0.12,
+      contributionPlan: { amountUsd: 500, cadence: "monthly" },
+      supersedesId: "v-0",
+      note: "moved the date out",
+    });
+
+  test("writes every column the table needs, under the table's names", () => {
+    expect(row()).toEqual({
+      user_id: "u-1",
+      goal_id: "g-1",
+      account_id: null,
+      baseline_type: "manual_plan",
+      baseline_value: 100_000,
+      target_date: "2027-12-31",
+      target_value: 150_000,
+      target_return_pct: 0.12,
+      contribution_plan: { amountUsd: 500, cadence: "monthly" },
+      supersedes_id: "v-0",
+      note: "moved the date out",
+    });
+  });
+
+  test("carries no updated_at — the table is append-only (GOAL-002)", () => {
+    expect(Object.keys(row())).not.toContain("updated_at");
+    expect(Object.keys(row())).not.toContain("id");
+  });
+
+  test("an unknown baseline is written as NULL, never as zero", () => {
+    const r = goalVersionInsert({
+      userId: "u-1",
+      goalId: "g-1",
+      baselineType: "manual_plan",
+      baselineValue: null,
+      targetDate: null,
+      targetValue: 150_000,
+      targetReturnPct: null,
+      contributionPlan: null,
+      supersedesId: null,
+      note: null,
+    });
+    expect(r.baseline_value).toBeNull();
+    expect(r.baseline_value).not.toBe(0);
+    // The first version has nothing to supersede, which is null and not "".
+    expect(r.supersedes_id).toBeNull();
+  });
+
+  test("the target return is a FRACTION, and the builder does not convert", () => {
+    // The percentage-to-fraction conversion happens once, at the form, and a
+    // second conversion here would divide it twice.
+    expect(row().target_return_pct).toBe(0.12);
   });
 });

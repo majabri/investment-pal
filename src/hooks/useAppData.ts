@@ -7,6 +7,7 @@ import { sumField } from "@/lib/accountAggregate";
 import { scopedRows, type AccountScope } from "@/lib/accountTotals";
 import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 import { localIsoDate } from "@/lib/localDate";
+import { goalVersionInsert } from "@/lib/goalVersion";
 import type { GoalVersionRow } from "@/lib/goalVersion";
 import { isUniqueViolation } from "@/lib/postgresError";
 import type { HouseholdMember } from "@/lib/household";
@@ -217,8 +218,10 @@ export function useGoal() {
   const latestVersionId = versions.data?.[0]?.id ?? null;
 
   const update = useMutation({
-    mutationFn: async (patch: Partial<Goal> & { id: string; versionNote?: string }) => {
-      const { id, versionNote, ...rest } = patch;
+    mutationFn: async (
+      patch: Partial<Goal> & { id: string; versionNote?: string; targetReturnPct?: number | null },
+    ) => {
+      const { id, versionNote, targetReturnPct, ...rest } = patch;
       const { error } = await supabase.from("goals").update(rest).eq("id", id);
       if (error) throw error;
 
@@ -232,24 +235,33 @@ export function useGoal() {
       // break goal editing to gain a history row. What is NOT acceptable is
       // failing silently, so the caller is told through `versionRecorded`.
       const merged = { ...(query.data ?? {}), ...rest } as Partial<Goal>;
-      const previous = latestVersionId;
-      const { error: versionError } = await supabase.from("goal_versions" as never).insert({
-        user_id: (await supabase.auth.getUser()).data.user?.id,
-        goal_id: id,
-        // GOAL-003: a goal edited in Settings is a PLANNING baseline. The
-        // broker's equity is a different number that nobody chose, and the two
-        // must not merge into one starting point.
-        baseline_type: "manual_plan",
-        baseline_value: merged.starting_value ?? null,
-        target_date: merged.target_date ?? null,
-        target_value: merged.target_value ?? null,
-        contribution_plan:
-          merged.monthly_contribution === null || merged.monthly_contribution === undefined
-            ? null
-            : { amountUsd: Number(merged.monthly_contribution), cadence: "monthly" },
-        supersedes_id: previous,
-        note: versionNote ?? null,
-      } as never);
+      const contribution =
+        merged.monthly_contribution === null || merged.monthly_contribution === undefined
+          ? null
+          : { amountUsd: Number(merged.monthly_contribution), cadence: "monthly" as const };
+      // The payload is built in `lib/goalVersion.ts`, not here. Partly because
+      // what gets written to an append-only table is worth a unit test — a
+      // wrong value there can never be edited out — and partly because
+      // `promptMandate.test.ts` holds this module to declaring objective fields
+      // rather than assigning them, which is how the objective keeps one home
+      // per scope.
+      const { error: versionError } = await supabase.from("goal_versions" as never).insert(
+        goalVersionInsert({
+          userId: (await supabase.auth.getUser()).data.user?.id,
+          goalId: id,
+          // GOAL-003: a goal edited in Settings is a PLANNING baseline. The
+          // broker's equity is a different number that nobody chose, and the
+          // two must not merge into one starting point.
+          baselineType: "manual_plan",
+          baselineValue: merged.starting_value ?? null,
+          targetDate: merged.target_date ?? null,
+          targetValue: merged.target_value ?? null,
+          targetReturnPct: targetReturnPct ?? null,
+          contributionPlan: contribution,
+          supersedesId: latestVersionId,
+          note: versionNote ?? null,
+        }) as never,
+      );
       return { versionRecorded: !versionError };
     },
     onSuccess: () => {

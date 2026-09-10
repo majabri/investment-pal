@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabaseClient";
 import { localIsoDate } from "@/lib/localDate";
+import { useGoal } from "@/hooks/useAppData";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { getQuotesFn } from "@/lib/marketServer";
 import { computeOutcome, type Grade, type Close } from "@/lib/outcomeGrade";
@@ -53,6 +54,9 @@ const GRADE_STYLE: Record<
 
 export function LearningLog() {
   const qc = useQueryClient();
+  // GOAL-002. Read here rather than passed in, so every path that records a
+  // decision stamps it the same way and none can forget.
+  const { latestVersionId: goalVersionId } = useGoal();
   const [unavailable, setUnavailable] = useState(false);
   const [f, setF] = useState({
     symbol: "",
@@ -184,6 +188,10 @@ export function LearningLog() {
       decision: f.decision,
       review_type: f.review_type,
       price_at_rec: priceAtRec,
+      // GOAL-002: the goal version this decision was taken under. NULL means
+      // NOT KNOWN — no version has been recorded yet — which is the truth and
+      // is more useful later than a pointer at whatever the goal says then.
+      goal_version_id: goalVersionId,
     } as never);
     if (error) {
       toast.error(error.message);

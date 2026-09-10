@@ -202,6 +202,8 @@ function GoalsPage() {
         risk_preference: risk as "conservative" | "moderate" | "aggressive",
         margin_preference: margin as "none" | "conservative" | "moderate" | "aggressive",
         versionNote: versionNote.trim() || undefined,
+        // Stored as a FRACTION on the version; the field above is a percentage.
+        targetReturnPct: returnPct === null ? null : returnPct / 100,
       },
       {
         onSuccess: (r) => {
@@ -434,6 +436,62 @@ function GoalsPage() {
           </ul>
         </div>
       ) : null}
+
+      {/* GOAL-001. What the goal USED to be, and why it changed.
+          `goals.updated_at` recorded that something changed and never what, so
+          a goal moved to meet the portfolio looked exactly like a portfolio
+          moved to meet the goal — and only the second is worth doing. */}
+      <div className="mt-4 rounded-2xl border bg-card p-5">
+        <div className="mb-1 text-sm font-medium">Goal history</div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Every save appends a version and nothing is ever edited. Each decision records the version
+          it was taken under.
+        </p>
+        {versions === undefined ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : versions.length === 0 ? (
+          // Not "no changes". Nobody has saved the goal since versioning
+          // existed, which is a different fact and the one that is true today.
+          <p className="text-sm text-muted-foreground">
+            No versions recorded yet — the history starts at the next save.
+          </p>
+        ) : (
+          <ol className="space-y-2 text-sm">
+            {versions.map((v, i) => {
+              // The NEXT entry in a descending list is the older version.
+              const older = versions[i + 1] ?? null;
+              const changes = versionChanges(older, v, (n) => fmtUSD(n));
+              return (
+                <li key={v.id} className="border-l-2 border-muted pl-3">
+                  <div className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="font-medium">
+                      {usdOrUnavailable(v.target_value === null ? null : Number(v.target_value))}
+                      {v.target_date ? ` by ${v.target_date}` : ""}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {v.effective_at.slice(0, 10)} ·{" "}
+                      {/* GOAL-003: which kind of starting point this version
+                          planned from. A broker-derived baseline and a
+                          planning one are different numbers and the version
+                          says which it used. */}
+                      {v.baseline_type === "broker_equity"
+                        ? "from broker equity"
+                        : "from a planning baseline"}{" "}
+                      {usdOrUnavailable(
+                        v.baseline_value === null ? null : Number(v.baseline_value),
+                      )}
+                    </span>
+                  </div>
+                  {changes.length > 0 && (
+                    <div className="text-[11px] text-muted-foreground">{changes.join(" · ")}</div>
+                  )}
+                  {v.note && <div className="text-[11px] italic">“{v.note}”</div>}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </div>
     </AppShell>
   );
 }
