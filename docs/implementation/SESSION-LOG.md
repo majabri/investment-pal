@@ -2552,3 +2552,21 @@ its `failed` argument — reddens 3.
 changes a rate — `targetLinkage` is untouched — but this does change **when a
 row carrying one is written**, and the rule says that when in doubt it is
 money-adjacent. Awaiting Amir's line-item sign-off.
+
+### Follow-up — the merge line, narrowed (Amir, 2026-09-10)
+
+#202 merged, and Amir's response to it stopping for sign-off was that ready PRs
+should not wait. He is right, and the rule was the problem rather than the call:
+OD-001 clause 3 ended in "any threshold/rate" plus "when in doubt, ask", which
+sweeps in any change that *touches* a rate-carrying field. #202 touched one and
+computed nothing.
+
+Amendment 1 draws the line at what a change **produces**. Position sizing,
+margin math, tax lots, cash/order math, a threshold or rate the app itself
+computes or applies, and the committee mandate still stop for line-item
+sign-off. Handling, storing, displaying, validating or protecting such a value
+does not — that is ordinary work and merges on a green gate.
+
+The doubt clause survives, narrowed to "unclear whether it computes a figure"
+rather than "a rate is nearby". ADR-APP-005 §2 is untouched: **ADRs are still
+never self-merged.**
