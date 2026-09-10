@@ -9,8 +9,8 @@ import { describe, expect, test } from "bun:test";
 import { render } from "@testing-library/react";
 import axe from "axe-core";
 
-import { BuybackStrip, TodaysPlanStrip } from "../DashboardStrips";
-import type { BuybackPlanRow, PlanRow } from "../DashboardStrips";
+import { AlertChips, BuybackStrip, TodaysPlanStrip } from "../DashboardStrips";
+import type { AlertChip, BuybackPlanRow, PlanRow } from "../DashboardStrips";
 
 /** Synthetic throughout (ADR-APP-012 rules 23-25). */
 const plan: PlanRow[] = [
@@ -116,5 +116,39 @@ describe("BuybackStrip", () => {
       </div>,
     );
     expect(await violations(container)).not.toEqual([]);
+  });
+});
+
+describe("AlertChips", () => {
+  const alerts: AlertChip[] = [
+    { text: "CPI release", date: "2026-09-11", kind: "econ" },
+    { text: "NVDA earnings", date: "2026-09-12", kind: "earnings" },
+  ];
+
+  test("renders each event, dated", () => {
+    const { container } = render(<AlertChips alerts={alerts} />);
+    const text = container.textContent ?? "";
+    expect(text).toContain("CPI release");
+    expect(text).toContain("NVDA earnings");
+    // Month-day only — the year is always the current one on this surface.
+    expect(text).toContain("09-11");
+    expect(text).not.toContain("2026-09-11");
+  });
+
+  test("EMPTY: renders nothing at all", () => {
+    const { container } = render(<AlertChips alerts={[]} />);
+    expect(container.innerHTML).toBe("");
+  });
+
+  test("economic and earnings chips are visually distinct", () => {
+    const { container } = render(<AlertChips alerts={alerts} />);
+    const classes = [...container.querySelectorAll("span")].map((s) => s.className);
+    expect(classes.some((c) => c.includes("warning"))).toBe(true);
+    expect(classes.some((c) => c.includes("primary"))).toBe(true);
+  });
+
+  test("no axe violations", async () => {
+    const { container } = render(<AlertChips alerts={alerts} />);
+    expect(await violations(container)).toEqual([]);
   });
 });
