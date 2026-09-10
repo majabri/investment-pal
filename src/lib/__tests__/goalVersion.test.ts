@@ -86,19 +86,13 @@ describe("targetLinkage — both stated", () => {
   test("consistent figures agree", () => {
     // Take the value the rate actually produces, so they cannot disagree.
     const implied = fvWithContributions(100_000, 0.1, 2.0, 0, 26);
-    const l = targetLinkage(
-      { ...base, targetValue: implied, targetReturnPct: 0.1 },
-      NOW,
-    );
+    const l = targetLinkage({ ...base, targetValue: implied, targetReturnPct: 0.1 }, NOW);
     expect(l.kind).toBe("agree");
     expect(canSaveVersion(l)).toBe(true);
   });
 
   test("$150,000 and 12% on a $100,000 baseline is a CONFLICT, and is refused", () => {
-    const l = targetLinkage(
-      { ...base, targetValue: 150_000, targetReturnPct: 0.12 },
-      NOW,
-    );
+    const l = targetLinkage({ ...base, targetValue: 150_000, targetReturnPct: 0.12 }, NOW);
     expect(l.kind).toBe("conflict");
     if (l.kind !== "conflict") throw new Error("kind");
     // Both readings are carried, so the holder resolves it by reading what each
@@ -292,12 +286,8 @@ describe("versionChanges", () => {
 
   test("a contribution change is named, including to and from nothing", () => {
     const withPlan = v({ contribution_plan: { amountUsd: 500, cadence: "monthly" } });
-    expect(versionChanges(v({}), withPlan, usd)).toEqual([
-      "contribution not known → $500",
-    ]);
-    expect(versionChanges(withPlan, v({}), usd)).toEqual([
-      "contribution $500 → not known",
-    ]);
+    expect(versionChanges(v({}), withPlan, usd)).toEqual(["contribution not known → $500"]);
+    expect(versionChanges(withPlan, v({}), usd)).toEqual(["contribution $500 → not known"]);
   });
 });
 

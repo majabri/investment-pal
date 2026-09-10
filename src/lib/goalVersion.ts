@@ -108,10 +108,7 @@ function perPeriodOf(plan: FlowPlan | null): { perPeriod: number; periodsPerYear
  * read as a LOCAL calendar date, because a horizon is a number of days on the
  * holder's calendar, not a UTC instant (P0-04).
  */
-export function targetLinkage(
-  input: GoalVersionInput,
-  now: Date = new Date(),
-): TargetLinkage {
+export function targetLinkage(input: GoalVersionInput, now: Date = new Date()): TargetLinkage {
   const missing: string[] = [];
   if (input.baselineValue === null || !Number.isFinite(input.baselineValue))
     missing.push("baseline value");

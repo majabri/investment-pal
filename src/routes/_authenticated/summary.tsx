@@ -28,6 +28,7 @@ import {
   useLatestBalance,
   useScopedAccount,
   useScopedHoldings,
+  useCashFlows,
   useSnapshots,
   useUnscopedSnapshotCount,
 } from "@/hooks/useAppData";
@@ -65,6 +66,10 @@ function SummaryPage() {
   const { data: holdings } = useScopedHoldings(scope, { includeUnassigned: true });
   const { data: balance } = useScopedAccount(scope);
   const { data: snapshots = [], isError: snapshotsError } = useSnapshots(scope);
+  // PERF-001: UNKNOWN until the cash_flows migration is applied and a flow
+  // history is recorded, and the panel says so rather than reporting a
+  // deposit as return.
+  const { data: cashFlows } = useCashFlows(scope);
   const { data: unscopedCount = 0 } = useUnscopedSnapshotCount();
   const { data: latestBalance } = useLatestBalance(scope);
   const { data: ipsLite } = useIpsLite();
@@ -138,6 +143,7 @@ function SummaryPage() {
         <PerformancePanel
           series={series}
           totals={totals}
+          flows={cashFlows}
           objective={
             objective.kind === "set"
               ? {
