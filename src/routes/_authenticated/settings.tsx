@@ -10,6 +10,7 @@ import { PortfolioCsvImport } from "@/components/app/PortfolioCsvImport";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Field } from "@/components/app/Field";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -148,8 +149,11 @@ function IpsLiteCard() {
       )}
       <div className="grid gap-3 sm:grid-cols-[200px_200px_160px_auto]">
         <div>
-          <Label className="text-xs">Max single position (% of gross)</Label>
+          <Label className="text-xs" htmlFor="settings-max-single-position-of-gross">
+            Max single position (% of gross)
+          </Label>
           <Input
+            id="settings-max-single-position-of-gross"
             type="number"
             min={0}
             max={100}
@@ -158,8 +162,11 @@ function IpsLiteCard() {
           />
         </div>
         <div>
-          <Label className="text-xs">Max margin utilization (% of acct)</Label>
+          <Label className="text-xs" htmlFor="settings-max-margin-utilization-of-acct">
+            Max margin utilization (% of acct)
+          </Label>
           <Input
+            id="settings-max-margin-utilization-of-acct"
             type="number"
             min={0}
             max={100}
@@ -287,11 +294,14 @@ function ObjectiveCard() {
       </p>
       <div className="grid gap-3 sm:grid-cols-[180px_180px_180px_180px_auto]">
         <div>
-          <Label className="text-xs">Target value ($)</Label>
+          <Label className="text-xs" htmlFor="settings-objective-target-value">
+            Target value ($)
+          </Label>
           {/* `min` matches the check in onSave. A browser constraint that
               disagrees with the validation produces an error message the form
               itself said was fine. */}
           <Input
+            id="settings-objective-target-value"
             type="number"
             min={0.01}
             step="0.01"
@@ -300,12 +310,22 @@ function ObjectiveCard() {
           />
         </div>
         <div>
-          <Label className="text-xs">Target date</Label>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Label className="text-xs" htmlFor="settings-target-date">
+            Target date
+          </Label>
+          <Input
+            id="settings-target-date"
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
         </div>
         <div>
-          <Label className="text-xs">Starting value ($)</Label>
+          <Label className="text-xs" htmlFor="settings-starting-value">
+            Starting value ($)
+          </Label>
           <Input
+            id="settings-starting-value"
             type="number"
             min={0}
             value={starting}
@@ -313,8 +333,11 @@ function ObjectiveCard() {
           />
         </div>
         <div>
-          <Label className="text-xs">Monthly contribution ($)</Label>
+          <Label className="text-xs" htmlFor="settings-monthly-contribution">
+            Monthly contribution ($)
+          </Label>
           <Input
+            id="settings-monthly-contribution"
             type="number"
             min={0}
             value={monthly}
@@ -436,8 +459,11 @@ function MarginRateCard() {
       ) : null}
       <div className="grid gap-3 sm:grid-cols-[160px_180px_160px_160px_auto]">
         <div>
-          <Label className="text-xs">Annual rate (%)</Label>
+          <Label className="text-xs" htmlFor="settings-annual-rate">
+            Annual rate (%)
+          </Label>
           <Input
+            id="settings-annual-rate"
             type="number"
             min={0}
             max={100}
@@ -448,8 +474,15 @@ function MarginRateCard() {
           />
         </div>
         <div>
-          <Label className="text-xs">Verified on</Label>
-          <Input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+          <Label className="text-xs" htmlFor="settings-verified-on">
+            Verified on
+          </Label>
+          <Input
+            id="settings-verified-on"
+            type="date"
+            value={asOf}
+            onChange={(e) => setAsOf(e.target.value)}
+          />
         </div>
         <div>
           <Label className="text-xs">Rate type</Label>
@@ -464,8 +497,11 @@ function MarginRateCard() {
           </Select>
         </div>
         <div>
-          <Label className="text-xs">Flag as stale after (days)</Label>
+          <Label className="text-xs" htmlFor="settings-flag-as-stale-after-days">
+            Flag as stale after (days)
+          </Label>
           <Input
+            id="settings-flag-as-stale-after-days"
             type="number"
             min={1}
             value={staleDays}
@@ -529,11 +565,17 @@ function HouseholdCard() {
 
       <div className="mb-4 grid gap-2 sm:grid-cols-[1fr_170px_150px_auto]">
         <Input
+          aria-label="Name as it should appear"
           placeholder="Name as it should appear"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <Input type="date" value={birth} onChange={(e) => setBirth(e.target.value)} />
+        <Input
+          aria-label="Date of birth"
+          type="date"
+          value={birth}
+          onChange={(e) => setBirth(e.target.value)}
+        />
         <Select value={rel} onValueChange={setRel}>
           <SelectTrigger>
             <SelectValue placeholder="Relationship" />
@@ -576,6 +618,7 @@ function HouseholdCard() {
                   {age === null ? "birth date not set" : `age ${age}`}
                 </span>
                 <Input
+                  aria-label={`Date of birth for ${m.display_name}`}
                   type="date"
                   className="h-8 w-40 text-xs"
                   value={m.birth_date ?? ""}
@@ -646,6 +689,7 @@ function StrategyCard() {
       {strategy === null ? (
         <div className="flex flex-wrap items-center gap-2">
           <Input
+            aria-label="Strategy name (e.g. Long-term core)"
             className="max-w-xs"
             placeholder="Strategy name (e.g. Long-term core)"
             value={newName}
@@ -675,15 +719,21 @@ function StrategyCard() {
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-[1fr_180px_auto]">
             <div>
-              <Label className="text-xs">Name</Label>
+              <Label className="text-xs" htmlFor="settings-name">
+                Name
+              </Label>
               <Input
+                id="settings-name"
                 value={strategy.name}
                 onChange={(e) => update.mutate({ id: strategy.id, name: e.target.value })}
               />
             </div>
             <div>
-              <Label className="text-xs">Speculative cap (%)</Label>
+              <Label className="text-xs" htmlFor="settings-speculative-cap">
+                Speculative cap (%)
+              </Label>
               <Input
+                id="settings-speculative-cap"
                 type="number"
                 placeholder="No cap"
                 value={
@@ -728,6 +778,7 @@ function StrategyCard() {
 
           <div className="grid gap-2 sm:grid-cols-[1fr_200px_auto]">
             <Input
+              aria-label="Symbol"
               placeholder="Symbol"
               value={sym}
               onChange={(e) => setSym(e.target.value.toUpperCase())}
@@ -850,6 +901,7 @@ function SettingsPage() {
 
         <div className="mb-4 grid gap-2 sm:grid-cols-[1fr_180px_auto]">
           <Input
+            aria-label="Account name (e.g., Brokerage, Roth IRA, Kids UTMA)"
             placeholder="Account name (e.g., Brokerage, Roth IRA, Kids UTMA)"
             value={newAcctName}
             onChange={(e) => setNewAcctName(e.target.value)}
@@ -925,6 +977,7 @@ function SettingsPage() {
           </div>
           <div className="mb-3 flex gap-2">
             <Input
+              aria-label="e.g., NVDA earnings tomorrow"
               placeholder="e.g., NVDA earnings tomorrow"
               value={pLabel}
               onChange={(e) => setPLabel(e.target.value)}
@@ -992,11 +1045,17 @@ function SettingsPage() {
               </SelectContent>
             </Select>
             <Input
+              aria-label="Symbol"
               placeholder="Symbol"
               value={aSym}
               onChange={(e) => setASym(e.target.value.toUpperCase())}
             />
-            <Input placeholder="Rationale" value={aRat} onChange={(e) => setARat(e.target.value)} />
+            <Input
+              aria-label="Rationale"
+              placeholder="Rationale"
+              value={aRat}
+              onChange={(e) => setARat(e.target.value)}
+            />
             <Button
               size="icon"
               onClick={() => {
@@ -1405,6 +1464,7 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
               a target nobody entered is exactly what Phase 4 removed. */}
           <Field label="Target value ($)">
             <Input
+              aria-label="Not set"
               type="number"
               value={form.target_value}
               placeholder="Not set"
@@ -1420,6 +1480,7 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
           </Field>
           <Field label="Contribution ($)">
             <Input
+              aria-label="No plan"
               type="number"
               value={form.contribution_amount}
               placeholder="No plan"
@@ -1428,6 +1489,7 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
           </Field>
           <Field label="Every (days)">
             <Input
+              aria-label="No plan"
               type="number"
               value={form.contribution_cadence_days}
               placeholder="No plan"
@@ -1486,23 +1548,6 @@ function AccountCard({ account, onSynced }: { account: Account; onSynced: () => 
   );
 }
 
-function Field({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={className}>
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      <div className="mt-1">{children}</div>
-    </div>
-  );
-}
-
 function AddAccountForm() {
   const qc = useQueryClient();
   const [name, setName] = useState("");
@@ -1528,6 +1573,7 @@ function AddAccountForm() {
   return (
     <div className="flex items-center gap-2 py-1">
       <Input
+        aria-label="Add account"
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Add account (e.g. HSA, ROTH IRA)"
