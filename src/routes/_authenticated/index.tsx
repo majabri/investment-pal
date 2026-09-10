@@ -46,6 +46,7 @@ import {
   useScopedHoldings,
   useScopedAccount,
   useLatestBalance,
+  useCashFlows,
   useSnapshots,
   useUnscopedSnapshotCount,
   useAccounts,
@@ -107,6 +108,10 @@ function Dashboard() {
   // imported. Preferred over the app's estimate below (Stage 3 delta).
   const { data: latestBalance } = useLatestBalance(scope);
   const { data: snapshots = [], isError: snapshotsError } = useSnapshots(scope);
+  // PERF-001: UNKNOWN until the cash_flows migration is applied and a flow
+  // history is recorded, and the panel says so rather than reporting a
+  // deposit as return.
+  const { data: cashFlows } = useCashFlows(scope);
   const { data: unscopedCount = 0 } = useUnscopedSnapshotCount();
   const series = useMemo(() => balanceSeries(snapshots), [snapshots]);
   const { data: priorities = [], dismiss: dismissPriority } = usePriorities();
@@ -595,6 +600,7 @@ function Dashboard() {
         <PerformancePanel
           series={series}
           totals={totals}
+          flows={cashFlows}
           objective={
             objective.kind === "set"
               ? {

@@ -1700,3 +1700,100 @@ money-adjacent: open the PR and stop."
 The `unknownBalances` guard was updated with it: it asserted `(NOT KNOWN of
 acct)`, and now asserts the labelled form plus `not.toContain("of acct")` — no
 bare, unattributed percentage survives on a holdings line.
+
+---
+
+## 2026-09-10 — Task 3 of the 09-10 audit brief: cash-flow-aware performance (PERF-001)
+
+### The defect, exactly
+
+`portfolioSummary.performance()` computed
+
+```ts
+const change = latest.net - start.net;
+changePct: start.net > 0 ? change / start.net : null,
+```
+
+and rendered it in a panel titled **Performance**, with a percentage. There was
+no cash-flow record anywhere in the schema, so:
+
+- deposit $10,000 into a flat $100,000 account → the app reported **+$10,000
+  (+10.0%) performance**;
+- withdraw $10,000 → it reported a **10% loss**.
+
+Neither number had anything to do with how the investments did.
+
+### Why the table has two columns where one looks sufficient
+
+`kind` records what happened; `treatment` records how the return arithmetic must
+handle it. Only money crossing the portfolio's boundary is removed from return:
+
+- a dividend **left in the account** is return — subtracting it understates
+  performance by exactly the dividend, every quarter, forever;
+- a dividend **swept out** to a bank account is an external outflow;
+- a fee or margin interest charge paid **from** the account is a real cost of
+  the strategy and belongs in the return; the same charge settled from outside
+  it is a contribution.
+
+Deriving `treatment` from `kind` is how a dividend gets counted twice or not at
+all, so it is stored, and `DEFAULT_TREATMENT` is explicitly a suggestion for the
+entry form rather than a rule.
+
+### The column that matters more than the table
+
+`accounts.cash_flows_as_of`. An account with no flow rows looks exactly like an
+account with no flows, and computing a time-weighted return under the second
+reading when the first is true **is PERF-001 again, with a better name on it**.
+NULL — every existing account — means NOT KNOWN, and only the account saying
+somebody looked can promote coverage out of `unknown`. Rows alone cannot: a
+partial import produces rows too.
+
+So there are three states, and they render differently:
+
+| Coverage | What the panel shows |
+|---|---|
+| `unknown` | change in value, with an amber caveat saying it is **not** a return |
+| `none` | a real return — somebody looked and nothing crossed the boundary |
+| `known` | a real return, with the net flow disclosed beside it |
+
+### The arithmetic
+
+`src/lib/returnMath.ts`.
+
+**TWR** links sub-periods: `r = p[i].net / (p[i-1].net + F) − 1` over
+`F = flows in (p[i-1].date, p[i].date]`. The half-open window encodes the stated
+convention — a flow dated `d` happened at the START of day `d` and is already
+inside day `d`'s closing value. A closed window would subtract it twice and
+invent a loss; there is a test for exactly that.
+
+`null`, never a number, when any sub-period starts from a non-positive base. A
+withdrawal that empties the account is not a −100% leg to multiply through; it
+is a break in the chain, and linking past it would silently drop everything
+before it.
+
+**MWR** is XIRR: Newton-Raphson with a bisection fallback over `[−0.9999, 100]`,
+returning `null` on no sign change or non-convergence. A non-converged XIRR is
+not a number to round and print. The first version of the bisection held `fLo`
+constant across iterations, which converges to the wrong root once the bracket
+moves — fixed, and the reason is in the comment.
+
+**Units.** TWR here is a period return; XIRR is annualised. `METHOD_LABEL.mwr`
+says "annualised" out loud, and `annualise()` exists so the two can be put on
+the same basis. A 10% one-month TWR beside a 214% annualised MWR in one row is
+the same defect as an unlabelled denominator.
+
+### Verification
+
+Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
+`bun test` **1002 pass / 0 fail** · boot 200 on `/auth`, `/summary`,
+`/portfolio`, `/settings`.
+
+Fault injection: coverage taken from the row count instead of `as_of` reddens 2;
+TWR ignoring flows — the original defect — reddens 6; the panel dropping its
+caveat reddens 2. Each restored and re-verified green.
+
+### Lovable checkpoint 1
+
+The migration is **not applied**. Until it is, `useCashFlows` errors on both
+selects and returns `unknown`, which is the correct answer and is what the panel
+already renders. Nothing regresses while it waits.
