@@ -515,6 +515,7 @@ export type Database = {
           original_thesis: string | null
           quantity: number
           sector: string | null
+          security_id: string | null
           symbol: string
           updated_at: string
           user_id: string
@@ -534,6 +535,7 @@ export type Database = {
           original_thesis?: string | null
           quantity?: number
           sector?: string | null
+          security_id?: string | null
           symbol: string
           updated_at?: string
           user_id: string
@@ -553,6 +555,7 @@ export type Database = {
           original_thesis?: string | null
           quantity?: number
           sector?: string | null
+          security_id?: string | null
           symbol?: string
           updated_at?: string
           user_id?: string
@@ -564,6 +567,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holdings_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
             referencedColumns: ["id"]
           },
         ]
@@ -613,6 +623,7 @@ export type Database = {
           relative_strength: number | null
           replaces_symbol: string | null
           risk: number | null
+          security_id: string | null
           symbol: string
           technical_strength: number | null
           thesis: string | null
@@ -634,6 +645,7 @@ export type Database = {
           relative_strength?: number | null
           replaces_symbol?: string | null
           risk?: number | null
+          security_id?: string | null
           symbol: string
           technical_strength?: number | null
           thesis?: string | null
@@ -655,6 +667,7 @@ export type Database = {
           relative_strength?: number | null
           replaces_symbol?: string | null
           risk?: number | null
+          security_id?: string | null
           symbol?: string
           technical_strength?: number | null
           thesis?: string | null
@@ -662,7 +675,15 @@ export type Database = {
           user_id?: string
           valuation?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "investment_universe_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ips_lite: {
         Row: {
@@ -963,6 +984,7 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          security_id: string | null
           source: string
           symbol: string
           user_id: string
@@ -973,6 +995,7 @@ export type Database = {
           created_at?: string
           date: string
           id?: string
+          security_id?: string | null
           source?: string
           symbol: string
           user_id: string
@@ -983,12 +1006,21 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          security_id?: string | null
           source?: string
           symbol?: string
           user_id?: string
           volume?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "price_history_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       priorities: {
         Row: {
@@ -1073,6 +1105,98 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      securities: {
+        Row: {
+          asset_class: string
+          canonical_symbol: string
+          created_at: string
+          cusip: string | null
+          delisted_at: string | null
+          figi: string | null
+          id: string
+          isin: string | null
+          name: string | null
+          sector: string | null
+          sector_source: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_class: string
+          canonical_symbol: string
+          created_at?: string
+          cusip?: string | null
+          delisted_at?: string | null
+          figi?: string | null
+          id?: string
+          isin?: string | null
+          name?: string | null
+          sector?: string | null
+          sector_source?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_class?: string
+          canonical_symbol?: string
+          created_at?: string
+          cusip?: string | null
+          delisted_at?: string | null
+          figi?: string | null
+          id?: string
+          isin?: string | null
+          name?: string | null
+          sector?: string | null
+          sector_source?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      security_aliases: {
+        Row: {
+          alias: string
+          alias_kind: string
+          created_at: string
+          id: string
+          security_id: string
+          source: string
+          user_id: string
+          valid_from: string | null
+          valid_to: string | null
+        }
+        Insert: {
+          alias: string
+          alias_kind: string
+          created_at?: string
+          id?: string
+          security_id: string
+          source: string
+          user_id: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Update: {
+          alias?: string
+          alias_kind?: string
+          created_at?: string
+          id?: string
+          security_id?: string
+          source?: string
+          user_id?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_aliases_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       server_request_limits: {
         Row: {
