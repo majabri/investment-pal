@@ -18,7 +18,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useGoal, useScopedHoldings, useScopedAccount } from "@/hooks/useAppData";
-import { accountTotals, scopeLabel } from "@/lib/accountTotals";
+import { accountTotals, scopeLabel,
+  livePriceOf,
+} from "@/lib/accountTotals";
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import {
@@ -125,7 +127,7 @@ function GoalsPage() {
   });
   const portfolioValue = useMemo(
     () =>
-      accountTotals(holdings, balance, (h) => liveQuotes?.[h.symbol]?.price ?? h.current_price)
+      accountTotals(holdings, balance, (h) => livePriceOf(h, liveQuotes))
         .totalAccountValue, // net equity — same arithmetic as the Office
     [holdings, balance, liveQuotes],
   );

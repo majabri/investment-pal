@@ -27,7 +27,9 @@ import { ReconciliationPanel } from "@/components/app/ReconciliationPanel";
 import { Button } from "@/components/ui/button";
 import { marginInterestFigure, rateStatus } from "@/lib/marginCost";
 import { balanceSeries, dayChange } from "@/lib/portfolioSummary";
-import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
+import { accountTotals, scopeIsEmpty, scopeLabel,
+  livePriceOf,
+} from "@/lib/accountTotals";
 import { constitutionCheck, positionsStaleDays } from "@/lib/constitutionCheck";
 import {
   AlertChips,
@@ -128,8 +130,7 @@ function Dashboard() {
     enabled: householdSymbols.length > 0,
     refetchInterval: 60 * 1000,
   });
-  const px = (h: { symbol: string; current_price: number }) =>
-    liveQuotes?.[h.symbol]?.price ?? h.current_price;
+  const px = (h: { symbol: string; current_price: number }) => livePriceOf(h, liveQuotes);
   const week = new Date();
   week.setDate(week.getDate() + 7);
   const weekEnd = localIsoDate(week);

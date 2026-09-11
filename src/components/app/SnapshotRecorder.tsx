@@ -14,12 +14,14 @@ import { useEffect } from "react";
 import { useAccountScope } from "@/contexts/AccountContext";
 import { useRecordSnapshot, useSnapshots } from "@/hooks/useAppData";
 import { balanceSeries } from "@/lib/portfolioSummary";
+import { snapshotDecision } from "@/lib/snapshotGate";
 import { localIsoDate } from "@/lib/localDate";
 
 export function SnapshotRecorder({
   gross,
   net,
   marginUsed,
+  today = localIsoDate(),
 }: {
   /** NULL when the account's cash or margin loan is not known (Phase 1a). A
    *  snapshot is a permanent, append-only record of what the account was worth;
@@ -28,6 +30,13 @@ export function SnapshotRecorder({
   gross: number | null;
   net: number | null;
   marginUsed: number | null;
+  /**
+   * The owner's calendar day. Injectable for the same reason `localIsoDate`
+   * takes a `now`: without a seam, a test can only catch a UTC-vs-local mix-up
+   * during the hours the two disagree, so the proof would pass or fail by the
+   * time of day it ran. Production never passes it.
+   */
+  today?: string;
 }) {
   const scope = useAccountScope();
   const { data: snapshots = [], isLoading } = useSnapshots(scope);
@@ -35,22 +44,27 @@ export function SnapshotRecorder({
 
   useEffect(() => {
     if (scope.kind !== "account") return;
-    // Nothing worth recording yet: a zero gross is the loading state, and a
-    // row of zeroes would draw a day the account was worth nothing.
-    if (gross === null || net === null || marginUsed === null) return;
-    if (!(gross > 0)) return;
-    if (isLoading || record.isPending) return;
-    const series = balanceSeries(snapshots);
-    // The owner's calendar day, not UTC. The previous check compared UTC dates,
-    // so an evening session west of Greenwich recorded a second row for what
-    // the user would call the same day.
-    if (series.at(-1)?.date === localIsoDate()) return;
-    record.mutate({ accountId: scope.accountId, gross, net, marginUsed });
+    // The decision lives in `lib/snapshotGate.ts`. It was four conditions here
+    // with no test file — and one of them is the dependency array below, which
+    // is a guard nothing could see. Moving the refusals somewhere pure is what
+    // let them be proven; what stays here is the effect and its dependencies.
+    const decision = snapshotDecision({
+      gross,
+      net,
+      marginUsed,
+      isAccountScope: true,
+      isLoading,
+      isPending: record.isPending,
+      lastRecordedDate: balanceSeries(snapshots).at(-1)?.date ?? null,
+      today,
+    });
+    if (!decision.record) return;
+    record.mutate({ accountId: scope.accountId, ...decision.figures });
     // `record` is deliberately not a dependency: including the mutation object
     // re-runs this whenever its own pending state changes, which turns a
     // once-a-day insert into a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, gross, net, marginUsed, snapshots, isLoading]);
+  }, [scope, gross, net, marginUsed, snapshots, isLoading, today]);
 
   return null;
 }
