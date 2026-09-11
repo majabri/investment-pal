@@ -28,7 +28,21 @@ export type QuoteLike = { price: number; prevClose: number };
 export type HouseholdHolding = PositionLike & { account_id: string | null; symbol: string };
 
 /** An account row: its identity, its balances, and how it is categorised. */
-export type HouseholdAccount = BalanceLike & { id: string };
+export type HouseholdAccount = BalanceLike & {
+  id: string;
+  /**
+   * How the account is classified (DATA-007). Optional because the rollup works
+   * without it — a missing type groups as `Unclassified`, which is the honest
+   * answer and never `Primary`.
+   *
+   * It used to be absent from this type entirely and the call below cast the
+   * account to `never` to get past it. That cast said nothing about whether the
+   * field arrives: `useAccounts` selects `*`, so it does, and grouping works —
+   * but nothing checked, and a query narrowed to named columns would have
+   * silently moved every account into `Unclassified` with no type error.
+   */
+  account_type?: string | null;
+};
 
 export type GroupTotal = {
   /** Net equity for the group. NULL = at least one account is unknown. */
@@ -86,7 +100,7 @@ export function householdRollup(
     // account must not restore a total that is already missing one.
     total = total === null || net === null ? null : total + net;
 
-    const category = accountCategory(account as never);
+    const category = accountCategory({ account_type: account.account_type ?? null });
     const g = groups.get(category) ?? { net: 0, day: 0 };
     g.net = g.net === null || net === null ? null : g.net + net;
     g.day += day;

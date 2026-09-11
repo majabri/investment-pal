@@ -34,6 +34,7 @@ import { useJournal } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { supabase } from "@/lib/supabaseClient";
 import { localIsoDate } from "@/lib/localDate";
+import type { Insert } from "@/lib/dbRows";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 import { objectiveOf } from "@/lib/objective";
 import { accountTotals } from "@/lib/accountTotals";
@@ -134,7 +135,7 @@ function PromptCenter() {
     queryKey: ["decisions-for-prompt"],
     queryFn: async () => {
       const { data } = await supabase
-        .from("decisions" as never)
+        .from("decisions")
         .select("decided_on,symbol,recommendation,decision,outcome_pl")
         .order("decided_on", { ascending: false })
         .limit(10);
@@ -152,7 +153,7 @@ function PromptCenter() {
     queryKey: ["decisions-scorecard"],
     queryFn: async () => {
       const { data } = await supabase
-        .from("decisions" as never)
+        .from("decisions")
         .select("action,recommendation,grade,outcome_1m")
         .in("grade", ["CORRECT", "WRONG"])
         .limit(200);
@@ -402,7 +403,11 @@ function PromptCenter() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("Not signed in");
       const today = localIsoDate();
-      const rows = actions.map((a) => ({
+      // Typed to the generated shape rather than inferred, so a column this
+      // screen invents — or a NOT NULL one it forgets — is a compile error.
+      // Every row here is model-derived text, which is exactly where a silent
+      // shape mistake is most likely and least visible.
+      const rows: Insert<"decisions">[] = actions.map((a) => ({
         user_id: auth.user!.id,
         decided_on: today,
         symbol: a.symbol,
@@ -427,7 +432,7 @@ function PromptCenter() {
       // check throws rather than filtering — silently dropping a field would
       // leave this code believing it had been saved.
       for (const row of rows) assertAiWritable("decisions", row);
-      const { error } = await supabase.from("decisions" as never).insert(rows as never);
+      const { error } = await supabase.from("decisions").insert(rows);
       if (error) throw error;
       toast.success(`Action Sheet extracted: ${actions.length} items logged as pending decisions`);
       void qc.invalidateQueries({

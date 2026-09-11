@@ -222,14 +222,22 @@ export function PortfolioCsvImport() {
         // an account with NO POSITIONS if the insert failed after the delete,
         // and dropped every thesis, note and review on every import (rule 29).
         const { data: result, error: rpcErr } = await supabase.rpc(
-          "import_account_positions" as never,
+          "import_account_positions",
           {
             p_account_id: acct!.id,
             p_rows: rows,
-            p_cash: cash,
+            // The ONE narrow cast in this call, and it is the generated type
+            // being wrong rather than the value. The function declares
+            // `p_cash NUMERIC` and its body is `COALESCE(p_cash, cash)` — a
+            // NULL deliberately leaves the stored cash alone (IMP-002, and
+            // `importSafety.test.ts` pins it). Supabase's generator cannot
+            // express a nullable parameter, so it emits `number`. Casting the
+            // whole argument object instead would also silence a genuinely
+            // wrong `p_account_id` or `p_rows`.
+            p_cash: cash as number,
             p_as_of: asOf,
             p_source: "portfolio_csv",
-          } as never,
+          },
         );
         if (rpcErr) throw rpcErr;
         const r = (result ?? {}) as { inserted?: number; updated?: number; removed?: number };

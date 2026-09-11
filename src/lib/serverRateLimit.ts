@@ -27,10 +27,10 @@ export async function enforceProviderRateLimit(
   scope: ProviderRateLimitScope,
 ): Promise<void> {
   const { data, error } = await supabase.rpc(
-    "consume_provider_request_limit" as never,
+    "consume_provider_request_limit",
     {
       p_scope: scope,
-    } as never,
+    },
   );
 
   if (error) {

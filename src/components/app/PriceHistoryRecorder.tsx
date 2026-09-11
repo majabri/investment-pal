@@ -49,8 +49,8 @@ export function PriceHistoryRecorder({ quotes }: { quotes: QuoteMap }) {
       }
 
       const { error } = await supabase
-        .from("price_history" as never)
-        .upsert(rows as never, { onConflict: "user_id,symbol,date" });
+        .from("price_history")
+        .upsert(rows, { onConflict: "user_id,symbol,date" });
 
       // On error (e.g. migration not yet applied), allow a later retry.
       if (error) doneForDay.current = null;

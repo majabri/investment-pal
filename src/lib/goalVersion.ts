@@ -12,6 +12,7 @@
 // dollars, and choosing silently would decide which one the holder meant.
 import { fvWithContributions, requiredCagrWithContributions } from "./objectiveMath";
 import { isRealCalendarDate, localIsoDate } from "./localDate";
+import type { Insert } from "./dbRows";
 
 /**
  * Which kind of starting point a version was planned from (GOAL-003).
@@ -340,7 +341,7 @@ export function versionChanges(
  * and a payload built in the hooks module is how a second one starts.
  */
 export function goalVersionInsert(input: {
-  userId: string | undefined;
+  userId: string;
   goalId: string;
   accountId?: string | null;
   baselineType: BaselineType;
@@ -351,7 +352,7 @@ export function goalVersionInsert(input: {
   contributionPlan: FlowPlan | null;
   supersedesId: string | null;
   note: string | null;
-}): Record<string, unknown> {
+}): Insert<"goal_versions"> {
   return {
     user_id: input.userId,
     goal_id: input.goalId,

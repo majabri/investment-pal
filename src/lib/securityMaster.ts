@@ -10,6 +10,7 @@
 // prices to another company's position is exactly the failure DATA-001 names,
 // and a wrong answer here is invisible afterwards.
 import { isRealCalendarDate, localIsoDate } from "./localDate";
+import type { Insert } from "./dbRows";
 import { SECTOR_MAP } from "./data/sectors";
 
 /** What kind of instrument. Decides which arithmetic is even meaningful. */
@@ -254,11 +255,11 @@ export const BACKFILL_ASSET_CLASS: AssetClass = "other";
 
 /** The `securities` row a backfill creates for one label. */
 export function securityInsert(input: {
-  userId: string | undefined;
+  userId: string;
   canonicalSymbol: string;
-}): Record<string, unknown> {
+}): Insert<"securities"> {
   return {
-    user_id: input.userId ?? null,
+    user_id: input.userId,
     canonical_symbol: normaliseAlias(input.canonicalSymbol),
     asset_class: BACKFILL_ASSET_CLASS,
     // Sector is left NULL rather than run through the built-in map here. The
@@ -272,12 +273,12 @@ export function securityInsert(input: {
 
 /** The `security_aliases` row that points a label at its security. */
 export function aliasInsert(input: {
-  userId: string | undefined;
+  userId: string;
   securityId: string;
   alias: string;
-}): Record<string, unknown> {
+}): Insert<"security_aliases"> {
   return {
-    user_id: input.userId ?? null,
+    user_id: input.userId,
     security_id: input.securityId,
     alias: normaliseAlias(input.alias),
     alias_kind: "ticker",

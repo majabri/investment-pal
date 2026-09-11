@@ -139,7 +139,7 @@ function Dashboard() {
     queryFn: async () => {
       const today = localIsoDate();
       const { data } = await supabase
-        .from("decisions" as never)
+        .from("decisions")
         .select("id,recommendation,decision")
         .eq("decided_on", today)
         .order("id", { ascending: true })
@@ -155,7 +155,7 @@ function Dashboard() {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 45);
       const { data } = await supabase
-        .from("decisions" as never)
+        .from("decisions")
         .select("id,symbol,action,recommendation,price_at_rec,decided_on")
         .gte("decided_on", localIsoDate(cutoff))
         .not("price_at_rec", "is", null)

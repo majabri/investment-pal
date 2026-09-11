@@ -66,7 +66,7 @@ function DecisionsPage() {
     queryKey: ["decisions-all"],
     queryFn: async () => {
       const { data } = await supabase
-        .from("decisions" as never)
+        .from("decisions")
         .select(CONTRACT_SELECT)
         .order("decided_on", { ascending: false })
         .order("id", { ascending: true })
