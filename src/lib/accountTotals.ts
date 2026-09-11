@@ -100,7 +100,55 @@ export type AccountTotals = {
   leverage: number | null;
   /** Debt ÷ gross. The figure the IPS margin cap is expressed against. */
   marginUtilisation: number | null;
+  /** Held positions carrying a usable price. */
+  pricedPositions: number;
+  /**
+   * Held positions with NO usable price.
+   *
+   * Their contribution to `positionsValue` is zero, which is not their value.
+   * When this is above zero every total below is a floor.
+   */
+  unpricedPositions: number;
+  /** What the two counts mean, for a screen to say out loud. */
+  valuationCoverage: ValuationCoverage;
 };
+
+/**
+ * How much of this scope's value the prices actually cover (PORT-003, §17.1).
+ *
+ * `empty`    — nothing held. Not a coverage problem.
+ * `complete` — every held position has a usable price.
+ * `partial`  — some do not. `positionsValue` is a FLOOR, not the value.
+ * `none`     — positions are held and not one of them is priced.
+ *
+ * The blueprint requires incomplete valuation be flagged when material
+ * positions lack valid prices, and nothing counted them: a position with no
+ * usable price contributed 0 to investments and the total read as a complete
+ * figure. That is the "unknown becomes zero" defect one level up from the
+ * fields — every individual number is right and the sum quietly is not.
+ */
+export type ValuationCoverage = "empty" | "complete" | "partial" | "none";
+
+/**
+ * Whether a position's price can be used.
+ *
+ * A price of zero is NOT a valuation. Nothing trades at exactly nothing, so a
+ * stored 0 on a held position means "never fetched", and counting it as a price
+ * is how a holding silently contributes nothing to the total. The known cost:
+ * a genuinely worthless holding reads as unpriced rather than as zero. That is
+ * the right way round — it is visible and correctable, where a silent zero is
+ * neither. Sub-cent prices are fine; `0.0001` is a price (§26.3).
+ */
+export function isUsablePrice(price: number): boolean {
+  return Number.isFinite(price) && price > 0;
+}
+
+/** Coverage from the two counts. Kept separate so it can be tested directly. */
+export function valuationCoverageOf(priced: number, unpriced: number): ValuationCoverage {
+  if (priced + unpriced === 0) return "empty";
+  if (unpriced === 0) return "complete";
+  return priced === 0 ? "none" : "partial";
+}
 
 /** A position figure: absent or unusable reads as 0, which for a quantity or a
  *  price is the arithmetic identity, not a claim about a balance. */
@@ -131,10 +179,19 @@ export function accountTotals<T extends PositionLike>(
 ): AccountTotals {
   let positionsValue = 0;
   let costBasis = 0;
+  let pricedPositions = 0;
+  let unpricedPositions = 0;
   for (const p of positions) {
     const qty = num(p.quantity);
-    positionsValue += qty * num(priceOf(p));
+    const price = num(priceOf(p));
+    positionsValue += qty * price;
     costBasis += qty * num(p.cost_basis);
+    // A zero-quantity row is not a held position and cannot be unpriced —
+    // counting it would put a permanent warning on every closed holding.
+    if (qty !== 0) {
+      if (isUsablePrice(price)) pricedPositions += 1;
+      else unpricedPositions += 1;
+    }
   }
 
   const cash = money(balance?.cash);
@@ -167,6 +224,9 @@ export function accountTotals<T extends PositionLike>(
   const unrealizedPL = positionsValue - costBasis;
 
   return {
+    pricedPositions,
+    unpricedPositions,
+    valuationCoverage: valuationCoverageOf(pricedPositions, unpricedPositions),
     positionsValue,
     cash,
     marginDebit,

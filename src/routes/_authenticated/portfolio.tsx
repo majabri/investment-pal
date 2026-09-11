@@ -295,6 +295,22 @@ function PortfolioPage() {
         />
       </div>
 
+      {/* PORT-003 / §17.1. A position with no usable price contributed 0 to
+          investments and every total above read as complete. Counting them is
+          the whole of the fix — nothing here re-values anything; it says the
+          figures are a floor, and which holdings are why. */}
+      {!noScope && totals.unpricedPositions > 0 ? (
+        <p
+          className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400"
+          role="status"
+        >
+          {totals.valuationCoverage === "none"
+            ? `None of the ${totals.unpricedPositions} holding${totals.unpricedPositions === 1 ? "" : "s"} here has a usable price, so the figures above exclude every position.`
+            : `${totals.unpricedPositions} of ${totals.pricedPositions + totals.unpricedPositions} holdings have no usable price, so the figures above are a floor, not the value.`}{" "}
+          Refresh quotes, or set a price on the holding.
+        </p>
+      ) : null}
+
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border bg-card p-5 lg:col-span-2">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
