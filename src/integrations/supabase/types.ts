@@ -281,6 +281,7 @@ export type Database = {
           decided_on: string
           decision: string
           evidence: Json | null
+          goal_version_id: string | null
           grade: string | null
           id: string
           invalidation_conditions: Json | null
@@ -310,6 +311,7 @@ export type Database = {
           decided_on?: string
           decision?: string
           evidence?: Json | null
+          goal_version_id?: string | null
           grade?: string | null
           id?: string
           invalidation_conditions?: Json | null
@@ -339,6 +341,7 @@ export type Database = {
           decided_on?: string
           decision?: string
           evidence?: Json | null
+          goal_version_id?: string | null
           grade?: string | null
           id?: string
           invalidation_conditions?: Json | null
@@ -360,7 +363,97 @@ export type Database = {
           symbol?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "decisions_goal_version_id_fkey"
+            columns: ["goal_version_id"]
+            isOneToOne: false
+            referencedRelation: "goal_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      goal_versions: {
+        Row: {
+          account_id: string | null
+          baseline_type: string
+          baseline_value: number | null
+          contribution_plan: Json | null
+          created_at: string
+          effective_at: string
+          goal_id: string
+          id: string
+          model_assumptions: Json | null
+          note: string | null
+          risk_constraints: Json | null
+          supersedes_id: string | null
+          target_date: string | null
+          target_return_pct: number | null
+          target_value: number | null
+          user_id: string
+          withdrawal_plan: Json | null
+        }
+        Insert: {
+          account_id?: string | null
+          baseline_type: string
+          baseline_value?: number | null
+          contribution_plan?: Json | null
+          created_at?: string
+          effective_at?: string
+          goal_id: string
+          id?: string
+          model_assumptions?: Json | null
+          note?: string | null
+          risk_constraints?: Json | null
+          supersedes_id?: string | null
+          target_date?: string | null
+          target_return_pct?: number | null
+          target_value?: number | null
+          user_id: string
+          withdrawal_plan?: Json | null
+        }
+        Update: {
+          account_id?: string | null
+          baseline_type?: string
+          baseline_value?: number | null
+          contribution_plan?: Json | null
+          created_at?: string
+          effective_at?: string
+          goal_id?: string
+          id?: string
+          model_assumptions?: Json | null
+          note?: string | null
+          risk_constraints?: Json | null
+          supersedes_id?: string | null
+          target_date?: string | null
+          target_return_pct?: number | null
+          target_value?: number | null
+          user_id?: string
+          withdrawal_plan?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_versions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_versions_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_versions_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "goal_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       goals: {
         Row: {
