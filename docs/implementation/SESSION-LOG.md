@@ -2640,3 +2640,73 @@ do match, and now reddens under injection.
 Not money-adjacent under OD-001 Amendment 1. The parser **transcribes** figures
 the broker printed; it computes and defaults nothing. Handling a value of that
 kind is ordinary work, so this merged on a green gate.
+
+---
+
+## Session — 2026-09-11 — PERF-001 gets a write path (Phase 1)
+
+### The finding this closes
+
+The gap analysis found `cash_flows` had **exactly one call site and it was a
+SELECT**. The migration was applied — Lovable's `1b613c0` regenerated
+`types.ts` with the table — but no code could ever put a row in it, so
+`flowCoverage` could only answer `unknown` and the time-weighted return
+merged in #190 could never run on a real figure. PERF-001 read as delivered on
+the merge log and was inert in the product (D-14).
+
+### Two acts, deliberately two buttons
+
+**Record** stores one flow. **Mark history complete** writes
+`accounts.cash_flows_as_of`, and that is the only thing that moves coverage off
+`unknown`.
+
+Recording deliberately does **not** promote coverage. A partial import produces
+rows too, and a return computed over a partial history is wrong by exactly what
+is missing — so one deposit must not turn the performance panel from "changes in
+value" into "returns". `coverageAfterRecording` exists to hold that line in a
+test rather than in a comment.
+
+The second button also matters for an account with no flows at all: `none` is a
+positive fact somebody has to state, and without a way to state it a genuinely
+flow-free account would show an em-dash forever.
+
+### Refusals that name the box
+
+`validateFlow` mirrors the `cash_flows_bounds` CHECK rather than relying on it.
+The database is the guarantee; this is the readable refusal. A negative deposit
+comes back as *"A deposit is money in, so it is positive. For money out, choose
+Withdrawal"* rather than as a Postgres constraint violation — the sign is the
+one mistake here that inverts a return silently.
+
+`fee`, `interest` and `dividend` are deliberately **not** sign-constrained, in
+the validator as in the CHECK: a fee rebate is a real positive flow, and
+refusing it would push it into the return instead.
+
+The stored `treatment` is what the holder chose, never derived from `kind` at
+write time. `DEFAULT_TREATMENT` re-suggests on a kind change and nothing more —
+a dividend swept out to a bank account is external, and only they know that.
+
+### Also
+
+Navigation did not move (ADR-APP-015 is Proposed). The panel sits on Portfolio,
+which is already account-scoped data entry.
+
+The two stale comments at `summary.tsx` and `index.tsx` are corrected: they said
+coverage was unknown "until the cash_flows migration is applied", which had
+stopped being true and implied waiting would fix it.
+
+### Verification
+
+Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
+`bun test` **1259 pass / 0 fail** · boot 200 on `/auth`, `/portfolio`,
+`/summary`, `/`.
+
+Fault injection, four ways: dropping the deposit/withdrawal sign rules reddens
+2; letting rows alone promote coverage reddens 1; deriving `treatment` from
+`kind` at write time reddens 1; allowing a future-dated flow reddens 1.
+
+### Governance
+
+Not money-adjacent under OD-001 Amendment 1. This **stores** flows the holder
+states as fact; it computes no figure, defaults no rate, and the return
+arithmetic it feeds was merged separately in #190.

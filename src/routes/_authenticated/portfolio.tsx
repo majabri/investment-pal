@@ -29,7 +29,13 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { supabase } from "@/lib/supabaseClient";
-import { useScopedHoldings, useScopedAccount, useLogSync, type Holding } from "@/hooks/useAppData";
+import {
+  useScopedHoldings,
+  useScopedAccount,
+  useLogSync,
+  useCashFlows,
+  type Holding,
+} from "@/hooks/useAppData";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
 import {
   DENOMINATOR_DEFINITION,
@@ -39,6 +45,7 @@ import {
 } from "@/lib/concentration";
 import type { Denominators } from "@/lib/concentration";
 import { ConcentrationBreakdown } from "@/components/app/ConcentrationBreakdown";
+import { CashFlowPanel } from "@/components/app/CashFlowPanel";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { PriceHistoryRecorder } from "@/components/app/PriceHistoryRecorder";
 import { SwingScoreBadge } from "@/components/app/SwingScoreBadge";
@@ -85,6 +92,7 @@ function PortfolioPage() {
   // Scoped, not aggregated. `account` here used to be every account summed,
   // and `upsert` wrote to whichever account happened to be first.
   const { data: balance, upsert } = useScopedAccount(scope);
+  const { data: cashFlows } = useCashFlows(scope);
   const scopeName = scopeLabel(scope);
   const noScope = scopeIsEmpty(scope) || balance === null;
   const logSync = useLogSync();
@@ -701,6 +709,16 @@ function PortfolioPage() {
             </div>
           );
         })()}
+
+        {/* PERF-001, write side. Sited here rather than behind a new nav entry
+            because flows are account-scoped data entry, which is what this page
+            already is — and ADR-APP-015 is Proposed, so navigation does not
+            move. */}
+        <CashFlowPanel
+          accountId={scope.kind === "account" ? scope.accountId : null}
+          coverage={cashFlows?.coverage ?? "unknown"}
+          rowCount={cashFlows?.rows.length ?? 0}
+        />
       </div>
     </AppShell>
   );
