@@ -32,13 +32,13 @@ import { accountTotals, scopeIsEmpty, scopeLabel,
 } from "@/lib/accountTotals";
 import { constitutionCheck, positionsStaleDays } from "@/lib/constitutionCheck";
 import {
-  AlertChips,
   BuybackStrip,
   TodaysPlanStrip,
 } from "@/components/app/dashboard/DashboardStrips";
 import { HouseholdStrip } from "@/components/app/dashboard/HouseholdStrip";
 import { householdRollup } from "@/lib/householdTotals";
 import { CommandCenterStrip } from "@/components/app/dashboard/CommandCenterStrip";
+import { AlertsPanel } from "@/components/app/AlertsPanel";
 import { GoalOutlookPanel } from "@/components/app/dashboard/GoalOutlookPanel";
 import { PrioritiesPanel } from "@/components/app/dashboard/PrioritiesPanel";
 import {
@@ -314,6 +314,26 @@ function Dashboard() {
       {/* The governance strip. Its arithmetic is `lib/constitutionCheck.ts`
           and its rendering is the component — this route resolves the inputs
           and nothing else (audit brief G4). */}
+      {/* §23.1. The conditions below were already evaluated — each visible only
+          on the screen that rendered it. This gathers them. Source health is
+          probed in Settings and the panel says so, because an unprobed source
+          must not read as a healthy one. */}
+      <AlertsPanel
+        input={{
+          constitution: noScope
+            ? null
+            : constitutionCheck(
+                holdings.map((h) => ({ symbol: h.symbol, quantity: h.quantity, price: px(h) })),
+                totals,
+                ipsLite,
+              ),
+          sources: [],
+          positionsStaleDays: positionsStaleDays(holdings),
+          valuationUnknown: totals.totalAccountValue === null,
+          goalProbability: goalMetrics?.prob ?? null,
+          upcomingEvents: alerts.map((a) => ({ date: a.date, text: a.text })),
+        }}
+      />
       <CommandCenterStrip
         verdict={constitutionCheck(
           holdings.map((h) => ({ symbol: h.symbol, quantity: h.quantity, price: px(h) })),
@@ -334,7 +354,6 @@ function Dashboard() {
       <HouseholdStrip rollup={householdRollup(accountsList, allHoldings, liveQuotes, px)} />
       <TodaysPlanStrip rows={todaysPlan} />
       <BuybackStrip plans={buybackPlans} />
-      <AlertChips alerts={alerts} />
       {/* The Portfolio Summary panels (Stage 5b), shared with /summary rather
           than re-implemented. The dashboard's own six stat cards said the same
           things in different words, and two wordings for one figure is how the

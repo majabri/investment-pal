@@ -2987,3 +2987,70 @@ make the tests honest rather than re-implementations: `livePriceOf` (extracting
 a five-way duplicate) and `snapshotGate` (extracting the decision). A test that
 asserts against its own copy of the logic proves nothing, which is the whole
 point of this phase.
+
+---
+
+## Session — 2026-09-11 — the two libraries that reached no screen (Phase 5)
+
+`alerts.ts` and `readinessGate.ts` were merged, tested and imported by nothing.
+Both are now wired, and wiring the second one turned up the defect that made it
+worth building.
+
+### DEGRADED had no representation at all
+
+`ReadinessPanel` asked `gate()` for allowed/blocked and **returned `null` when
+allowed**. So a review running without a noncritical input rendered *nothing* —
+no caveat, no gap named, no difference from a fully-ready run.
+
+That is the exact case §23.2 singles out: "a review may still run in degraded
+mode, but the output must clearly state what is unavailable and which
+conclusions are blocked." Silence is not that statement, and a user cannot tell
+a considered gap from a complete answer.
+
+The panel now takes `gateState`, which splits a capability's inputs into
+critical and noncritical — the same input carries different weight in different
+answers, so open orders block a share count and merely degrade prose a human
+reads. READY stays the only silent state. DEGRADED renders the caveat the output
+itself must carry, so the screen and any generated text say the same thing.
+
+One change reaches all three prompt centres, since they share the panel.
+
+### §23.1 gets one surface, not two
+
+`AlertsPanel` aggregates the seven conditions that were already evaluated, each
+visible only to whoever happened to be on the screen that rendered it — a margin
+breach on Portfolio, a dead feed in Settings, a stale import on a dashboard
+strip. All real, none gathered.
+
+The rule it holds hardest is what an **empty list** means: every evaluator ran
+and found nothing, never that nothing was checked. So the quiet sentence names
+the scope of what ran and says source health is probed in Settings — an unprobed
+source must not read as a healthy one. An unevaluable policy check reports "not
+a clean result" rather than silence, and the four types this surface cannot
+raise are listed with reasons rather than omitted.
+
+### A visible UI change, stated plainly
+
+`AlertChips` — the dashboard's event chip row — is **removed**, and its
+component and tests with it. It rendered `event_proximity` only, which the panel
+now raises, and two alert surfaces on one screen is the fragmentation §23.1
+exists to end. This is a change to what the dashboard looks like, not just to
+what it computes.
+
+### Verification
+
+Full gate: `typecheck` · `test:typecheck` · `bun test` **1335 pass / 0 fail** ·
+boot 200 on `/auth`, `/`, `/prompt-center`, `/kids-prompt-center`, `/kids`.
+
+Fault injection: restoring the boolean gate — DEGRADED invisible again — reddens
+4; reporting "all clear" when the policy check could not run reddens 1.
+
+Both panels carry axe assertions, and severity is carried in words as well as
+colour (§22.2).
+
+### Still not built
+
+**Persistence.** Acknowledging an alert so it stops nagging, and any health
+history, both need a table. Three migrations already reached Lovable this week;
+a fourth to hold dismissal state for a surface nobody has used yet is the wrong
+order, and the reasoning from #200/#201 has not changed.
