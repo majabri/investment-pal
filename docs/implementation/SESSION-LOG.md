@@ -2570,3 +2570,73 @@ does not — that is ordinary work and merges on a green gate.
 The doubt clause survives, narrowed to "unclear whether it computes a figure"
 rather than "a rate is nearby". ADR-APP-005 §2 is untouched: **ADRs are still
 never self-merged.**
+
+---
+
+## Session — 2026-09-11 — the balance parser could not read the balances page
+
+### The report that found it
+
+Not a test, and not me reading the code. Amir pasted his Fidelity balances page
+and got **"No balance figures found in that text."** The suite was green at the
+time, and had been for every commit since the parser shipped.
+
+### Why a green suite said nothing
+
+`parseBalanceBlock` required a label and its value in the same fragment.
+`balanceFragments` splits on newlines, and Fidelity's balances page copies out
+with the label on one line and its value on the next, prefixed `current:` —
+`Margin interest rate`, then `current: <rate>`. So every label line was dropped
+at the `amount === null` check as "a heading or a disclaimer", and every value
+line took its label from the text *before* the digits, which was only
+`current: `, matched nothing, and landed in `unrecognised`. **Twelve of twelve
+fields missed and `empty` was true.**
+
+The fixtures all used a one-line-per-field shape taken from the 2026-09-03
+Stage 2 brief. That sample was a reformatting, not a page copy. The parser and
+its 25 tests were built to a format that does not occur, so the suite passed on
+every commit while the only ingestion path in V1 (§20.1) was unusable.
+
+### The fix
+
+A pending label, carried across fragments and dropped by anything that breaks
+the adjacency it assumes:
+
+- a label-only line is **held**; a heading, a disclaimer or a `gains/losses:`
+  line with no value **clears** it;
+- a caps section heading is never held **even when its words match a label
+  pattern** — `MARGIN STATUS` matches nothing either way, but `EQUITY` and
+  `TOTAL` do, and without the check a heading would capture the first number
+  beneath it;
+- a held label is spent exactly once, and only on a fragment carrying **no
+  words of its own** (`isBareValue`);
+- a line with both label and value answers for itself and resets the held label.
+
+**Rule 1 did not move.** A held label applied to the wrong value is worse than a
+miss, so every ambiguity resolves to a miss: an unrecognised line between a
+label and a number breaks the pair, a timestamp breaks the pair, and a second
+number under a spent label is reported rather than filed.
+
+### Verification
+
+Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
+`bun test` **1241 pass / 0 fail** · boot 200 on `/auth` and `/portfolio`.
+
+Fixtures now exist in **both** shapes — the two-line page copy and the original
+single line — with the same synthetic figures, and a test asserts the two parse
+identically, so fixing the real format cannot regress the sample.
+
+Fault injection, four ways: reverting to the old drop-the-label behaviour
+reddens 7; binding a held label to any numeric line reddens 1; holding a
+heading reddens 1; letting a spent label survive reddens 1.
+
+**One of those tests was written wrong first.** The heading assertion used
+`MARGIN STATUS`, which matches no label pattern, so it passed with the guard
+removed — a vacuous test. It was rewritten around `EQUITY` and `TOTAL`, which
+do match, and now reddens under injection.
+
+### Governance
+
+Not money-adjacent under OD-001 Amendment 1. The parser **transcribes** figures
+the broker printed; it computes and defaults nothing. Handling a value of that
+kind is ordinary work, so this merged on a green gate.

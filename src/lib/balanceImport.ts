@@ -150,8 +150,10 @@ const EMPTY_FIELDS = (): BalanceFields => ({
  * accounting parentheses — because getting any of them wrong flips a debit into
  * a credit.
  */
+const AMOUNT = /\(?\s*[−–—-]?\s*\$?\s*[\d,]+(?:\.\d+)?\s*%?\s*\)?/;
+
 export function parseAmount(text: string): number | null {
-  const m = text.match(/\(?\s*[−–—-]?\s*\$?\s*[\d,]+(?:\.\d+)?\s*%?\s*\)?/);
+  const m = text.match(AMOUNT);
   if (!m) return null;
   const raw = m[0];
   const negative = /^\s*\(/.test(raw) || /[−–—-]\s*\$?\s*[\d,]/.test(raw);
@@ -180,6 +182,48 @@ export function isDateOrTime(fragment: string): boolean {
 }
 
 /**
+ * Prefixes Fidelity puts on a VALUE line when the label is on the line above.
+ *
+ * The balances page copies out as two lines per field — `Margin interest rate`
+ * then `current: 9.875%` — and the prefix is the only thing standing between
+ * the label above and its number. Stripped rather than matched as a label,
+ * because `current:` names no field.
+ */
+const VALUE_PREFIX = /^\s*(?:current|gains?\/losses?|gain\/loss)\s*:\s*/i;
+
+/**
+ * A section heading: capitals, no lowercase, no digits.
+ *
+ * `HOLDINGS`, `MARGIN STATUS`, `AVAILABLE TO TRADE`. These must never be held
+ * as a pending label — a heading held across a section boundary is exactly the
+ * wrong-value binding this parser refuses to make.
+ */
+export function isSectionHeading(fragment: string): boolean {
+  return /[A-Z]/.test(fragment) && !/[a-z]/.test(fragment) && !/\d/.test(fragment);
+}
+
+/** The field a fragment's text names, or null. */
+function labelKeyOf(text: string): BalanceFieldKey | null {
+  const hit = LABEL_PATTERNS.find(([, re]) => re.test(text));
+  return hit ? hit[0] : null;
+}
+
+/**
+ * Whether a fragment is a number and nothing else.
+ *
+ * This is the guard on the whole pending-label mechanism. A held label may be
+ * applied ONLY to a fragment that carries no words of its own: once the amount
+ * and any `current:` prefix are removed, a single letter left behind means the
+ * line names something, and binding the held label to it would file a figure
+ * under a field the user never saw. A miss is recoverable; a wrong number in a
+ * balance column is not (rule 1 — a partial parse is never silently accepted).
+ */
+export function isBareValue(fragment: string): boolean {
+  const rest = fragment.replace(VALUE_PREFIX, "").replace(AMOUNT, " ");
+  return !/[A-Za-z]/.test(rest);
+}
+
+/**
  * Split a paste into label/value fragments.
  *
  * Fidelity's balances copy out as one line per field on the web, as
@@ -199,31 +243,76 @@ export function parseBalanceBlock(input: string): BalanceParse {
   const fields = EMPTY_FIELDS();
   const unrecognised: string[] = [];
 
-  for (const fragment of balanceFragments(input)) {
-    // A timestamp is not a figure. Skipped before parsing, because the digits
-    // in a date parse perfectly well into a plausible-looking amount.
-    if (isDateOrTime(fragment)) continue;
+  // The label from a preceding line, waiting for the number that belongs to it.
+  //
+  // Fidelity's balances page copies out with the label and its value on
+  // SEPARATE lines. Before this, a label line was dropped as "a heading" and
+  // the value line landed in `unrecognised`, so a real paste produced twelve
+  // misses and the screen said "No balance figures found in that text" — while
+  // the test suite stayed green, because every fixture used the reformatted
+  // one-line shape from the 2026-09-03 brief rather than the page copy.
+  //
+  // The label is held for exactly one fragment's reach and is dropped by
+  // anything that breaks the adjacency it assumes.
+  let held: BalanceFieldKey | null = null;
 
-    const amount = parseAmount(fragment);
-    // A fragment with no number is a heading or a disclaimer. Not an error, and
-    // not something to report as unrecognised.
-    if (amount === null) continue;
-
-    // Match against the label part only. Searching the whole fragment lets a
-    // dollar amount containing "11" satisfy a pattern meant for a label.
-    const label = fragment.slice(0, fragment.search(/\(?\s*[−–—-]?\s*\$?\s*[\d,]+(?:\.\d+)?/));
-    const hit = LABEL_PATTERNS.find(([, re]) => re.test(label || fragment));
-    if (!hit) {
-      unrecognised.push(fragment);
-      continue;
-    }
-    const [key] = hit;
+  const take = (key: BalanceFieldKey, amount: number) => {
     // First occurrence wins. Fidelity repeats "Total" in per-section subtotals
     // below the summary; the summary comes first and is the one that is the
     // account's total.
-    if (fields[key] !== null) continue;
+    if (fields[key] !== null) return;
     // The debit is stored positive whichever way it was printed.
     fields[key] = key === "netDebit" ? Math.abs(amount) : amount;
+  };
+
+  for (const fragment of balanceFragments(input)) {
+    // A timestamp is not a figure. Skipped before parsing, because the digits
+    // in a date parse perfectly well into a plausible-looking amount. It also
+    // drops any held label: a stamp between a label and a number means they
+    // were never a pair.
+    if (isDateOrTime(fragment)) {
+      held = null;
+      continue;
+    }
+
+    const amount = parseAmount(fragment);
+
+    if (amount === null) {
+      // No number. Either a label awaiting its value on the next line, or a
+      // heading/disclaimer — including a `gains/losses:` line with nothing
+      // after it, which names a field but supplies no figure.
+      //
+      // A heading is never held even when its words brush a label pattern, and
+      // an unrecognised line CLEARS the held label rather than leaving it to
+      // reach across. Both are the same rule: the pending label survives only
+      // while the next line is still plausibly its value.
+      held = isSectionHeading(fragment) ? null : labelKeyOf(fragment);
+      continue;
+    }
+
+    // Match against the label part only. Searching the whole fragment lets a
+    // dollar amount containing "11" satisfy a pattern meant for a label.
+    const label = fragment.slice(0, fragment.search(AMOUNT));
+    const own = labelKeyOf(label || fragment);
+    if (own) {
+      // Label and value on one line — the original single-line shape. It
+      // answers for itself, so any held label is stale and goes.
+      take(own, amount);
+      held = null;
+      continue;
+    }
+
+    if (held !== null && isBareValue(fragment)) {
+      take(held, amount);
+      held = null;
+      continue;
+    }
+
+    // A number under no label this parser knows. Reported, never guessed at:
+    // applying a held label to a line carrying words of its own is how a figure
+    // lands in the wrong column, which is worse than the miss.
+    unrecognised.push(fragment);
+    held = null;
   }
 
   const missing = BALANCE_FIELD_ORDER.filter((k) => fields[k] === null);
