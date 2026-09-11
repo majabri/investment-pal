@@ -11,11 +11,15 @@
 // These pin the resolution, and — more importantly — the refusals.
 import { describe, expect, test } from "bun:test";
 import {
+  BACKFILL_ASSET_CLASS,
   SECTOR_PRECEDENCE,
   UNCLASSIFIED,
+  aliasInsert,
   canonicalSector,
   isListed,
+  planBackfill,
   resolveSecurity,
+  securityInsert,
 } from "@/lib/securityMaster";
 import type { Security, SecurityAlias } from "@/lib/securityMaster";
 
@@ -229,5 +233,116 @@ describe("isListed", () => {
     expect(isListed(s("2026-06-01"), "2026-05-31")).toBe(true);
     expect(isListed(s("2026-06-01"), "2026-06-01")).toBe(false);
     expect(isListed(s("2026-06-01"), "2026-09-10")).toBe(false);
+  });
+});
+
+// Backfill (UNIV-001 / DATA-001, write side).
+//
+// The tables shipped with zero call sites: nothing read them, nothing wrote
+// them, every `security_id` was NULL and symbol stayed the de facto identity.
+describe("planBackfill", () => {
+  const alias = (securityId: string, a: string): SecurityAlias => ({
+    securityId,
+    alias: a,
+    aliasKind: "ticker",
+    validFrom: null,
+    validTo: null,
+  });
+
+  test("NEGATIVE CONTROL: an unknown label is planned for creation", () => {
+    // Without this, every skip below passes on a planner that creates nothing.
+    expect(planBackfill(["AAA"], []).create).toEqual(["AAA"]);
+  });
+
+  test("a label that already resolves is left alone", () => {
+    // Re-creating it would fork the identity — the defect the table prevents.
+    const p = planBackfill(["AAA"], [alias("s1", "AAA")]);
+    expect(p.create).toEqual([]);
+    expect(p.alreadyResolved).toEqual(["AAA"]);
+  });
+
+  test("case and whitespace do not fork a security", () => {
+    const p = planBackfill(["aapl", "AAPL", "  Aapl  "], []);
+    expect(p.create).toEqual(["AAPL"]);
+  });
+
+  test("an ambiguous label is neither created nor resolved", () => {
+    // Two securities claim it. Creating a third would make that permanent.
+    const p = planBackfill(["AAA"], [alias("s1", "AAA"), alias("s2", "AAA")]);
+    expect(p.ambiguous).toEqual(["AAA"]);
+    expect(p.create).toEqual([]);
+    expect(p.alreadyResolved).toEqual([]);
+  });
+
+  test("it is idempotent — the second run plans nothing", () => {
+    const first = planBackfill(["AAA", "BBB"], []);
+    expect(first.create).toEqual(["AAA", "BBB"]);
+    const after = [alias("s1", "AAA"), alias("s2", "BBB")];
+    expect(planBackfill(["AAA", "BBB"], after).create).toEqual([]);
+  });
+
+  test("empty and blank labels are skipped, not created", () => {
+    expect(planBackfill(["", "   ", "AAA"], []).create).toEqual(["AAA"]);
+  });
+
+  test("a label whose alias window has closed is created, not resolved", () => {
+    // The alias pointed there once and no longer does. Treating a closed
+    // window as current would attach today's holding to a retired identity.
+    const closed: SecurityAlias = { ...alias("s1", "AAA"), validTo: "2020-01-01" };
+    expect(planBackfill(["AAA"], [closed], "2026-09-11").create).toEqual(["AAA"]);
+  });
+});
+
+describe("securityInsert / aliasInsert", () => {
+  test("a backfilled security carries NO sector", () => {
+    // The built-in map is a FALLBACK that canonicalSector applies behind a user
+    // or provider answer. Writing its output here would promote a guess to a
+    // stored fact and destroy that precedence.
+    const row = securityInsert({ userId: "u1", canonicalSymbol: "AAA" });
+    expect(row.sector).toBeNull();
+    expect(row.sector_source).toBeNull();
+  });
+
+  test("asset class is `other`, never guessed from the symbol", () => {
+    // A four-letter ticker is not an ETF. There is no `unknown` member, so the
+    // least-claiming one is used and the holder can correct it.
+    expect(securityInsert({ userId: "u1", canonicalSymbol: "AAA" }).asset_class).toBe("other");
+    expect(BACKFILL_ASSET_CLASS).toBe("other");
+  });
+
+  test("the canonical symbol is normalised", () => {
+    expect(securityInsert({ userId: "u1", canonicalSymbol: "  aaa " }).canonical_symbol).toBe("AAA");
+  });
+
+  test("an alias carries a source, because the column is NOT NULL", () => {
+    // Omitting it is a constraint violation that only appears at insert time.
+    const row = aliasInsert({ userId: "u1", securityId: "s1", alias: "AAA" });
+    expect(row.source).toBe("derived");
+    // Not `imported` — no broker sent us this mapping, the app inferred it.
+    expect(row.source).not.toBe("imported");
+  });
+
+  test("an alias window is open at both ends", () => {
+    // A backfill has no evidence of when the mapping began, and inventing a
+    // start date would make every resolution before it fail.
+    const row = aliasInsert({ userId: "u1", securityId: "s1", alias: "AAA" });
+    expect(row.valid_from).toBeNull();
+    expect(row.valid_to).toBeNull();
+  });
+
+  test("the alias round-trips through resolveSecurity", () => {
+    // The whole point: what the backfill writes must be what the resolver
+    // reads. Asserting the shape alone would not catch a field-name drift.
+    const row = aliasInsert({ userId: "u1", securityId: "s1", alias: "  AAA " });
+    const res = resolveSecurity("AAA", [
+      {
+        securityId: row.security_id as string,
+        alias: row.alias as string,
+        aliasKind: "ticker",
+        validFrom: null,
+        validTo: null,
+      },
+    ]);
+    expect(res).toEqual({ kind: "resolved", securityId: "s1" });
   });
 });

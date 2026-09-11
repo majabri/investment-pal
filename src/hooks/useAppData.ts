@@ -8,6 +8,8 @@ import { scopedRows, type AccountScope } from "@/lib/accountTotals";
 import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 import { localIsoDate } from "@/lib/localDate";
 import { canRecordFlow, flowCoverage, flowInsert, validateFlow } from "@/lib/cashFlows";
+import { aliasInsert, planBackfill, securityInsert } from "@/lib/securityMaster";
+import type { SecurityAlias } from "@/lib/securityMaster";
 import type { CashFlowRow, FlowDraft } from "@/lib/cashFlows";
 import { canRecordVersion, goalHistory, goalVersionInsert, latestVersion } from "@/lib/goalVersion";
 import type { GoalHistory, GoalVersionRow } from "@/lib/goalVersion";
@@ -976,6 +978,93 @@ export function useMarkFlowsReviewed() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cash_flows"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
+    },
+  });
+}
+
+/**
+ * The security master, as the resolver needs it (UNIV-001).
+ *
+ * Errors read as an EMPTY master rather than as a failure, and that is safe
+ * here only because every consumer treats "no security" as "resolve by symbol,
+ * as before". An empty master degrades to the pre-UNIV-001 behaviour; it never
+ * produces a wrong identity.
+ */
+export function useSecurityAliases() {
+  return useQuery({
+    queryKey: ["security_aliases"],
+    queryFn: async (): Promise<SecurityAlias[]> => {
+      const { data, error } = await supabase
+        .from("security_aliases" as never)
+        .select("security_id,alias,alias_kind,valid_from,valid_to");
+      if (error) return [];
+      return ((data ?? []) as unknown as {
+        security_id: string;
+        alias: string;
+        alias_kind: SecurityAlias["aliasKind"];
+        valid_from: string | null;
+        valid_to: string | null;
+      }[]).map((r) => ({
+        securityId: r.security_id,
+        alias: r.alias,
+        aliasKind: r.alias_kind,
+        validFrom: r.valid_from,
+        validTo: r.valid_to,
+      }));
+    },
+  });
+}
+
+/**
+ * Give every held symbol a stable security id (DATA-001).
+ *
+ * Creates one `securities` row and one `security_aliases` row per label that
+ * does not already resolve, then points each holding at its security. Labels
+ * that already resolve are left alone — re-creating one forks the identity,
+ * which is the defect this table exists to prevent. Ambiguous labels are
+ * neither created nor linked and are reported back, because breaking the tie by
+ * inventing a third security would make the ambiguity permanent.
+ *
+ * Idempotent: running it twice plans nothing the second time.
+ */
+export function useBackfillSecurities() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { symbols: string[]; aliases: SecurityAlias[] }) => {
+      const plan = planBackfill(p.symbols, p.aliases);
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not signed in");
+      const userId = userData.user.id;
+
+      for (const symbol of plan.create) {
+        const { data: sec, error: secError } = await supabase
+          .from("securities" as never)
+          .insert(securityInsert({ userId, canonicalSymbol: symbol }) as never)
+          .select("id")
+          .single();
+        if (secError) throw secError;
+        const securityId = (sec as unknown as { id: string }).id;
+
+        const { error: aliasError } = await supabase
+          .from("security_aliases" as never)
+          .insert(aliasInsert({ userId, securityId, alias: symbol }) as never);
+        if (aliasError) throw aliasError;
+
+        // Point the holdings at it. Symbol stays on the row as a LABEL — this
+        // adds identity rather than replacing the label with it (DATA-001).
+        const { error: linkError } = await supabase
+          .from("holdings")
+          .update({ security_id: securityId } as never)
+          .eq("user_id", userId)
+          .ilike("symbol", symbol);
+        if (linkError) throw linkError;
+      }
+
+      return plan;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["security_aliases"] });
+      qc.invalidateQueries({ queryKey: ["holdings"] });
     },
   });
 }

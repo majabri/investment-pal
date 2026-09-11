@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Field } from "@/components/app/Field";
 import { SourceHealthCard } from "@/components/app/SourceHealthCard";
+import { SecurityMasterCard } from "@/components/app/SecurityMasterCard";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -893,6 +894,7 @@ function SettingsPage() {
           strip for the same glance. */}
       <div className="mt-4">
         <SourceHealthCard />
+        <SecurityMasterCard />
       </div>
       {/* ACCOUNTS */}
       <section className="rounded-2xl border bg-card p-5">
