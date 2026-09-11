@@ -32,7 +32,9 @@ import {
   useSnapshots,
   useUnscopedSnapshotCount,
 } from "@/hooks/useAppData";
-import { accountTotals, scopeIsEmpty, scopeLabel, type AccountScope } from "@/lib/accountTotals";
+import { accountTotals, scopeIsEmpty, scopeLabel, type AccountScope,
+  livePriceOf,
+} from "@/lib/accountTotals";
 import { getEarningsCalendarFn } from "@/lib/calendarServer";
 import { getQuotesFn } from "@/lib/marketServer";
 import { marginInterestFigure } from "@/lib/marginCost";
@@ -86,7 +88,7 @@ function SummaryPage() {
     refetchInterval: 60 * 1000,
   });
   const px = (h: { symbol: string; current_price: number }) =>
-    quotes?.[h.symbol]?.price ?? h.current_price;
+    livePriceOf(h, quotes);
 
   const totals = useMemo(
     () => (balance === null ? null : accountTotals(holdings, balance, px)),

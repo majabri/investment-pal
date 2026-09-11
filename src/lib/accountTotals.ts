@@ -150,6 +150,29 @@ export function valuationCoverageOf(priced: number, unpriced: number): Valuation
   return priced === 0 ? "none" : "partial";
 }
 
+/**
+ * The price to value a holding at: the live quote, or the stored one.
+ *
+ * §26.2 lists "missing quote does not become zero" as a mandatory data-state
+ * test, and there was no such test — the behaviour was correct and undefended.
+ * The expression lived inline at five call sites
+ * (`quotes?.[h.symbol]?.price ?? h.current_price`), which is five places for it
+ * to be got wrong and none of them reachable by a unit test.
+ *
+ * A missing quote falls back to the stored price. It does NOT fall back to
+ * zero, and it does not fall back to a stale quote for a different symbol. A
+ * quote that arrives as a non-number is treated as missing rather than
+ * propagated: `NaN` through a multiplication makes a whole total `NaN`, which
+ * renders as nothing anywhere and looks like a crash rather than a gap.
+ */
+export function livePriceOf(
+  holding: { symbol: string; current_price: number },
+  quotes: Record<string, { price: number }> | undefined,
+): number {
+  const quoted = quotes?.[holding.symbol]?.price;
+  return typeof quoted === "number" && Number.isFinite(quoted) ? quoted : holding.current_price;
+}
+
 /** A position figure: absent or unusable reads as 0, which for a quantity or a
  *  price is the arithmetic identity, not a claim about a balance. */
 const num = (v: number | null | undefined): number =>

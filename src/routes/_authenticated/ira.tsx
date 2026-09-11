@@ -9,7 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 import { useAccounts, useAllHoldings } from "@/hooks/useAppData";
 import { accountCategory } from "@/lib/data/accountGroups";
-import { accountTotals } from "@/lib/accountTotals";
+import { accountTotals,
+  livePriceOf,
+} from "@/lib/accountTotals";
 import { getQuotesFn } from "@/lib/marketServer";
 import { fmtUSD, fmtPct } from "@/lib/finance";
 import { usdOrNotKnown, usdOrUnavailable } from "@/lib/unavailable";
@@ -43,7 +45,7 @@ function Page() {
     refetchInterval: 60 * 1000,
   });
   const px = (h: { symbol: string; current_price: number }) =>
-    quotes?.[h.symbol]?.price ?? h.current_price;
+    livePriceOf(h, quotes);
 
   const rows = iraAccounts.map((a) => {
     const hs = allHoldings.filter((h) => h.account_id === a.id);

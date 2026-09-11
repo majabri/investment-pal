@@ -22,7 +22,7 @@
 // is checking tests only that two copies of a formula agree.
 import { describe, expect, test } from "bun:test";
 
-import { accountTotals } from "../accountTotals";
+import { accountTotals, isUsablePrice } from "../accountTotals";
 import { sumField } from "../accountAggregate";
 import { DEFAULT_TOLERANCE, reconcileAccount, wasChecked } from "../reconciliation";
 import { runChecks, gate, combineChecks } from "../readiness";
@@ -574,5 +574,99 @@ describe("this suite is synthetic and calls the shipped code", () => {
 
   test("precision survives at synthetic crypto scale", () => {
     expect(fmtPrice(0.00002, { instrument_class: "crypto" })).not.toBe("$0.00");
+  });
+});
+
+// The two §26.3 scenarios that had no synthetic equivalent.
+//
+// The blueprint's §26.3 fixtures are real portfolio figures, which ADR-APP-012
+// rules 23-25 keep out of this repository. The SCENARIOS are the valuable part
+// and the rest of this file already carries most of them; these two did not
+// have a home. Numbers are synthetic and chosen so each proves its own point:
+// the sub-cent price is small enough that two-decimal rounding would erase it
+// entirely, and the basis differs from market by enough that a sign error is
+// obvious rather than a near-miss.
+describe("§26.3 — sub-cent instruments keep their meaning", () => {
+  test("a 0.0001 price is a price, not a rounding artefact", () => {
+    // Rounded to cents this is 0.00, and a holding worth $40 reads as worth
+    // nothing. `isUsablePrice` must accept it and the value must survive.
+    expect(isUsablePrice(0.0001)).toBe(true);
+    const t = accountTotals(
+      [{ symbol: "PENNY", quantity: 400_000, cost_basis: 0.00005, current_price: 0.0001 }],
+      { cash: 0, margin_used: 0, margin_enabled: false },
+    );
+    expect(t.positionsValue).toBeCloseTo(40, 6);
+    expect(t.valuationCoverage).toBe("complete");
+  });
+
+  test("a sub-cent move is not erased", () => {
+    // 0.0001 → 0.00011 is a 10% gain. At two decimals both are 0.00 and the
+    // gain is invisible; the point of the fixture is that it is not.
+    const at = (price: number) =>
+      accountTotals([{ symbol: "PENNY", quantity: 400_000, cost_basis: 0.0001, current_price: price }], {
+        cash: 0,
+        margin_used: 0,
+        margin_enabled: false,
+      });
+    const before = at(0.0001).positionsValue;
+    const after = at(0.00011).positionsValue;
+    expect(after - before).toBeCloseTo(4, 6);
+    expect(after).toBeGreaterThan(before);
+  });
+
+  test("a real zero is still unpriced, even at sub-cent scale", () => {
+    // The distinction the scale makes tempting to blur: 0.0001 is a price and
+    // 0 is not, however small the instrument.
+    expect(isUsablePrice(0)).toBe(false);
+  });
+});
+
+describe("§26.3 — basis against market gives unrealised P/L", () => {
+  const balance = { cash: 5_000, margin_used: 0, margin_enabled: false };
+
+  test("market above basis is a gain, and it is the difference", () => {
+    const t = accountTotals(
+      [
+        { symbol: "AAA", quantity: 100, cost_basis: 40, current_price: 55 }, // +1,500
+        { symbol: "BBB", quantity: 200, cost_basis: 12.5, current_price: 15 }, // +500
+      ],
+      balance,
+    );
+    expect(t.costBasis).toBeCloseTo(6_500, 2);
+    expect(t.positionsValue).toBeCloseTo(8_500, 2);
+    expect(t.unrealizedPL).toBeCloseTo(2_000, 2);
+  });
+
+  test("market below basis is a LOSS, signed", () => {
+    // A sign error here reports a loss as a gain of the same size, which is
+    // the whole position wrong in the direction that matters most.
+    const t = accountTotals(
+      [{ symbol: "AAA", quantity: 100, cost_basis: 55, current_price: 40 }],
+      balance,
+    );
+    expect(t.unrealizedPL).toBeCloseTo(-1_500, 2);
+    expect(t.unrealizedPL).toBeLessThan(0);
+  });
+
+  test("cash never enters the P/L", () => {
+    const positions = [{ symbol: "AAA", quantity: 100, cost_basis: 40, current_price: 55 }];
+    const small = accountTotals(positions, { ...balance, cash: 0 });
+    const large = accountTotals(positions, { ...balance, cash: 900_000 });
+    expect(small.unrealizedPL).toBe(large.unrealizedPL);
+  });
+
+  test("an unpriced holding does not report a 100% loss", () => {
+    // §35.2: "a missing quote cannot create a false −100% loss or false zero
+    // valuation." With no price the position contributes 0 to market value, so
+    // the arithmetic WOULD read as a total loss — the coverage flag is what
+    // stops that being presented as one.
+    const t = accountTotals(
+      [{ symbol: "AAA", quantity: 100, cost_basis: 40, current_price: 0 }],
+      balance,
+    );
+    expect(t.unrealizedPL).toBeCloseTo(-4_000, 2);
+    // …and the scope declares itself unvalued, which is what the screen reads.
+    expect(t.valuationCoverage).toBe("none");
+    expect(t.unpricedPositions).toBe(1);
   });
 });

@@ -2913,3 +2913,77 @@ defect, and moving 1,400 lines of hook into new files to fix a typing problem
 that the types themselves fixed would have been a much larger diff for no
 further safety. That extraction stays available if call-site sprawl becomes the
 problem; today it is not.
+
+---
+
+## Session — 2026-09-11 — proving what was only reasoned (Phase 3)
+
+Four things in the gap analysis were judged correct **by reading the code**, with
+nothing defending them. This closes those, and corrects one of the findings.
+
+### A correction: `outcomeGrade` was already covered
+
+D-08 said `portfolioSummary.ts:202/:408` and `outcomeGrade.ts:49` were all
+unproven. `addDaysISO` — the `outcomeGrade` one — already had **four**
+TZ-parameterised tests in `calendarDateBoundary.test.ts`. Only
+`portfolioSummary` was uncovered, and it now has six, in the same subprocess
+harness.
+
+### §26.2's missing mandatory test, and the extraction that made it real
+
+"Missing quote does not become zero" had no test. The behaviour was correct and
+undefended, and the expression lived inline at **five** call sites as
+`quotes?.[h.symbol]?.price ?? h.current_price` — five places to get it wrong and
+none of them reachable by a unit test.
+
+`livePriceOf` is that expression, once. A missing quote falls back to the stored
+price; it does not fall back to zero, does not borrow another symbol's quote,
+and treats a non-numeric quote as missing rather than propagating `NaN` through
+a multiplication into a total that renders as nothing everywhere.
+
+### The snapshot gate, and an approach abandoned halfway
+
+The recorder's four guards had no test file. The first attempt tested the
+**component**, which meant mocking the account context and the query hooks —
+and, through them, pulling the browser Supabase client into the test typecheck
+to assert four booleans. That surfaced two type errors in unrelated files
+(`supabaseClient.ts`'s `typeof fetch` against Bun's, and a generic-resolution
+complaint on an `ips_lite` upsert), neither of which is a defect in the app.
+
+**That proved the approach wrong, not the code.** The attempt was reverted —
+including a change to `supabaseClient.ts` that made things worse — and the
+decision extracted to `lib/snapshotGate.ts` instead, which is how the rest of
+this codebase is built: the refusals are pure, the component keeps the effect
+and the dependency array it must not change.
+
+`snapshotDecision` returns the figures it proved rather than a boolean, so the
+caller does not re-check the three nulls the gate has just checked — a redundant
+check is how two copies of a rule drift apart.
+
+One rule got a test it would not otherwise have had: **a zero NET still
+records.** Only gross gates, and gating on net would silently drop the most
+interesting day a margin account has.
+
+### §26.3's last two scenarios
+
+Sub-cent precision and basis-versus-market now have synthetic equivalents in
+`syntheticRegression.test.ts`. The penny fixture is chosen so two-decimal
+rounding would erase it entirely; the basis fixture so a sign error is obvious
+rather than a near-miss. §35.2's "a missing quote cannot create a false −100%
+loss" is covered as the place where the two rules meet.
+
+### Verification
+
+Full gate: `typecheck` · `test:typecheck` · `bun test` **1320 pass / 0 fail** ·
+boot 200 on `/auth`, `/`, `/portfolio`, `/summary`, `/goals`, `/ira`.
+
+Fault injection: dropping the in-flight guard reddens 2; gating on net instead
+of gross reddens 3; checking the balance before the scope reddens 2.
+
+### Not test-only, and saying so
+
+Phase 3 was planned as test-only. Two small production changes were needed to
+make the tests honest rather than re-implementations: `livePriceOf` (extracting
+a five-way duplicate) and `snapshotGate` (extracting the decision). A test that
+asserts against its own copy of the logic proves nothing, which is the whole
+point of this phase.

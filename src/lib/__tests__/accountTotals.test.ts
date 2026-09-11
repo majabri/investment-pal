@@ -11,6 +11,7 @@ import { join } from "node:path";
 import {
   accountTotals,
   isUsablePrice,
+  livePriceOf,
   valuationCoverageOf,
   scopedRows,
   scopeIsEmpty,
@@ -480,6 +481,70 @@ describe("accountTotals counts what it could not value", () => {
     // A live quote of 0 means the quote failed; the stored price is the
     // fallback, and a caller that passes a broken quote should see partial.
     const t = accountTotals([pos()], bal, () => 0);
+    expect(t.valuationCoverage).toBe("none");
+    expect(t.unpricedPositions).toBe(1);
+  });
+});
+
+// §26.2, mandatory: "Missing quote does not become zero."
+//
+// The blueprint lists ten mandatory data-state tests and this was one of two
+// with no test at all. The behaviour was correct and undefended — the fallback
+// lived inline at five call sites as
+// `quotes?.[h.symbol]?.price ?? h.current_price`, which is five places to get
+// it wrong and none of them reachable by a unit test.
+describe("a missing quote falls back to the stored price, never to zero", () => {
+  const h = { symbol: "AAA", current_price: 25 };
+
+  test("NEGATIVE CONTROL: a live quote is used when there is one", () => {
+    // Without this, every assertion below passes on a function that ignores
+    // quotes entirely and always returns the stored price.
+    expect(livePriceOf(h, { AAA: { price: 31.5 } })).toBe(31.5);
+  });
+
+  test("no quotes at all keeps the stored price", () => {
+    expect(livePriceOf(h, undefined)).toBe(25);
+    expect(livePriceOf(h, {})).toBe(25);
+  });
+
+  test("a quote for a DIFFERENT symbol is not borrowed", () => {
+    // The failure this rules out is subtler than a zero: valuing one holding
+    // at another's price produces a plausible number that is simply wrong.
+    expect(livePriceOf(h, { BBB: { price: 999 } })).toBe(25);
+  });
+
+  test("a non-numeric quote is missing, not propagated", () => {
+    // NaN through a multiplication makes the whole total NaN, which renders as
+    // nothing everywhere and reads as a crash rather than a gap.
+    expect(livePriceOf(h, { AAA: { price: Number.NaN } })).toBe(25);
+    expect(livePriceOf(h, { AAA: { price: Number.POSITIVE_INFINITY } })).toBe(25);
+    expect(livePriceOf(h, { AAA: { price: undefined as unknown as number } })).toBe(25);
+  });
+
+  test("end to end: a missing quote does not zero the account", () => {
+    // The §26.2 sentence itself, at the level a user would feel it.
+    const positions = [{ symbol: "AAA", quantity: 10, cost_basis: 20, current_price: 25 }];
+    const balance = { cash: 1_000, margin_used: 0, margin_enabled: false };
+    const withQuote = accountTotals(positions, balance, (p) =>
+      livePriceOf(p, { AAA: { price: 30 } }),
+    );
+    const withoutQuote = accountTotals(positions, balance, (p) => livePriceOf(p, undefined));
+
+    expect(withQuote.positionsValue).toBe(300);
+    expect(withoutQuote.positionsValue).toBe(250);
+    // Not zero, and not unpriced: the stored price is a real price.
+    expect(withoutQuote.valuationCoverage).toBe("complete");
+    expect(withoutQuote.totalAccountValue).toBe(1_250);
+  });
+
+  test("a stored price of zero is still unpriced, quote or no quote", () => {
+    // The two rules meet here. The fallback does not manufacture a price, so a
+    // holding nobody has ever priced stays visible as unpriced (PORT-003)
+    // rather than being valued at nothing.
+    const positions = [{ symbol: "ZZZ", quantity: 10, cost_basis: 20, current_price: 0 }];
+    const t = accountTotals(positions, { cash: 0, margin_used: 0, margin_enabled: false }, (p) =>
+      livePriceOf(p, undefined),
+    );
     expect(t.valuationCoverage).toBe("none");
     expect(t.unpricedPositions).toBe(1);
   });

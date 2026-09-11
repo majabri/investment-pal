@@ -21,6 +21,7 @@ function underTZ(tz: string, expr: string): unknown {
   const script = `
     const { localIsoDate, nextLocalDays } = await import("${process.cwd()}/src/lib/localDate.ts");
     const { addDaysISO } = await import("${process.cwd()}/src/lib/outcomeGrade.ts");
+    const { performance, seriesInRange } = await import("${process.cwd()}/src/lib/portfolioSummary.ts");
     console.log(JSON.stringify(${expr}));
   `;
   const r = Bun.spawnSync(["bun", "-e", script], {
@@ -114,5 +115,68 @@ describe("addDaysISO is date-only at both ends", () => {
   test("zero days is identity, in either hemisphere of the meridian", () => {
     expect(underTZ(BERLIN, `addDaysISO("2026-09-10", 0)`)).toBe("2026-09-10");
     expect(underTZ(NY, `addDaysISO("2026-09-10", 0)`)).toBe("2026-09-10");
+  });
+});
+
+// portfolioSummary's two window boundaries, under a real timezone.
+//
+// These were judged SAFE by reading: both take an existing YYYY-MM-DD, anchor
+// it at UTC midnight explicitly, shift, and format back — symmetric at both
+// ends, and never reading the current instant. That reasoning is sound and it
+// was the only thing defending them. `portfolioSummary.test.ts` runs in UTC
+// like the rest of the suite, so it would pass identically whether or not the
+// anchoring were correct, which is the definition of a test that proves
+// nothing about this defect class.
+//
+// `addDaysISO` above is the same shape and was already covered here; these two
+// were not.
+describe("portfolioSummary window boundaries are timezone-independent", () => {
+  // A series whose points straddle the dates a UTC/local mix-up would shift.
+  const SERIES = `[
+    { date: "2026-03-06", value: 100 },
+    { date: "2026-03-07", value: 101 },
+    { date: "2026-03-08", value: 102 },
+    { date: "2026-04-06", value: 110 },
+    { date: "2026-04-07", value: 111 }
+  ]`;
+
+  test("NEGATIVE CONTROL: the harness reaches both modules under a real zone", () => {
+    // Without this, a typo in the dynamic import would make every assertion
+    // below pass by never running.
+    expect(underTZ(NY, `typeof performance === "function" && typeof seriesInRange === "function"`)).toBe(
+      true,
+    );
+  });
+
+  test("a one-month range picks the same points east and west of Greenwich", () => {
+    const expr = `seriesInRange(${SERIES}, { label: "1M", months: 1 }).map((p) => p.date)`;
+    const ny = underTZ(NY, expr);
+    const berlin = underTZ(BERLIN, expr);
+    expect(ny).toEqual(berlin);
+  });
+
+  test("the range crosses the US spring-forward without moving a boundary", () => {
+    // 2026-03-08 is the US DST change. A window anchored in local time would
+    // land a day out on one side of it.
+    const expr = `seriesInRange(${SERIES}, { label: "1M", months: 1 }).length`;
+    expect(underTZ(NY, expr)).toBe(underTZ(BERLIN, expr));
+  });
+
+  test("an all-history range is identical in either zone", () => {
+    const expr = `seriesInRange(${SERIES}, { label: "All", months: null }).map((p) => p.date)`;
+    expect(underTZ(NY, expr)).toEqual(underTZ(BERLIN, expr));
+  });
+
+  test("performance windows report the same from/to dates in either zone", () => {
+    // The `w.days` arm at :202 is the one that subtracts milliseconds from a
+    // parsed date. If its anchor were local, these would differ by a day.
+    const expr = `performance(${SERIES}, [{ label: "1M", kind: "days", days: 30 }]).map((p) => [p.from, p.to])`;
+    expect(underTZ(NY, expr)).toEqual(underTZ(BERLIN, expr));
+  });
+
+  test("a year-to-date window starts on 1 January in either zone", () => {
+    const expr = `performance(${SERIES}, [{ label: "YTD", kind: "ytd" }]).map((p) => p.from)`;
+    expect(underTZ(NY, expr)).toEqual(underTZ(BERLIN, expr));
+    expect(underTZ(NY, expr)).toEqual(["2026-03-06"]);
   });
 });
