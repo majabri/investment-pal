@@ -2761,3 +2761,74 @@ unpriced reddens 1.
 Not money-adjacent under OD-001 Amendment 1. It computes no money figure — it
 counts positions and reports coverage, and deliberately leaves the arithmetic
 untouched.
+
+---
+
+## Session — 2026-09-11 — the security master gets a first reader and writer (Phase 1)
+
+### The finding
+
+`securities` and `security_aliases` shipped as tables with **zero call sites**.
+Nothing read them, nothing wrote them, every `security_id` on `holdings`,
+`investment_universe` and `price_history` was NULL, and the ticker remained the
+de facto identity. Of `securityMaster.ts` only `canonicalSector` was imported
+anywhere; `resolveSecurity()` — the resolver that is the point of UNIV-001 — was
+imported by nothing outside its own tests (D-16).
+
+### What this adds
+
+`planBackfill` computes, as a pure value, what a backfill *would* do: which
+labels already resolve, which are ambiguous, and which may be created. The
+interesting decisions are all refusals, so they belong somewhere testable rather
+than inline in a mutation.
+
+- **Already resolves → left alone.** Re-creating it forks the identity, which is
+  the defect the table exists to prevent.
+- **Ambiguous → neither created nor linked.** `resolveSecurity` returns
+  `ambiguous` rather than the newest match on purpose; a backfill that broke the
+  tie by inventing a third security would make the ambiguity permanent.
+- **Idempotent.** The second run plans nothing.
+
+Symbol stays on the holding as a **label**. Identity is added beside it, never
+substituted for it, so nothing that reads `symbol` today changes behaviour —
+which is what makes this safe to ship before any cutover.
+
+### Two things deliberately not guessed
+
+`asset_class` is `other`, never inferred from the ticker: a four-letter symbol is
+not an ETF, and a wrong class would propagate into every screen that groups by
+it. The enum has no `unknown` member, which is a schema limitation worth
+recording rather than papering over.
+
+`sector` is left NULL. The built-in map is a **fallback** `canonicalSector`
+applies at read time behind a user or provider answer; writing its output into
+the table would promote a guess to a stored fact and destroy that precedence.
+
+### A constraint that only types.ts caught
+
+`security_aliases.source` is NOT NULL with no default. The first `aliasInsert`
+omitted it — a violation that appears only at insert time, on a table nothing
+had ever inserted into. The generated types carry it as required, which is
+exactly the typing the 50 remaining `as never` casts elsewhere throw away.
+It is `derived`, not `imported`: no broker sent this mapping, the app inferred
+it from a symbol already on a holding.
+
+### Verification
+
+Full gate: `typecheck` · `test:typecheck` · `bun test` **1284 pass / 0 fail** ·
+boot 200 on `/auth`, `/settings`, `/portfolio`.
+
+Fault injection: creating a third security for an ambiguous label reddens 1;
+dropping the alias `source` reddens 1; writing a guessed sector into the row
+reddens 1.
+
+**Three test expectations were wrong, not the code.** `normaliseAlias`
+upper-cases; the new assertions had been written against a lower-casing
+normaliser that does not exist. The code was right and the tests were fixed.
+
+### What remains of D-16
+
+This makes the tables reachable and populated. The **read-through** — resolving
+sector and identity through `securities` rather than through `holdings.symbol`
+and `data/sectors.ts` — is the dual-read step and is not in this change. D-16
+moves from OPEN to PARTIAL, not to closed.

@@ -172,3 +172,126 @@ export function isListed(security: Security, on: string = localIsoDate()): boole
   if (security.delistedAt === null) return true;
   return on < security.delistedAt;
 }
+
+// ---------------------------------------------------------------------------
+// Backfill (UNIV-001 / DATA-001, write side)
+// ---------------------------------------------------------------------------
+//
+// `securities` and `security_aliases` shipped as tables with zero call sites:
+// nothing read them, nothing wrote them, every `security_id` was NULL, and
+// symbol stayed the de facto identity. The resolver above was imported by
+// nothing outside its own tests. This is the first half of making it real —
+// giving each held symbol a stable id, with the symbol demoted to an alias.
+//
+// The plan is computed as a pure value, separately from applying it, because
+// the interesting decisions are all here: what already resolves, what is
+// ambiguous, and what may be created. A mutation that decided those inline
+// would be untestable at exactly the points where guessing is a defect.
+
+/** What a backfill would do. Nothing is created for a label that resolves. */
+export type BackfillPlan = {
+  /** Labels with no security yet. Each becomes one security and one alias. */
+  create: string[];
+  /** Labels that already resolve. Left alone — re-creating one would fork it. */
+  alreadyResolved: string[];
+  /**
+   * Labels that two securities both claim.
+   *
+   * NOT created and NOT linked. `resolveSecurity` returns `ambiguous` rather
+   * than the newest match for a reason, and a backfill that broke the tie by
+   * inventing a third security would make the ambiguity permanent.
+   */
+  ambiguous: string[];
+};
+
+/**
+ * What to create so every held label resolves.
+ *
+ * Deduplicated case-insensitively through `normaliseAlias`, so `aapl` and
+ * `AAPL` are one security rather than two — the exact fork DATA-001 exists to
+ * prevent.
+ */
+export function planBackfill(
+  rawSymbols: readonly string[],
+  aliases: readonly SecurityAlias[],
+  on: string = localIsoDate(),
+): BackfillPlan {
+  const create: string[] = [];
+  const alreadyResolved: string[] = [];
+  const ambiguous: string[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of rawSymbols) {
+    const alias = normaliseAlias(raw);
+    if (alias === "") continue;
+    if (seen.has(alias)) continue;
+    seen.add(alias);
+
+    const res = resolveSecurity(alias, aliases, on);
+    if (res.kind === "resolved") alreadyResolved.push(alias);
+    else if (res.kind === "ambiguous") ambiguous.push(alias);
+    else create.push(alias);
+  }
+
+  return {
+    create: create.sort(),
+    alreadyResolved: alreadyResolved.sort(),
+    ambiguous: ambiguous.sort(),
+  };
+}
+
+/**
+ * The asset class a backfilled security starts in.
+ *
+ * `other`, always — deliberately not guessed from the symbol. A four-letter
+ * ticker is not an ETF and a five-letter one is not a fund; those heuristics
+ * are wrong often enough that a wrong class would propagate into every screen
+ * that groups by it. `other` is the enum's least-claiming member and the holder
+ * can correct it. There is no `unknown` member to reach for, which is a schema
+ * limitation worth recording rather than papering over with a guess.
+ */
+export const BACKFILL_ASSET_CLASS: AssetClass = "other";
+
+/** The `securities` row a backfill creates for one label. */
+export function securityInsert(input: {
+  userId: string | undefined;
+  canonicalSymbol: string;
+}): Record<string, unknown> {
+  return {
+    user_id: input.userId ?? null,
+    canonical_symbol: normaliseAlias(input.canonicalSymbol),
+    asset_class: BACKFILL_ASSET_CLASS,
+    // Sector is left NULL rather than run through the built-in map here. The
+    // map is a FALLBACK that `canonicalSector` applies at read time behind a
+    // user or provider answer; writing its output into the table would promote
+    // a guess to a stored fact and lose that precedence.
+    sector: null,
+    sector_source: null,
+  };
+}
+
+/** The `security_aliases` row that points a label at its security. */
+export function aliasInsert(input: {
+  userId: string | undefined;
+  securityId: string;
+  alias: string;
+}): Record<string, unknown> {
+  return {
+    user_id: input.userId ?? null,
+    security_id: input.securityId,
+    alias: normaliseAlias(input.alias),
+    alias_kind: "ticker",
+    // `derived`, not `imported`: nobody sent us this mapping, the app inferred
+    // it from a symbol already sitting on a holding. Calling it imported would
+    // credit a broker with a link the broker never made. (The CHECK allows
+    // imported | user_entry | derived, and the column has no default — an
+    // omitted `source` is a NOT NULL violation at insert time, which types.ts
+    // marks required and nothing else would have caught until it ran.)
+    source: "derived",
+    // NULL/NULL is "has always pointed here and still does". A backfill has no
+    // evidence of when the mapping began, and inventing a start date would make
+    // every historical resolution before it fail.
+    valid_from: null,
+    valid_to: null,
+  };
+}
