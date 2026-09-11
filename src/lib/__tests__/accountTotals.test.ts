@@ -10,6 +10,8 @@ import { join } from "node:path";
 
 import {
   accountTotals,
+  isUsablePrice,
+  valuationCoverageOf,
   scopedRows,
   scopeIsEmpty,
   scopeLabel,
@@ -388,5 +390,97 @@ describe("no screen recomputes the account arithmetic", () => {
       if (/-\s*Number\(\s*\w+\.margin_used/.test(code)) offenders.push(file);
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+// Valuation coverage (PORT-003, §17.1).
+//
+// A position with no usable price contributed 0 to investments and the total
+// read as a complete figure. Nothing counted them, so "incomplete valuation
+// must be flagged" had no mechanism — the unknown-becomes-zero defect one level
+// up from the fields, where every individual number is right and the sum
+// quietly is not.
+describe("valuationCoverageOf", () => {
+  test("nothing held is not a coverage problem", () => {
+    expect(valuationCoverageOf(0, 0)).toBe("empty");
+  });
+
+  test("all priced is complete", () => {
+    expect(valuationCoverageOf(4, 0)).toBe("complete");
+  });
+
+  test("one unpriced makes the whole scope partial", () => {
+    // Not "mostly complete". The total is a floor the moment one is missing.
+    expect(valuationCoverageOf(9, 1)).toBe("partial");
+  });
+
+  test("none priced is its own state, not partial", () => {
+    expect(valuationCoverageOf(0, 3)).toBe("none");
+  });
+});
+
+describe("isUsablePrice", () => {
+  test("zero is not a price", () => {
+    // Nothing trades at exactly nothing, so a stored 0 means never fetched.
+    expect(isUsablePrice(0)).toBe(false);
+    expect(isUsablePrice(-1)).toBe(false);
+  });
+
+  test("a sub-cent price IS a price", () => {
+    // §26.3: a penny security at 0.0001 must retain meaning, not round to
+    // nothing and then read as unpriced.
+    expect(isUsablePrice(0.0001)).toBe(true);
+  });
+
+  test("NaN and Infinity are not prices", () => {
+    expect(isUsablePrice(Number.NaN)).toBe(false);
+    expect(isUsablePrice(Number.POSITIVE_INFINITY)).toBe(false);
+  });
+});
+
+describe("accountTotals counts what it could not value", () => {
+  const pos = (over: Partial<{ symbol: string; quantity: number; current_price: number; cost_basis: number }> = {}) => ({
+    symbol: "AAA",
+    quantity: 10,
+    current_price: 25,
+    cost_basis: 20,
+    ...over,
+  });
+  const bal = { cash: 1_000, margin_used: 0, margin_enabled: false };
+
+  test("NEGATIVE CONTROL: a fully priced scope is complete", () => {
+    // Without this, every assertion below passes on code that flags everything.
+    const t = accountTotals([pos(), pos({ symbol: "BBB" })], bal);
+    expect(t.valuationCoverage).toBe("complete");
+    expect(t.unpricedPositions).toBe(0);
+    expect(t.pricedPositions).toBe(2);
+  });
+
+  test("an unpriced holding is counted, and the total becomes a floor", () => {
+    const t = accountTotals([pos(), pos({ symbol: "BBB", current_price: 0 })], bal);
+    expect(t.valuationCoverage).toBe("partial");
+    expect(t.unpricedPositions).toBe(1);
+    // The arithmetic is unchanged — this PR counts, it does not re-value.
+    expect(t.positionsValue).toBe(250);
+  });
+
+  test("a closed holding is not unpriced", () => {
+    // A zero-quantity row would otherwise put a permanent warning on every
+    // position the user has exited.
+    const t = accountTotals([pos(), pos({ symbol: "OLD", quantity: 0, current_price: 0 })], bal);
+    expect(t.valuationCoverage).toBe("complete");
+    expect(t.unpricedPositions).toBe(0);
+  });
+
+  test("a scope with no positions is empty, not none", () => {
+    expect(accountTotals([], bal).valuationCoverage).toBe("empty");
+  });
+
+  test("the priceOf override is what gets judged, not the stored column", () => {
+    // A live quote of 0 means the quote failed; the stored price is the
+    // fallback, and a caller that passes a broken quote should see partial.
+    const t = accountTotals([pos()], bal, () => 0);
+    expect(t.valuationCoverage).toBe("none");
+    expect(t.unpricedPositions).toBe(1);
   });
 });

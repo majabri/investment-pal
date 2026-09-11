@@ -2710,3 +2710,54 @@ Fault injection, four ways: dropping the deposit/withdrawal sign rules reddens
 Not money-adjacent under OD-001 Amendment 1. This **stores** flows the holder
 states as fact; it computes no figure, defaults no rate, and the return
 arithmetic it feeds was merged separately in #190.
+
+---
+
+## Session — 2026-09-11 — the total said "complete" while holdings went unvalued (Phase 1)
+
+### The finding
+
+Blueprint §17.1 requires that "incomplete valuation must be flagged if material
+positions lack valid prices", and PORT-003 requires the coverage be visible.
+Nothing counted them. A position with no usable price contributed `0` to
+`positionsValue`, and every total above it read as a complete figure (D-05).
+
+This is the unknown-becomes-zero defect one level up from the fields. The
+`num()` / `money()` split already holds the line per field — but a *sum* over
+positions has no null to propagate, so the absence disappears into an addition
+and the answer looks whole.
+
+### What counts as unpriced
+
+A held position whose price is not finite **or is not above zero**. A stored `0`
+is not a valuation: nothing trades at exactly nothing, so it means the price was
+never fetched. The known cost is that a genuinely worthless holding reads as
+unpriced rather than as zero — which is the right way round, because unpriced is
+visible and correctable where a silent zero is neither.
+
+Sub-cent prices are prices: `0.0001` passes, per §26.3's penny-security fixture.
+
+A zero-quantity row is not a held position and is never counted — otherwise
+every exited holding would carry a permanent warning.
+
+### What this does NOT do
+
+It does not re-value anything. `positionsValue` is unchanged to the cent; the
+change counts and reports. The notice says the totals are a **floor**, which is
+what they have always been whenever a price was missing — the difference is that
+now it is said.
+
+### Verification
+
+Full gate: `typecheck` · `test:typecheck` · `bun test` **1271 pass / 0 fail** ·
+boot 200 on `/auth` and `/portfolio`.
+
+Fault injection: treating `0` as a usable price (the old behaviour) reddens 3;
+calling one unpriced holding "complete" reddens 3; counting closed positions as
+unpriced reddens 1.
+
+### Governance
+
+Not money-adjacent under OD-001 Amendment 1. It computes no money figure — it
+counts positions and reports coverage, and deliberately leaves the arithmetic
+untouched.
