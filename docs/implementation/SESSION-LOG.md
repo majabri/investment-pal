@@ -3054,3 +3054,37 @@ colour (§22.2).
 history, both need a table. Three migrations already reached Lovable this week;
 a fourth to hold dismissal state for a surface nobody has used yet is the wrong
 order, and the reasoning from #200/#201 has not changed.
+
+---
+
+## Session — 2026-09-11 — the schema guarantees verified in the console (D-20 closed)
+
+The one finding in the gap analysis that could not be settled from the repository.
+Generated types carry columns and nothing else — no CHECK constraints, no
+triggers, no RLS — so whether the guarantees inside the three September
+migrations survived Lovable's re-authoring was genuinely unknown. Amir ran the
+verification query against Lovable Cloud and pasted the output back.
+
+**Everything survived.**
+
+- `cash_flows_bounds` is present verbatim, including the rule that matters most:
+  `(kind <> 'deposit' OR amount > 0)` and `(kind <> 'withdrawal' OR amount < 0)`.
+  A sign typed the wrong way round is refused by the database, not only by
+  `validateFlow`. `fee`, `interest` and `dividend` remain unconstrained in sign,
+  as designed — a fee rebate is a real positive flow.
+- `goal_versions_bounds`, `securities_bounds` and `security_aliases_bounds` all
+  present.
+- `trg_goal_versions_immutable` present — the trigger this finding was about.
+- RLS on all four tables, and `goal_versions` carries **INSERT and SELECT only**.
+  With the trigger, append-only is enforced twice over. It is immutable at the
+  database rather than by convention, so a decision citing a goal version can be
+  trusted.
+
+**One thing the query did not cover**, checked separately in the migration
+source: the FK from `holdings` to `securities` is `ON DELETE SET NULL`, as are
+`investment_universe` and `price_history`. Only `security_aliases` cascades,
+where an orphan alias is meaningless. **Deleting a security cannot delete a
+holding** — worth confirming, because the opposite would have been silent and
+catastrophic.
+
+No code change. This is the record that the finding is closed and how.
