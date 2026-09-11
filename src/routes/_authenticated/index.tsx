@@ -105,9 +105,11 @@ function Dashboard() {
   // imported. Preferred over the app's estimate below (Stage 3 delta).
   const { data: latestBalance } = useLatestBalance(scope);
   const { data: snapshots = [], isError: snapshotsError } = useSnapshots(scope);
-  // PERF-001: UNKNOWN until the cash_flows migration is applied and a flow
-  // history is recorded, and the panel says so rather than reporting a
-  // deposit as return.
+  // PERF-001: UNKNOWN until the account's flow history is marked complete on
+  // the Portfolio page, and the panel says so rather than reporting a deposit
+  // as return. The migration is applied; what gates this now is
+  // `accounts.cash_flows_as_of`, which recording a flow deliberately does not
+  // set — a partial history produces rows too.
   const { data: cashFlows } = useCashFlows(scope);
   const { data: unscopedCount = 0 } = useUnscopedSnapshotCount();
   const series = useMemo(() => balanceSeries(snapshots), [snapshots]);

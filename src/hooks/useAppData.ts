@@ -7,8 +7,8 @@ import { sumField } from "@/lib/accountAggregate";
 import { scopedRows, type AccountScope } from "@/lib/accountTotals";
 import type { BalanceSnapshotInsert } from "@/lib/balanceImport";
 import { localIsoDate } from "@/lib/localDate";
-import { flowCoverage } from "@/lib/cashFlows";
-import type { CashFlowRow } from "@/lib/cashFlows";
+import { canRecordFlow, flowCoverage, flowInsert, validateFlow } from "@/lib/cashFlows";
+import type { CashFlowRow, FlowDraft } from "@/lib/cashFlows";
 import { canRecordVersion, goalHistory, goalVersionInsert, latestVersion } from "@/lib/goalVersion";
 import type { GoalHistory, GoalVersionRow } from "@/lib/goalVersion";
 import type { PerformanceFlows } from "@/lib/portfolioSummary";
@@ -912,6 +912,70 @@ export function useCashFlows(scope: AccountScope) {
       if (error) return { coverage: "unknown", rows: [] };
       const rows = (data ?? []) as unknown as CashFlowRow[];
       return { coverage: flowCoverage(asOf, rows.length), rows };
+    },
+  });
+}
+
+/**
+ * Record one cash flow (PERF-001, write side).
+ *
+ * Deliberately does NOT touch `accounts.cash_flows_as_of`. Recording a deposit
+ * says a deposit happened; it does not say the flow history is complete, and
+ * `flowCoverage` must stay `unknown` until somebody claims the second thing
+ * explicitly. A return computed over a partial history is wrong by exactly what
+ * is missing, and nothing about entering one row rules that out.
+ */
+export function useRecordCashFlow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { accountId: string; draft: FlowDraft }) => {
+      if (!canRecordFlow(p.draft)) {
+        // The form blocks this; the guard is here because a caller that skipped
+        // the form would otherwise reach the CHECK and get a Postgres error.
+        throw new Error(validateFlow(p.draft)[0]?.message ?? "That flow cannot be recorded.");
+      }
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not signed in");
+      const { error } = await supabase
+        .from("cash_flows" as never)
+        .insert(
+          flowInsert({
+            userId: userData.user.id,
+            accountId: p.accountId,
+            draft: p.draft,
+          }) as never,
+        );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cash_flows"] });
+    },
+  });
+}
+
+/**
+ * Claim that this account's flow history is complete through a date.
+ *
+ * This is the ONLY thing that moves coverage off `unknown`, and it is a
+ * separate action from recording a flow because it is a separate assertion:
+ * "I have entered everything up to here." An account with no flows at all still
+ * needs it — `none` is a positive fact somebody has to state, and it is what
+ * lets a genuinely flow-free account get a real time-weighted return instead of
+ * an em-dash forever.
+ */
+export function useMarkFlowsReviewed() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { accountId: string }) => {
+      const { error } = await supabase
+        .from("accounts")
+        .update({ cash_flows_as_of: new Date().toISOString() } as never)
+        .eq("id", p.accountId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cash_flows"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
     },
   });
 }
