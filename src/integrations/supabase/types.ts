@@ -106,6 +106,7 @@ export type Database = {
           broker_account_id: string | null
           buying_power: number | null
           cash: number | null
+          cash_flows_as_of: string | null
           contribution_amount: number | null
           contribution_anchor_date: string | null
           contribution_cadence_days: number | null
@@ -141,6 +142,7 @@ export type Database = {
           broker_account_id?: string | null
           buying_power?: number | null
           cash?: number | null
+          cash_flows_as_of?: string | null
           contribution_amount?: number | null
           contribution_anchor_date?: string | null
           contribution_cadence_days?: number | null
@@ -176,6 +178,7 @@ export type Database = {
           broker_account_id?: string | null
           buying_power?: number | null
           cash?: number | null
+          cash_flows_as_of?: string | null
           contribution_amount?: number | null
           contribution_anchor_date?: string | null
           contribution_cadence_days?: number | null
@@ -210,6 +213,65 @@ export type Database = {
           },
         ]
       }
+      cash_flows: {
+        Row: {
+          account_id: string
+          amount: number
+          as_of: string | null
+          created_at: string
+          flow_date: string
+          id: string
+          kind: string
+          note: string | null
+          source: string
+          source_ref: string | null
+          symbol: string | null
+          treatment: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          as_of?: string | null
+          created_at?: string
+          flow_date: string
+          id?: string
+          kind: string
+          note?: string | null
+          source: string
+          source_ref?: string | null
+          symbol?: string | null
+          treatment: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          as_of?: string | null
+          created_at?: string
+          flow_date?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          source?: string
+          source_ref?: string | null
+          symbol?: string | null
+          treatment?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_flows_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       decisions: {
         Row: {
           action: string | null
@@ -219,6 +281,7 @@ export type Database = {
           decided_on: string
           decision: string
           evidence: Json | null
+          goal_version_id: string | null
           grade: string | null
           id: string
           invalidation_conditions: Json | null
@@ -248,6 +311,7 @@ export type Database = {
           decided_on?: string
           decision?: string
           evidence?: Json | null
+          goal_version_id?: string | null
           grade?: string | null
           id?: string
           invalidation_conditions?: Json | null
@@ -277,6 +341,7 @@ export type Database = {
           decided_on?: string
           decision?: string
           evidence?: Json | null
+          goal_version_id?: string | null
           grade?: string | null
           id?: string
           invalidation_conditions?: Json | null
@@ -298,7 +363,97 @@ export type Database = {
           symbol?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "decisions_goal_version_id_fkey"
+            columns: ["goal_version_id"]
+            isOneToOne: false
+            referencedRelation: "goal_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      goal_versions: {
+        Row: {
+          account_id: string | null
+          baseline_type: string
+          baseline_value: number | null
+          contribution_plan: Json | null
+          created_at: string
+          effective_at: string
+          goal_id: string
+          id: string
+          model_assumptions: Json | null
+          note: string | null
+          risk_constraints: Json | null
+          supersedes_id: string | null
+          target_date: string | null
+          target_return_pct: number | null
+          target_value: number | null
+          user_id: string
+          withdrawal_plan: Json | null
+        }
+        Insert: {
+          account_id?: string | null
+          baseline_type: string
+          baseline_value?: number | null
+          contribution_plan?: Json | null
+          created_at?: string
+          effective_at?: string
+          goal_id: string
+          id?: string
+          model_assumptions?: Json | null
+          note?: string | null
+          risk_constraints?: Json | null
+          supersedes_id?: string | null
+          target_date?: string | null
+          target_return_pct?: number | null
+          target_value?: number | null
+          user_id: string
+          withdrawal_plan?: Json | null
+        }
+        Update: {
+          account_id?: string | null
+          baseline_type?: string
+          baseline_value?: number | null
+          contribution_plan?: Json | null
+          created_at?: string
+          effective_at?: string
+          goal_id?: string
+          id?: string
+          model_assumptions?: Json | null
+          note?: string | null
+          risk_constraints?: Json | null
+          supersedes_id?: string | null
+          target_date?: string | null
+          target_return_pct?: number | null
+          target_value?: number | null
+          user_id?: string
+          withdrawal_plan?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_versions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_versions_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_versions_supersedes_id_fkey"
+            columns: ["supersedes_id"]
+            isOneToOne: false
+            referencedRelation: "goal_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       goals: {
         Row: {
@@ -360,6 +515,7 @@ export type Database = {
           original_thesis: string | null
           quantity: number
           sector: string | null
+          security_id: string | null
           symbol: string
           updated_at: string
           user_id: string
@@ -379,6 +535,7 @@ export type Database = {
           original_thesis?: string | null
           quantity?: number
           sector?: string | null
+          security_id?: string | null
           symbol: string
           updated_at?: string
           user_id: string
@@ -398,6 +555,7 @@ export type Database = {
           original_thesis?: string | null
           quantity?: number
           sector?: string | null
+          security_id?: string | null
           symbol?: string
           updated_at?: string
           user_id?: string
@@ -409,6 +567,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holdings_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
             referencedColumns: ["id"]
           },
         ]
@@ -458,6 +623,7 @@ export type Database = {
           relative_strength: number | null
           replaces_symbol: string | null
           risk: number | null
+          security_id: string | null
           symbol: string
           technical_strength: number | null
           thesis: string | null
@@ -479,6 +645,7 @@ export type Database = {
           relative_strength?: number | null
           replaces_symbol?: string | null
           risk?: number | null
+          security_id?: string | null
           symbol: string
           technical_strength?: number | null
           thesis?: string | null
@@ -500,6 +667,7 @@ export type Database = {
           relative_strength?: number | null
           replaces_symbol?: string | null
           risk?: number | null
+          security_id?: string | null
           symbol?: string
           technical_strength?: number | null
           thesis?: string | null
@@ -507,7 +675,15 @@ export type Database = {
           user_id?: string
           valuation?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "investment_universe_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ips_lite: {
         Row: {
@@ -808,6 +984,7 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          security_id: string | null
           source: string
           symbol: string
           user_id: string
@@ -818,6 +995,7 @@ export type Database = {
           created_at?: string
           date: string
           id?: string
+          security_id?: string | null
           source?: string
           symbol: string
           user_id: string
@@ -828,12 +1006,21 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          security_id?: string | null
           source?: string
           symbol?: string
           user_id?: string
           volume?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "price_history_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       priorities: {
         Row: {
@@ -918,6 +1105,98 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      securities: {
+        Row: {
+          asset_class: string
+          canonical_symbol: string
+          created_at: string
+          cusip: string | null
+          delisted_at: string | null
+          figi: string | null
+          id: string
+          isin: string | null
+          name: string | null
+          sector: string | null
+          sector_source: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_class: string
+          canonical_symbol: string
+          created_at?: string
+          cusip?: string | null
+          delisted_at?: string | null
+          figi?: string | null
+          id?: string
+          isin?: string | null
+          name?: string | null
+          sector?: string | null
+          sector_source?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_class?: string
+          canonical_symbol?: string
+          created_at?: string
+          cusip?: string | null
+          delisted_at?: string | null
+          figi?: string | null
+          id?: string
+          isin?: string | null
+          name?: string | null
+          sector?: string | null
+          sector_source?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      security_aliases: {
+        Row: {
+          alias: string
+          alias_kind: string
+          created_at: string
+          id: string
+          security_id: string
+          source: string
+          user_id: string
+          valid_from: string | null
+          valid_to: string | null
+        }
+        Insert: {
+          alias: string
+          alias_kind: string
+          created_at?: string
+          id?: string
+          security_id: string
+          source: string
+          user_id: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Update: {
+          alias?: string
+          alias_kind?: string
+          created_at?: string
+          id?: string
+          security_id?: string
+          source?: string
+          user_id?: string
+          valid_from?: string | null
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_aliases_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       server_request_limits: {
         Row: {
