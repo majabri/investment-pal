@@ -106,6 +106,7 @@ export type Database = {
           broker_account_id: string | null
           buying_power: number | null
           cash: number | null
+          cash_flows_as_of: string | null
           contribution_amount: number | null
           contribution_anchor_date: string | null
           contribution_cadence_days: number | null
@@ -141,6 +142,7 @@ export type Database = {
           broker_account_id?: string | null
           buying_power?: number | null
           cash?: number | null
+          cash_flows_as_of?: string | null
           contribution_amount?: number | null
           contribution_anchor_date?: string | null
           contribution_cadence_days?: number | null
@@ -176,6 +178,7 @@ export type Database = {
           broker_account_id?: string | null
           buying_power?: number | null
           cash?: number | null
+          cash_flows_as_of?: string | null
           contribution_amount?: number | null
           contribution_anchor_date?: string | null
           contribution_cadence_days?: number | null
@@ -206,6 +209,65 @@ export type Database = {
             columns: ["owner_member_id"]
             isOneToOne: false
             referencedRelation: "household_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_flows: {
+        Row: {
+          account_id: string
+          amount: number
+          as_of: string | null
+          created_at: string
+          flow_date: string
+          id: string
+          kind: string
+          note: string | null
+          source: string
+          source_ref: string | null
+          symbol: string | null
+          treatment: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          as_of?: string | null
+          created_at?: string
+          flow_date: string
+          id?: string
+          kind: string
+          note?: string | null
+          source: string
+          source_ref?: string | null
+          symbol?: string | null
+          treatment: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          as_of?: string | null
+          created_at?: string
+          flow_date?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          source?: string
+          source_ref?: string | null
+          symbol?: string | null
+          treatment?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_flows_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]
