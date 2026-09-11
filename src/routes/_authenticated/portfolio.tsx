@@ -113,7 +113,7 @@ function PortfolioPage() {
     enabled: swingSymbols.length > 0,
     queryFn: async (): Promise<{ symbol: string; date: string; close: number }[]> => {
       const { data } = await supabase
-        .from("price_history" as never)
+        .from("price_history")
         .select("symbol,date,close")
         .in("symbol", swingSymbols)
         .order("date", { ascending: true });

@@ -215,7 +215,7 @@ export function useGoal() {
     enabled: Boolean(query.data?.id),
     queryFn: async (): Promise<GoalHistory> => {
       const { data, error } = await supabase
-        .from("goal_versions" as never)
+        .from("goal_versions")
         .select("id,effective_at,baseline_type,baseline_value,target_date,target_value,target_return_pct,contribution_plan,note")
         .eq("goal_id", query.data!.id)
         .order("effective_at", { ascending: false });
@@ -262,9 +262,16 @@ export function useGoal() {
       // `promptMandate.test.ts` holds this module to declaring objective fields
       // rather than assigning them, which is how the objective keeps one home
       // per scope.
-      const { error: versionError } = await supabase.from("goal_versions" as never).insert(
+      // The user is resolved BEFORE the payload is built, and its absence stops
+      // the append. It used to be passed straight through as `user?.id`, so a
+      // signed-out save built a row with a null owner and learned about it from
+      // an opaque RLS refusal. The generated type requires the id, which is the
+      // right requirement for a table whose rows are per-user and immutable.
+      const { data: versionUser } = await supabase.auth.getUser();
+      if (!versionUser.user) return { versionRecorded: false, historyKnown: true };
+      const { error: versionError } = await supabase.from("goal_versions").insert(
         goalVersionInsert({
-          userId: (await supabase.auth.getUser()).data.user?.id,
+          userId: versionUser.user.id,
           goalId: id,
           // GOAL-003: a goal edited in Settings is a PLANNING baseline. The
           // broker's equity is a different number that nobody chose, and the
@@ -277,7 +284,7 @@ export function useGoal() {
           contributionPlan: contribution,
           supersedesId: latestVersionId,
           note: versionNote ?? null,
-        }) as never,
+        }),
       );
       return { versionRecorded: !versionError, historyKnown: true };
     },
@@ -724,7 +731,7 @@ export function useLatestBalance(scope: AccountScope) {
     enabled: accountId !== null,
     queryFn: async (): Promise<AccountBalanceRow | null> => {
       const { data, error } = await supabase
-        .from("account_balances" as never)
+        .from("account_balances")
         .select("*")
         .eq("account_id", accountId!)
         .order("imported_at", { ascending: false })
@@ -756,7 +763,7 @@ export function useLatestBalances(accountIds: string[]) {
     enabled: accountIds.length > 0,
     queryFn: async (): Promise<Record<string, AccountBalanceRow>> => {
       const { data, error } = await supabase
-        .from("account_balances" as never)
+        .from("account_balances")
         .select("*")
         .in("account_id", accountIds)
         .order("imported_at", { ascending: false });
@@ -777,7 +784,7 @@ export function useBalanceHistory(scope: AccountScope, limit = 90) {
     enabled: accountId !== null,
     queryFn: async (): Promise<AccountBalanceRow[]> => {
       const { data, error } = await supabase
-        .from("account_balances" as never)
+        .from("account_balances")
         .select("*")
         .eq("account_id", accountId!)
         .order("imported_at", { ascending: false })
@@ -816,8 +823,8 @@ export function useRecordBalanceImport() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Not signed in");
       const { error: insertError } = await supabase
-        .from("account_balances" as never)
-        .insert({ ...snapshot, user_id: userData.user.id } as never);
+        .from("account_balances")
+        .insert({ ...snapshot, user_id: userData.user.id });
       if (insertError) throw insertError;
       if (Object.keys(patch).length > 0) {
         const { error } = await supabase
@@ -859,7 +866,7 @@ export function useSnapshots(scope: AccountScope, limit = 400) {
     enabled: accountId !== null,
     queryFn: async (): Promise<SnapshotRow[]> => {
       const { data, error } = await supabase
-        .from("portfolio_snapshots" as never)
+        .from("portfolio_snapshots")
         .select("id,gross,net,margin_used,created_at,snapshot_date")
         .eq("account_id", accountId!)
         // By the owner's calendar day, which is what the series is bucketed by
@@ -897,7 +904,7 @@ export function useCashFlows(scope: AccountScope) {
       // the right answer.
       const asOfQuery = await supabase
         .from("accounts")
-        .select("cash_flows_as_of" as never)
+        .select("cash_flows_as_of")
         .eq("id", accountId!)
         .maybeSingle();
       if (asOfQuery.error) return { coverage: "unknown", rows: [] };
@@ -905,7 +912,7 @@ export function useCashFlows(scope: AccountScope) {
         (asOfQuery.data as { cash_flows_as_of?: string | null } | null)?.cash_flows_as_of ?? null;
 
       const { data, error } = await supabase
-        .from("cash_flows" as never)
+        .from("cash_flows")
         .select("flow_date,amount,kind,treatment")
         .eq("account_id", accountId!)
         .order("flow_date", { ascending: true });
@@ -939,13 +946,13 @@ export function useRecordCashFlow() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Not signed in");
       const { error } = await supabase
-        .from("cash_flows" as never)
+        .from("cash_flows")
         .insert(
           flowInsert({
             userId: userData.user.id,
             accountId: p.accountId,
             draft: p.draft,
-          }) as never,
+          }),
         );
       if (error) throw error;
     },
@@ -971,7 +978,7 @@ export function useMarkFlowsReviewed() {
     mutationFn: async (p: { accountId: string }) => {
       const { error } = await supabase
         .from("accounts")
-        .update({ cash_flows_as_of: new Date().toISOString() } as never)
+        .update({ cash_flows_as_of: new Date().toISOString() })
         .eq("id", p.accountId);
       if (error) throw error;
     },
@@ -995,7 +1002,7 @@ export function useSecurityAliases() {
     queryKey: ["security_aliases"],
     queryFn: async (): Promise<SecurityAlias[]> => {
       const { data, error } = await supabase
-        .from("security_aliases" as never)
+        .from("security_aliases")
         .select("security_id,alias,alias_kind,valid_from,valid_to");
       if (error) return [];
       return ((data ?? []) as unknown as {
@@ -1038,23 +1045,23 @@ export function useBackfillSecurities() {
 
       for (const symbol of plan.create) {
         const { data: sec, error: secError } = await supabase
-          .from("securities" as never)
-          .insert(securityInsert({ userId, canonicalSymbol: symbol }) as never)
+          .from("securities")
+          .insert(securityInsert({ userId, canonicalSymbol: symbol }))
           .select("id")
           .single();
         if (secError) throw secError;
         const securityId = (sec as unknown as { id: string }).id;
 
         const { error: aliasError } = await supabase
-          .from("security_aliases" as never)
-          .insert(aliasInsert({ userId, securityId, alias: symbol }) as never);
+          .from("security_aliases")
+          .insert(aliasInsert({ userId, securityId, alias: symbol }));
         if (aliasError) throw aliasError;
 
         // Point the holdings at it. Symbol stays on the row as a LABEL — this
         // adds identity rather than replacing the label with it (DATA-001).
         const { error: linkError } = await supabase
           .from("holdings")
-          .update({ security_id: securityId } as never)
+          .update({ security_id: securityId })
           .eq("user_id", userId)
           .ilike("symbol", symbol);
         if (linkError) throw linkError;
@@ -1075,7 +1082,7 @@ export function useUnscopedSnapshotCount() {
     queryKey: ["portfolio_snapshots", "unscoped-count"],
     queryFn: async (): Promise<number> => {
       const { count, error } = await supabase
-        .from("portfolio_snapshots" as never)
+        .from("portfolio_snapshots")
         .select("id", { count: "exact", head: true })
         .is("account_id", null);
       if (error) throw error;
@@ -1103,14 +1110,14 @@ export function useRecordSnapshot() {
     }) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Not signed in");
-      const { error } = await supabase.from("portfolio_snapshots" as never).insert({
+      const { error } = await supabase.from("portfolio_snapshots").insert({
         user_id: userData.user.id,
         account_id: p.accountId,
         snapshot_date: localIsoDate(),
         gross: p.gross,
         net: p.net,
         margin_used: p.marginUsed,
-      } as never);
+      });
       // A unique violation here means the day is already recorded — which is
       // the outcome the index exists to produce, not a failure. Both surfaces
       // render `SnapshotRecorder`, so walking from the dashboard to the summary
@@ -1313,7 +1320,7 @@ export function useUniverse() {
     queryKey: ["investment_universe"],
     queryFn: async (): Promise<{ symbol: string }[]> => {
       const { data, error } = await supabase
-        .from("investment_universe" as never)
+        .from("investment_universe")
         .select("symbol")
         .order("symbol");
       if (error) throw error;
@@ -1346,7 +1353,7 @@ export function useIpsLite() {
     queryKey: ["ips_lite"],
     queryFn: async (): Promise<IpsLite> => {
       const { data, error } = await supabase
-        .from("ips_lite" as never)
+        .from("ips_lite")
         .select(
           "position_cap_pct,position_cap_hard,margin_cap_pct,caps_source,margin_rate_annual_pct,margin_rate_as_of,margin_rate_is_floating,margin_rate_stale_days",
         )
@@ -1389,8 +1396,8 @@ export function useIpsLite() {
         "position_cap_pct" in patch || "position_cap_hard" in patch || "margin_cap_pct" in patch;
       const stamped = touchesCaps ? { ...patch, caps_source: "user_set" } : patch;
       const { error } = await supabase
-        .from("ips_lite" as never)
-        .upsert({ user_id: userData.user.id, ...stamped } as never, { onConflict: "user_id" });
+        .from("ips_lite")
+        .upsert({ user_id: userData.user.id, ...stamped }, { onConflict: "user_id" });
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ips_lite"] }),

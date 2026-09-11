@@ -2832,3 +2832,84 @@ This makes the tables reachable and populated. The **read-through** — resolvin
 sector and identity through `securities` rather than through `holdings.symbol`
 and `data/sectors.ts` — is the dual-read step and is not in this change. D-16
 moves from OPEN to PARTIAL, not to closed.
+
+---
+
+## Session — 2026-09-11 — the casts come out, and four real defects come with them (Phase 2)
+
+### A correction to my own count
+
+The gap analysis said **50** `as never` casts, and the number was wrong. A plain
+search for `as never` matches inside "h**as never**" and "w**as never**", so
+ordinary prose — "the app has never asked", "a figure that was never the
+account's balance" — counted as a cast. The real figure was **49**, and the
+inflated one had grown to 60 by the time Phase 1 added more comments containing
+the word.
+
+The word boundary is now load-bearing in the guard, with the three spellings
+that fooled the first count as explicit negative controls.
+
+### Every cast was removable
+
+All 49 came out and `tsc` stayed clean. The tables have existed since Lovable
+applied the migrations; the casts were left over from when they did not, and had
+simply never been revisited. Only **one** narrow cast survives, argued at its
+site.
+
+### What the removal surfaced
+
+This is the part worth recording. Four defects were invisible while the casts
+stood, and none of them is a typing nicety:
+
+1. **`p_cash` on the import RPC.** The generated type says `number`; the client
+   passes `number | null`. The SQL is right — `COALESCE(p_cash, cash)`, so a
+   NULL leaves stored cash alone (IMP-002, pinned by `importSafety.test.ts`).
+   Supabase's generator cannot express a nullable parameter. This earns the one
+   surviving cast, on the single field, with the reasoning written down —
+   casting the argument object instead would also have silenced a wrong
+   `p_account_id` or `p_rows`.
+
+2. **Payload builders returning `Record<string, unknown>`** —
+   `goalVersionInsert`, `flowInsert`, `securityInsert`, `aliasInsert`. Three of
+   those I wrote earlier today. A shapeless return plus an `as never` at the
+   call site is a typed write in name only: a misspelt column, a missing NOT
+   NULL field or a wrong value type compiled cleanly and failed at runtime, on
+   tables holding money. They now return the generated `Insert<...>` shapes.
+
+3. **A null owner on an immutable row.** `goalVersionInsert` took
+   `userId: string | undefined` and the call site passed `user?.id` straight
+   through, so a signed-out save built a row with a null owner and learned about
+   it from an opaque RLS refusal. The user is now resolved before the payload is
+   built, and its absence stops the append.
+
+4. **`HouseholdAccount` had no `account_type`.** The rollup cast the whole
+   account to `never` to call `accountCategory`. It works at runtime only
+   because `useAccounts` selects `*`; a query narrowed to named columns would
+   have moved every account into `Unclassified` with no type error. The type now
+   carries the field, optional, and grouping degrades honestly.
+
+### The guard
+
+`generatedDatabaseTypes.test.ts` admitted its own blind spot — "a loosening
+introduced in another module and imported here would not trip it". It now walks
+every source file. A cast is not automatically wrong; it is a **claim that the
+generated types are wrong**, which is sometimes true. It has to be argued at the
+site and allowed here deliberately, rather than reached for by habit.
+
+### Verification
+
+Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
+`bun test` **1287 pass / 0 fail** · boot 200 on `/auth`, `/`, `/portfolio`,
+`/summary`, `/settings`, `/goals`, `/decisions`, `/prompt-center`.
+
+Fault injection: reintroducing one cast reddens 1; dropping the word boundary
+from the matcher — the exact mistake that produced the wrong count — reddens 2.
+
+### Scope
+
+Behaviour-preserving except where the types proved behaviour was already wrong,
+which is items 3 and 4 above. No `src/lib/repo/` extraction: the casts were the
+defect, and moving 1,400 lines of hook into new files to fix a typing problem
+that the types themselves fixed would have been a much larger diff for no
+further safety. That extraction stays available if call-site sprawl becomes the
+problem; today it is not.

@@ -111,6 +111,7 @@ export function netExternalFlow(
 // correct and could never run on a real figure.
 
 import { isFutureLocalDate, isRealCalendarDate } from "./localDate";
+import type { Insert } from "./dbRows";
 
 /** Where a row came from. Mirrors the `source` arm of `cash_flows_bounds`. */
 export type CashFlowSource = "imported" | "user_entry" | "derived";
@@ -193,18 +194,22 @@ export function canRecordFlow(draft: FlowDraft): boolean {
  * spelled two ways.
  */
 export function flowInsert(input: {
-  userId: string | undefined;
+  userId: string;
   accountId: string;
   draft: FlowDraft;
   source?: CashFlowSource;
-}): Record<string, unknown> {
+}): Insert<"cash_flows"> {
   const { draft } = input;
   return {
-    user_id: input.userId ?? null,
+    user_id: input.userId,
     account_id: input.accountId,
     flow_date: draft.flowDate,
     kind: draft.kind,
-    amount: draft.amount,
+    // Non-null by the time this is reached: `canRecordFlow` refuses a null
+    // amount, and the mutation checks it before building the row. The generated
+    // type requires a number, which is the right requirement — this is where
+    // the validator's guarantee is handed to the compiler.
+    amount: draft.amount as number,
     // Never defaulted from `kind` at write time. DEFAULT_TREATMENT suggests it
     // in the form; what the holder chose is what is stored, because a dividend
     // swept out of the account is external and only they know that.

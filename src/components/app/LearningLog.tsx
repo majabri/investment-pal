@@ -69,7 +69,7 @@ export function LearningLog() {
     queryKey: ["decisions"],
     queryFn: async (): Promise<Decision[]> => {
       const { data, error } = await supabase
-        .from("decisions" as never)
+        .from("decisions")
         .select("*")
         .order("decided_on", { ascending: false })
         .limit(100);
@@ -91,7 +91,7 @@ export function LearningLog() {
     enabled: gradeSymbols.length > 0,
     queryFn: async (): Promise<{ symbol: string; date: string; close: number }[]> => {
       const { data } = await supabase
-        .from("price_history" as never)
+        .from("price_history")
         .select("symbol,date,close")
         .in("symbol", gradeSymbols)
         .order("date", { ascending: true });
@@ -149,13 +149,13 @@ export function LearningLog() {
     void (async () => {
       for (const u of updates) {
         await supabase
-          .from("decisions" as never)
+          .from("decisions")
           .update({
             outcome_1d: u.outcome_1d,
             outcome_1w: u.outcome_1w,
             outcome_1m: u.outcome_1m,
             grade: u.grade,
-          } as never)
+          })
           .eq("id", u.id);
       }
       gradingRef.current = false;
@@ -181,7 +181,7 @@ export function LearningLog() {
         priceAtRec = null;
       }
     }
-    const { error } = await supabase.from("decisions" as never).insert({
+    const { error } = await supabase.from("decisions").insert({
       user_id: auth.user.id,
       symbol: sym,
       recommendation: f.recommendation,
@@ -192,7 +192,7 @@ export function LearningLog() {
       // NOT KNOWN — no version has been recorded yet — which is the truth and
       // is more useful later than a pointer at whatever the goal says then.
       goal_version_id: goalVersionId,
-    } as never);
+    });
     if (error) {
       toast.error(error.message);
       return;
@@ -203,8 +203,8 @@ export function LearningLog() {
 
   async function setOutcome(id: string, outcome: string, pl: number | null) {
     const { error } = await supabase
-      .from("decisions" as never)
-      .update({ outcome, outcome_pl: pl } as never)
+      .from("decisions")
+      .update({ outcome, outcome_pl: pl })
       .eq("id", id);
     if (!error) void qc.invalidateQueries({ queryKey: ["decisions"] });
   }
