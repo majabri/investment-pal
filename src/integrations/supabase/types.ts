@@ -274,6 +274,7 @@ export type Database = {
       }
       decisions: {
         Row: {
+          account_id: string | null
           action: string | null
           confidence: number | null
           counterargument: string | null
@@ -300,10 +301,12 @@ export type Database = {
           prompt_version: string | null
           recommendation: string
           review_type: string
+          supersedes_decision_id: string | null
           symbol: string | null
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           action?: string | null
           confidence?: number | null
           counterargument?: string | null
@@ -330,10 +333,12 @@ export type Database = {
           prompt_version?: string | null
           recommendation: string
           review_type?: string
+          supersedes_decision_id?: string | null
           symbol?: string | null
           user_id: string
         }
         Update: {
+          account_id?: string | null
           action?: string | null
           confidence?: number | null
           counterargument?: string | null
@@ -360,15 +365,80 @@ export type Database = {
           prompt_version?: string | null
           recommendation?: string
           review_type?: string
+          supersedes_decision_id?: string | null
           symbol?: string | null
           user_id?: string
         }
         Relationships: [
           {
+            foreignKeyName: "decisions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "decisions_goal_version_id_fkey"
             columns: ["goal_version_id"]
             isOneToOne: false
             referencedRelation: "goal_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decisions_supersedes_decision_id_fkey"
+            columns: ["supersedes_decision_id"]
+            isOneToOne: false
+            referencedRelation: "decisions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fills: {
+        Row: {
+          broker_ref: string | null
+          created_at: string
+          fees: number | null
+          filled_at: string
+          id: string
+          note: string | null
+          order_id: string
+          price: number
+          quantity: number
+          source: string
+          user_id: string
+        }
+        Insert: {
+          broker_ref?: string | null
+          created_at?: string
+          fees?: number | null
+          filled_at: string
+          id?: string
+          note?: string | null
+          order_id: string
+          price: number
+          quantity: number
+          source: string
+          user_id: string
+        }
+        Update: {
+          broker_ref?: string | null
+          created_at?: string
+          fees?: number | null
+          filled_at?: string
+          id?: string
+          note?: string | null
+          order_id?: string
+          price?: number
+          quantity?: number
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fills_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -1310,6 +1380,82 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      tranches: {
+        Row: {
+          account_id: string
+          closed_at: string | null
+          created_at: string
+          decision_id: string | null
+          id: string
+          invalidation: string | null
+          kind: string
+          note: string | null
+          opened_at: string
+          opened_quantity: number
+          security_id: string | null
+          symbol: string
+          target: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          closed_at?: string | null
+          created_at?: string
+          decision_id?: string | null
+          id?: string
+          invalidation?: string | null
+          kind: string
+          note?: string | null
+          opened_at: string
+          opened_quantity: number
+          security_id?: string | null
+          symbol: string
+          target?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          closed_at?: string | null
+          created_at?: string
+          decision_id?: string | null
+          id?: string
+          invalidation?: string | null
+          kind?: string
+          note?: string | null
+          opened_at?: string
+          opened_quantity?: number
+          security_id?: string | null
+          symbol?: string
+          target?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tranches_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tranches_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tranches_security_id_fkey"
+            columns: ["security_id"]
+            isOneToOne: false
+            referencedRelation: "securities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       watchlist: {
         Row: {
