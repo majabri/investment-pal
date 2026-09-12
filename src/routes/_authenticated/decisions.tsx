@@ -14,6 +14,11 @@ import { useQuery } from "@tanstack/react-query";
 
 import { AppShell } from "@/components/app/AppShell";
 import { DecisionCard, type DecisionRow } from "@/components/app/DecisionCard";
+import {
+  isHistorical,
+  supersessionLabel,
+  supersessionStatus,
+} from "@/lib/supersessionView";
 import { supabase } from "@/lib/supabaseClient";
 import { Input } from "@/components/ui/input";
 
@@ -55,9 +60,18 @@ const CONTRACT_SELECT = [
   "model_version",
   "prompt_version",
   "objective_id",
+  // §13.1 / DEC-005. Both are NULL on every pre-migration row, and that is the
+  // point: `supersessionStatus` reports "only" for them rather than inventing a
+  // history nobody recorded.
+  "account_id",
+  "supersedes_decision_id",
 ].join(",");
 
-type Row = DecisionRow & { decided_on?: string | null };
+type Row = DecisionRow & {
+  decided_on?: string | null;
+  account_id: string | null;
+  supersedes_decision_id: string | null;
+};
 
 function DecisionsPage() {
   const [q, setQ] = useState("");
@@ -75,6 +89,16 @@ function DecisionsPage() {
     },
     refetchInterval: 5 * 60 * 1000,
   });
+
+  // The full loaded set, shaped for the supersession reader. Deliberately NOT
+  // `shown`: filtering is a view concern, and a decision must not read as
+  // current merely because its replacement was filtered out.
+  const supersessionRows = rows.map((r) => ({
+    id: r.id,
+    decided_on: r.decided_on ?? "",
+    supersedes_decision_id: r.supersedes_decision_id,
+    account_id: r.account_id,
+  }));
 
   const needle = q.trim().toLowerCase();
   const shown = needle
@@ -126,9 +150,27 @@ function DecisionsPage() {
                 {date}
               </h2>
               <div className="space-y-3">
-                {list.map((r) => (
-                  <DecisionCard key={r.id} row={r} />
-                ))}
+                {list.map((r) => {
+                  // Status is computed against ALL loaded rows, never the
+                  // filtered or grouped subset: a decision is not "current"
+                  // because the thing that replaced it failed a text filter.
+                  const status = supersessionStatus(
+                    { ...r, decided_on: r.decided_on ?? "" },
+                    supersessionRows,
+                  );
+                  const label = supersessionLabel(status);
+                  return (
+                    <div
+                      key={r.id}
+                      className={isHistorical(status) ? "opacity-60" : undefined}
+                    >
+                      {label && (
+                        <p className="mb-1 text-[11px] text-muted-foreground">{label}</p>
+                      )}
+                      <DecisionCard row={r} />
+                    </div>
+                  );
+                })}
               </div>
             </section>
           ))}
