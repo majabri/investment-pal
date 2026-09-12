@@ -20,6 +20,8 @@ import { policySourceOf, type PolicySource } from "@/lib/policy";
 import type { Strategy, StrategySymbol } from "@/lib/strategy";
 import type { Order } from "@/lib/orders";
 import type { Lot } from "@/lib/lots";
+import { readTranches, type TrancheRead } from "@/lib/trancheRows";
+import type { Row } from "@/lib/dbRows";
 
 export type Goal = {
   id: string;
@@ -548,6 +550,44 @@ export function useLots(accountId: string | null) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["position_lots"] }),
   });
   return { ...query, create, close };
+}
+
+/**
+ * Position tranches for one account (§12.4, BR-010).
+ *
+ * Account-scoped by the query for the same reason as `useLots` and `useOrders`:
+ * a client-side filter would show another account's composition for as long as
+ * the filter was wrong.
+ *
+ * NOT a cast. Every other hook here casts `data as T[]`, which is safe where
+ * the generated types are honest. They are not for `kind`: Postgres constrains
+ * it with a CHECK, PostgREST reports the column's type, and the cast would
+ * hand any string a compile-time type saying it is `"core" | "tactical"`.
+ * `readTranches` validates at the boundary and COUNTS what it cannot read, so a
+ * screen can say the totals are short rather than quietly showing a smaller
+ * position.
+ *
+ * An empty result is `not_recorded`, not "no position" — `trancheCoverage`
+ * reads that distinction.
+ */
+export function useTranches(accountId: string | null) {
+  const query = useQuery({
+    queryKey: ["tranches", accountId],
+    enabled: accountId !== null,
+    queryFn: async (): Promise<TrancheRead> => {
+      const { data, error } = await supabase
+        .from("tranches")
+        .select("*")
+        .eq("account_id", accountId!)
+        .order("opened_at", { ascending: false });
+      if (error) throw error;
+      return readTranches((data ?? []) as Row<"tranches">[]);
+    },
+  });
+  // Read-only, deliberately. Opening and closing tranches needs a form and a
+  // decision about who may do it; a mutation with no caller is inert code, and
+  // inert code merged ahead of its screen is what PERF-001 and UNIV-001 did.
+  return query;
 }
 
 export function useOrders(accountId: string | null) {

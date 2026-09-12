@@ -34,8 +34,11 @@ import {
   useScopedAccount,
   useLogSync,
   useCashFlows,
+  useTranches,
   type Holding,
 } from "@/hooks/useAppData";
+import { aggregationNote, symbolPosition } from "@/lib/tranches";
+import { unreadableNote } from "@/lib/trancheRows";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
 import {
   DENOMINATOR_DEFINITION,
@@ -93,6 +96,17 @@ function PortfolioPage() {
   // and `upsert` wrote to whichever account happened to be first.
   const { data: balance, upsert } = useScopedAccount(scope);
   const { data: cashFlows } = useCashFlows(scope);
+  // §12.4 / BR-010. Scoped to the selected account, like the lots: a tranche
+  // belongs to exactly one account. Absent tranches are `not_recorded`, which
+  // is why a symbol with none simply gets no note rather than a warning.
+  const { data: trancheRead } = useTranches(selectedAccount?.id ?? null);
+  const tranchesShort = trancheRead ? unreadableNote(trancheRead) : null;
+  // The caption a holdings row carries when one symbol holds more than one
+  // kind — "60 shares shown — 50 core + 10 tactical. Each closes separately."
+  // Null for a single kind and null when nothing is recorded: a caption on
+  // every row is a caption nobody reads.
+  const trancheNoteOf = (symbol: string): string | null =>
+    trancheRead ? aggregationNote(symbolPosition(symbol, trancheRead.tranches)) : null;
   const scopeName = scopeLabel(scope);
   const noScope = scopeIsEmpty(scope) || balance === null;
   const logSync = useLogSync();
@@ -325,6 +339,14 @@ function PortfolioPage() {
               <RefreshPricesButton symbols={holdings.map((h) => h.symbol)} />
             </span>
           </div>
+          {tranchesShort && (
+            // Rows exist that could not be classified. The per-row captions
+            // below are therefore understated, and saying so beats a silently
+            // short breakdown that looks exactly like a correct one.
+            <p className="mb-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              {tranchesShort}
+            </p>
+          )}
           {holdings.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No holdings yet. Click "Add position" or import from your broker in Settings.
@@ -451,6 +473,7 @@ function PortfolioPage() {
                       // three side by side (P0-05).
                       const pctOfAcct = weightOf(value, denoms, "netEquity");
                       const unpriced = !q;
+                      const trancheNote = trancheNoteOf(h.symbol);
                       return (
                         <TableRow
                           key={h.id}
@@ -463,6 +486,11 @@ function PortfolioPage() {
                               <span className="ml-1 align-super text-[9px] text-muted-foreground">
                                 t
                               </span>
+                            )}
+                            {trancheNote && (
+                              <div className="text-[11px] font-normal text-muted-foreground">
+                                {trancheNote}
+                              </div>
                             )}
                           </TableCell>
                           <TableCell className="text-right tabular">
