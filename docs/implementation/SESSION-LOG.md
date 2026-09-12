@@ -3088,3 +3088,96 @@ holding** — worth confirming, because the opposite would have been silent and
 catastrophic.
 
 No code change. This is the record that the finding is closed and how.
+
+---
+
+## Session — 2026-09-12 — the execution ledger (Phase 4) — OPENED, NOT MERGED
+
+Three blueprint requirements that had nowhere to live, each showing up as a
+wrong answer rather than a missing feature.
+
+**This stops for Amir.** It carries a migration only Lovable can apply, and it
+is money-adjacent under OD-001. The PR is open; nothing is merged.
+
+### Fills (§12.3)
+
+`orders.filled_quantity` and `average_fill_price` are a *summary* of the
+executions, and a summary cannot say what the fills cost, which statement line
+each was, or whether the second partial **added to** the first or **replaced**
+it. That last one is why §26.2 lists "partial fill updates exactly once" as a
+mandatory data-state test and why it could not be written: the schema could not
+represent two fills.
+
+Fees are `NULL` when unknown and the totals propagate that all-or-nothing.
+Summing the fees that happen to be recorded understates the cost by exactly the
+missing ones, with nothing to show for it. The average price is
+volume-weighted — 100 at $10 and 1 at $20 is $10.10, not $15 — and fees are
+deliberately **not** folded in: an average with costs baked in is neither a
+price nor a cost, and reconciling it against the broker's would show a gap that
+is not one.
+
+An over-fill is surfaced rather than clamped, because clamping hides a
+double-imported statement — the exact failure the idempotency index prevents.
+
+### Tranches (§12.4, BR-010)
+
+The blueprint's worked example was unrepresentable: 50 core shares plus a
+10-share tactical trade display as 60 and the 10 must stay separately
+identifiable. `position_lots` answers tax questions — cost basis, holding
+period — and nothing answered "which decision opened this, and when does it
+close".
+
+`exitCandidates` is newest-first **within a kind**, and is explicitly not a
+tax-lot selection: closing the tactical piece may well realise an older lot, and
+conflating the two questions is how "close the tactical piece" becomes
+arithmetic done by hand.
+
+No tranches at all is `not_recorded`, not a discrepancy. Nobody has recorded
+lifecycle for that holding, which differs from recording it wrongly — and the
+other reading would put a warning on every position on day one.
+
+### Supersession (DEC-005, DEC-002, §13.1)
+
+The link points from the **new** decision to the one it replaces. That direction
+is the design: writing it the other way means UPDATING the superseded row, and a
+row that gets updated is not immutable.
+
+**A test caught a real design flaw.** Two decisions with NULL accounts fell
+through as "agreeing", contradicting the comment directly above the code. But
+folding them into `different_account` would have been wrong too — that names a
+conflict nobody observed. They get their own reason, `account_not_known`, which
+is both honest and actionable.
+
+The consequence is deliberate and worth stating: **every decision written before
+this migration has a NULL account, so none can be superseded until somebody
+records which account it was about.** Refusing is recoverable; a supersession
+chain built across two accounts is not.
+
+The chain walk is cycle-safe. The database forbids a self-link and forbids two
+decisions superseding one, but neither prevents a longer cycle — and without the
+guard the test run does not fail, it **hangs**.
+
+### What is deliberately NOT here
+
+**No UI, and no hooks.** The tables do not exist until Lovable applies the
+migration, so anything wired now would be inert — which is the precise criticism
+this programme made of PERF-001 and UNIV-001 shipping as merged code over
+tables that were never created. The honest sequence is migration first, wiring
+second. `orders.filled_quantity` keeps working and stays authoritative until a
+screen writes fills.
+
+**No backfill.** Every existing decision keeps a NULL `account_id`. Guessing the
+household's primary account would put a fabricated answer into a table the app
+treats as memory.
+
+### Verification
+
+Full gate: `bun install --frozen-lockfile` · `typecheck` · `test:typecheck` ·
+`bun test` **1398 pass / 0 fail** · boot 200 on `/auth`, `/`, `/portfolio`,
+`/decisions`.
+
+Fault injection, eight ways: partial fees summed as complete reddens 1; an
+unweighted average reddens 1; a duplicate broker reference allowed reddens 2;
+no-tranches called a mismatch reddens 1; an exit reaching into the other kind
+reddens 2; two NULL accounts treated as agreeing reddens 2; and removing the
+cycle guard **hangs the run**.
