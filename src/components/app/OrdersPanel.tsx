@@ -4,7 +4,9 @@
 // `totalCommittedCash`; `fills.ts` shipped in #212 with the reconciliation and
 // the volume-weighted average. Neither had a caller: the only thing that read
 // `orders` at all was the readiness gate, and it read a timestamp, not rows.
-// This is the read side. Nothing here writes.
+// This is the read side. The one write — recording a fill — lives in
+// `FillForm`, opens beneath the order it belongs to, and goes through
+// `fillRejection` before anything is built.
 //
 // Every figure shown is one those libraries already compute. The panel decides
 // how it is said, and says the uncomfortable cases plainly: an order whose
@@ -23,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { FillForm } from "@/components/app/FillForm";
 import type { Account } from "@/hooks/useAppData";
 import { useFills } from "@/hooks/useAppData";
 import { fillsOf, readFills, unreadableFillsNote } from "@/lib/fillRows";
@@ -61,6 +64,9 @@ export function OrdersPanel({
   orders: Order[];
 }) {
   const [showClosed, setShowClosed] = useState(false);
+  // Which order has its fill form open. One at a time: two open forms for two
+  // orders is how a fill lands on the wrong one.
+  const [recordingFor, setRecordingFor] = useState<string | null>(null);
   const fills = useFills(orders.map((o) => o.id));
   const read = fills.data ?? NO_FILLS;
 
@@ -171,8 +177,30 @@ export function OrdersPanel({
                         o.average_fill_price !== null
                           ? ` Average from fills ${fmtPrice(summary.average)} differs from the broker's ${fmtPrice(o.average_fill_price)}.`
                           : null}
+                        {recordingFor !== o.id && (
+                          <Button
+                            size="sm"
+                            variant="link"
+                            className="ml-2 h-auto p-0 text-[11px]"
+                            onClick={() => setRecordingFor(o.id)}
+                            aria-label={`Record a fill on ${o.symbol}`}
+                          >
+                            Record fill
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
+                    {recordingFor === o.id && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={9} className="pt-0">
+                          <FillForm
+                            order={o}
+                            existing={orderFills}
+                            onDone={() => setRecordingFor(null)}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </Fragment>
                 );
               })}
