@@ -22,6 +22,9 @@ import type { Order } from "@/lib/orders";
 import type { Lot } from "@/lib/lots";
 import { readTranches, type TrancheRead } from "@/lib/trancheRows";
 import { readFills, type FillRead } from "@/lib/fillRows";
+import { canRecordFill, fillInsert, validateFillDraft } from "@/lib/fillDraft";
+import type { FillDraft } from "@/lib/fillDraft";
+import type { Fill } from "@/lib/fills";
 import type { Row } from "@/lib/dbRows";
 
 export type Goal = {
@@ -660,6 +663,53 @@ export function useFills(orderIds: readonly string[]) {
         .order("filled_at", { ascending: true });
       if (error) throw error;
       return readFills((data ?? []) as Row<"fills">[]);
+    },
+  });
+}
+
+/**
+ * Record one fill against an order (§12.3, §26.2 "partial fill updates
+ * exactly once").
+ *
+ * Does NOT touch `orders.filled_quantity`. That stays what the broker or the
+ * import reported; the fills are the evidence, and `reconcileFills` is where
+ * the two meet. Writing Σ fills back onto the order would make the app the
+ * author of the figure it is supposed to be checking.
+ *
+ * The client-side duplicate check sees THIS order's fills. The database's
+ * partial unique index is per user across every order, so a reference already
+ * used on a different order passes the form and is refused here — and that
+ * refusal is translated, because "duplicate key value violates unique
+ * constraint" is not a sentence a holder can act on.
+ */
+export function useRecordFill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { orderId: string; draft: FillDraft; existing: readonly Fill[] }) => {
+      if (!canRecordFill(p.draft, p.existing)) {
+        // The form blocks this; the guard is here because a caller that
+        // skipped the form would otherwise reach the CHECK and get a Postgres
+        // error.
+        throw new Error(
+          validateFillDraft(p.draft, p.existing)[0]?.message ?? "That fill cannot be recorded.",
+        );
+      }
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not signed in");
+      const { error } = await supabase
+        .from("fills")
+        .insert(fillInsert({ userId: userData.user.id, orderId: p.orderId, draft: p.draft }));
+      if (error) {
+        if (isUniqueViolation(error)) {
+          throw new Error(
+            "That broker reference is already recorded on another order. The same execution cannot land twice.",
+          );
+        }
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fills"] });
     },
   });
 }
