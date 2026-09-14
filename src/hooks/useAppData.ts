@@ -21,6 +21,7 @@ import type { Strategy, StrategySymbol } from "@/lib/strategy";
 import type { Order } from "@/lib/orders";
 import type { Lot } from "@/lib/lots";
 import { readTranches, type TrancheRead } from "@/lib/trancheRows";
+import { readFills, type FillRead } from "@/lib/fillRows";
 import type { Row } from "@/lib/dbRows";
 
 export type Goal = {
@@ -628,6 +629,39 @@ export function useOrders(accountId: string | null) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
   });
   return { ...query, create, remove };
+}
+
+/**
+ * The fills recorded against a set of orders (§12.3).
+ *
+ * Scoped by ORDER rather than by account: a fill belongs to exactly one order,
+ * and the order carries the account. Passing the account's order ids is what
+ * keeps this from showing another account's executions, for the same reason
+ * `useOrders` filters server-side.
+ *
+ * Same boundary as `useTranches`: `source` comes back as `string`, the domain
+ * type says `"imported" | "user_entry" | "derived"`, and `readFills` counts
+ * what it cannot classify rather than casting past it.
+ *
+ * Read-only, deliberately — the panel this feeds is the read side. Recording
+ * a fill goes through `fillRejection`, and lands with its own form.
+ */
+export function useFills(orderIds: readonly string[]) {
+  // Sorted so the key is stable across renders that reorder the list.
+  const key = orderIds.slice().sort().join(",");
+  return useQuery({
+    queryKey: ["fills", key],
+    enabled: orderIds.length > 0,
+    queryFn: async (): Promise<FillRead> => {
+      const { data, error } = await supabase
+        .from("fills")
+        .select("*")
+        .in("order_id", orderIds as string[])
+        .order("filled_at", { ascending: true });
+      if (error) throw error;
+      return readFills((data ?? []) as Row<"fills">[]);
+    },
+  });
 }
 
 export function useAccounts() {

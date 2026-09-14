@@ -35,8 +35,10 @@ import {
   useLogSync,
   useCashFlows,
   useTranches,
+  useOrders,
   type Holding,
 } from "@/hooks/useAppData";
+import { OrdersPanel } from "@/components/app/OrdersPanel";
 import { aggregationNote, symbolPosition } from "@/lib/tranches";
 import { unreadableNote } from "@/lib/trancheRows";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
@@ -100,6 +102,8 @@ function PortfolioPage() {
   // belongs to exactly one account. Absent tranches are `not_recorded`, which
   // is why a symbol with none simply gets no note rather than a warning.
   const { data: trancheRead } = useTranches(selectedAccount?.id ?? null);
+  // §12.3. The first caller `useOrders` has had. Scoped like the tranches.
+  const { data: orders = [] } = useOrders(selectedAccount?.id ?? null);
   const tranchesShort = trancheRead ? unreadableNote(trancheRead) : null;
   // The caption a holdings row carries when one symbol holds more than one
   // kind — "60 shares shown — 50 core + 10 tactical. Each closes separately."
@@ -758,6 +762,10 @@ function PortfolioPage() {
             because flows are account-scoped data entry, which is what this page
             already is — and ADR-APP-015 is Proposed, so navigation does not
             move. */}
+        {/* §12.3, read side. Same siting reasoning as the cash flows: orders
+            are account-scoped data, which is what this page already is. */}
+        <OrdersPanel account={selectedAccount ?? null} orders={orders} />
+
         <CashFlowPanel
           accountId={scope.kind === "account" ? scope.accountId : null}
           coverage={cashFlows?.coverage ?? "unknown"}
