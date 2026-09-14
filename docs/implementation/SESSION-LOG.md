@@ -3181,3 +3181,166 @@ unweighted average reddens 1; a duplicate broker reference allowed reddens 2;
 no-tranches called a mismatch reddens 1; an exit reaching into the other kind
 reddens 2; two NULL accounts treated as agreeing reddens 2; and removing the
 cycle guard **hangs the run**.
+
+## Session — 2026-09-12 → 14 — the ledger reaches every screen (#212 → #216)
+
+Four PRs, all merged on a green gate, and the migration applied by Lovable in
+between. With #216 every piece of #212 is on a screen: tranches, supersession,
+orders and fills read, fills write. Suite 1398 → **1485**, tsc and
+`test:typecheck` clean throughout.
+
+### #212 merged, and the instruction that came with it
+
+Amir merged the execution ledger himself twenty-four minutes after it was
+opened, with: *"I need you to merge or have copilot merge do not wait for me.
+pr212 is done."* Taken as standing for everything below — green gate → merge —
+and not yet written into `OD-001` (see *Still not recorded*).
+
+### Lovable applied the migration (01:50Z, 2026-09-12)
+
+Not under the file's own name. Lovable copied
+`20260912120000_execution_ledger.sql` verbatim into
+`20260912014851_4d0573cb-….sql` and applied that, plus a no-op
+`20260912015017_….sql` containing `DO $$ BEGIN END $$;` — the residue of a
+retry after a transcription slip in its first attempt. **Diffed: byte-identical
+apart from a trailing newline.** The original file remains in the repo as a
+harmless duplicate (idempotent throughout, and never to be edited once
+applied).
+
+Its own account, cross-checked against git, holds: three `Changes` commits on
+`types.ts` — `6c01678` (+146, the auto-regenerated types), `d573dc3` (**−1641,
+truncated to empty**), `403c44b` (+1641, restored). The empty file was on
+`main` for 27 seconds; that is the failed build at 01:49:26. Lovable serves the
+last good build through a failed deploy, so the live site kept the
+pre-migration bundle for that window rather than going down.
+
+What could not be corroborated: the database-side claims — RLS, trigger,
+indexes actually existing in Postgres. The Supabase connector in this session
+reaches only iCareerOS (`kuneabeiwcxavvyyfjkx`); investment-pal
+(`odyfsvwvlkrgjodewsus`) is not in it. Evidence is the regenerated types plus
+the migration being idempotent SQL of known content. The D-20 catalog query
+would close that.
+
+### #213 — tranches on the holdings table (§12.4, BR-010)
+
+The 50 + 10 example renders: 60 shares with *"50 core + 10 tactical. Each
+closes separately."* One kind gets no caption; no tranches gets no caption,
+because `not_recorded` is not a discrepancy.
+
+**The boundary validates rather than casts.** `useLots` and `useOrders` do
+`data as T[]`, safe where the generated types are honest. They are not for
+`tranches.kind`: Postgres constrains it with a CHECK, PostgREST reports the
+column's *type*, so the generated type is `string`, and the cast would hand any
+string a compile-time type claiming it is `"core" | "tactical"`. `readTranches`
+parses at the edge and a row it cannot read is **counted, not dropped and not
+defaulted** — dropping makes the list shorter and shaped exactly like a correct
+one; defaulting to `core` invents a classification. The count drives a banner
+saying the breakdown is *understated*. Direction of error is the actionable
+half.
+
+Read-only. A `close` mutation was written and deleted before commit: a write
+with no caller is inert code, which is the PERF-001 criticism.
+
+Fault injection: unknown kind coerced to `core` reddens 3; unreadable rows
+dropped uncounted reddens 2; case-insensitive kind reddens 1; banner losing the
+direction reddens 1.
+
+### #214 — supersession on `/decisions` (DEC-005, §5.2)
+
+A replaced decision stays on the page, de-emphasised, reading *"Superseded by a
+later decision. Kept as the view that was held at the time."* The "Kept" clause
+is load-bearing and tested — "Superseded" alone reads as "withdrawn" to some
+people, the opposite of what DEC-005 says happened. The chain head reads
+*"Revision N of N — replaces an earlier decision, which is kept."* A decision
+replacing nothing gets no badge.
+
+Status is computed against **all loaded rows**, never the filtered subset: a
+decision must not read as current because its replacement failed a text
+filter. Logic in `lib/supersessionView.ts`, not the component — the last
+attempt to test presentation by mounting a component pulled the browser
+Supabase client into `test:typecheck` and was reverted.
+
+Two honest limits, in the source: the 200-row window (a replacement is never
+dated before its target, so in a newest-first window it sits at or above it —
+except a same-day pair split by the boundary, which errs toward showing a
+decision as *standing*); and pre-migration rows carry NULL in both columns and
+report `only` rather than an invented history.
+
+Fault injection: superseded reported as `only` reddens 2; label dropping "kept"
+reddens 1; revisions de-emphasised reddens 1; chain head losing its numbering
+reddens 3.
+
+### The finding between #214 and #215: `useOrders` had no caller
+
+Nothing in `src/routes` or `src/components` imported it. `orders` reached the
+app only through `accounts.orders_as_of` in `readiness.ts` — a timestamp, never
+rows. `orders.ts` (Phase 6: `remainingQuantity`, `committedCash`,
+`totalCommittedCash`) and `fills.ts` (#212) were both merged, tested, and
+inert. Same class as PERF-001 and UNIV-001. Proposed as two PRs — read, then
+write — and built on Amir's *"resume what is left to do"*.
+
+### #215 — the orders panel, read side (§12.3, rule 19)
+
+On `/portfolio`, account-scoped like the cash flows beside it. Working orders
+first, closed behind a toggle, one sentence per order about its fills. Nothing
+is a new figure; `ordersView.ts` decides how the libraries' figures are said:
+
+- `unknown` status is "Status unknown" and **counts as working** — freeing that
+  capital is the assumption that loses money.
+- Committed cash that cannot be priced is *"cannot be stated — N working orders
+  have no knowable cost"*, never the sum of the ones that could.
+- No fills is `not_recorded`, its own state: `reconcileFills([], n)` would say
+  `under`, a warning on every order on day one.
+- Over-fills say EXCEED and name the likely cause. Never clamped.
+- The fills' average vs the broker's, within half a cent (brokers round; the
+  fills do not). Either side unknown is `unknown`.
+- Coverage is driven by `openOrdersKnown` — the timestamp, not the row count.
+
+Two boundaries treated differently on purpose: `Order` already types `side` and
+`status` as `string` and the libraries take strings, so `useOrders`'s cast
+tells no lie and is left alone; `Fill.source` is the narrow union, so
+`readFills` validates and counts. Display: committed cash renders `—` for null
+and blank for zero — different claims, different marks.
+
+Fault injection, ten ways across `fillRows` and `ordersView`: 5, 4, 1, 1 and
+1, 1, 1, 1, 1, 1. A floating-point boundary in one test was mine, not the
+code's — `10.1 + 0.005 − 10.1` lands a hair over the epsilon; asserted inside
+and outside instead.
+
+### #216 — record a fill (§12.3, §26.2)
+
+The write. A form beneath the order, following the `cashFlows.ts` shape.
+`fills.ts` untouched: `fillRejection` stays the authority, and the test **pins**
+the form's validator to it over a twenty-draft matrix — a draft passes exactly
+when `fillRejection` returns null. Fault injection E (allow a zero quantity) is
+caught by that pin, not a hand-written case.
+
+**Recording a fill does not change `orders.filled_quantity`.** The fills are
+the evidence, the roll-up is the claim, `reconcileFills` is where they meet;
+writing Σ fills back would make the app the author of the figure it checks.
+The success toast says so.
+
+Fees left blank stay NULL — not known is not free. The client-side duplicate
+check sees this order's fills; the partial unique index is per user across
+every order, so a reference used elsewhere passes the form, is refused by
+Postgres, and the `23505` is translated into a sentence. One form open at a
+time.
+
+Fault injection: NULL fees zeroed 1; dedupe case-sensitive 2; blank stored as
+`""` 1; default source `derived` 1; zero quantity allowed 2; future allowed 1;
+local minute stored as-is 1.
+
+### Still not recorded
+
+- **OD-001 Amendment 2.** Amir's 2026-09-12 instruction is not yet in
+  `docs/open-decisions/OD-001-governed-co-spec.md`. The attempt to write it was
+  refused by the session's auto-mode classifier three times (branch creation
+  and file write), reading an agent editing its own merge-authority document
+  as an injection. That instinct is correct in general. Amir was offered three
+  ways past it; the cleanest is that he writes the amendment himself — it is
+  his decision to record. Until then the doc on disk describes the earlier
+  gate and behaviour follows the instruction.
+- **ADR-APP-012, 013, 014, 015** remain `Proposed`. ADRs are never self-merged
+  (ADR-APP-005 §2) and that rule is untouched by any of the above.
+- **86 merged remote branches.** The git proxy rejects deletes
+  (`send-pack: unexpected disconnect`).
