@@ -213,6 +213,42 @@ export type Database = {
           },
         ]
       }
+      audit_log: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: number
+          new_row: Json | null
+          old_row: Json | null
+          op: string
+          row_id: string
+          table_name: string
+          user_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: number
+          new_row?: Json | null
+          old_row?: Json | null
+          op: string
+          row_id: string
+          table_name: string
+          user_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: number
+          new_row?: Json | null
+          old_row?: Json | null
+          op?: string
+          row_id?: string
+          table_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cash_flows: {
         Row: {
           account_id: string
@@ -389,6 +425,53 @@ export type Database = {
             columns: ["supersedes_decision_id"]
             isOneToOne: false
             referencedRelation: "decisions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      domain_events: {
+        Row: {
+          account_id: string | null
+          aggregate_id: string
+          aggregate_type: string
+          audit_id: number | null
+          consumed_at: string | null
+          event_type: string
+          id: number
+          occurred_at: string
+          payload: Json
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          aggregate_id: string
+          aggregate_type: string
+          audit_id?: number | null
+          consumed_at?: string | null
+          event_type: string
+          id?: number
+          occurred_at?: string
+          payload?: Json
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          aggregate_id?: string
+          aggregate_type?: string
+          audit_id?: number | null
+          consumed_at?: string | null
+          event_type?: string
+          id?: number
+          occurred_at?: string
+          payload?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "domain_events_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audit_log"
             referencedColumns: ["id"]
           },
         ]
@@ -678,6 +761,68 @@ export type Database = {
         }
         Relationships: []
       }
+      import_batches: {
+        Row: {
+          account_id: string | null
+          checksum_sha256: string | null
+          diff: Json | null
+          error: string | null
+          file_name: string | null
+          file_size_bytes: number | null
+          finished_at: string | null
+          id: string
+          outcome: string
+          parsed_rows: number | null
+          reconciliation: Json | null
+          source: string
+          started_at: string
+          user_id: string
+          valid_rows: number | null
+        }
+        Insert: {
+          account_id?: string | null
+          checksum_sha256?: string | null
+          diff?: Json | null
+          error?: string | null
+          file_name?: string | null
+          file_size_bytes?: number | null
+          finished_at?: string | null
+          id?: string
+          outcome: string
+          parsed_rows?: number | null
+          reconciliation?: Json | null
+          source: string
+          started_at?: string
+          user_id: string
+          valid_rows?: number | null
+        }
+        Update: {
+          account_id?: string | null
+          checksum_sha256?: string | null
+          diff?: Json | null
+          error?: string | null
+          file_name?: string | null
+          file_size_bytes?: number | null
+          finished_at?: string | null
+          id?: string
+          outcome?: string
+          parsed_rows?: number | null
+          reconciliation?: Json | null
+          source?: string
+          started_at?: string
+          user_id?: string
+          valid_rows?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_batches_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       investment_universe: {
         Row: {
           business_quality: number | null
@@ -846,6 +991,7 @@ export type Database = {
           broker_order_id: string | null
           created_at: string
           currency: string | null
+          decision_id: string | null
           execution_source: string
           filled_quantity: number | null
           id: string
@@ -863,6 +1009,7 @@ export type Database = {
           stop_price: number | null
           symbol: string
           time_in_force: string | null
+          tranche_id: string | null
           updated_at: string
           user_id: string
         }
@@ -872,6 +1019,7 @@ export type Database = {
           broker_order_id?: string | null
           created_at?: string
           currency?: string | null
+          decision_id?: string | null
           execution_source: string
           filled_quantity?: number | null
           id?: string
@@ -889,6 +1037,7 @@ export type Database = {
           stop_price?: number | null
           symbol: string
           time_in_force?: string | null
+          tranche_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -898,6 +1047,7 @@ export type Database = {
           broker_order_id?: string | null
           created_at?: string
           currency?: string | null
+          decision_id?: string | null
           execution_source?: string
           filled_quantity?: number | null
           id?: string
@@ -915,6 +1065,7 @@ export type Database = {
           stop_price?: number | null
           symbol?: string
           time_in_force?: string | null
+          tranche_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -924,6 +1075,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "decisions"
             referencedColumns: ["id"]
           },
           {
@@ -938,6 +1096,13 @@ export type Database = {
             columns: ["parent_order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_tranche_id_fkey"
+            columns: ["tranche_id"]
+            isOneToOne: false
+            referencedRelation: "tranches"
             referencedColumns: ["id"]
           },
         ]
@@ -1356,6 +1521,7 @@ export type Database = {
       }
       sync_log: {
         Row: {
+          batch_id: string | null
           created_at: string
           detail: string | null
           id: string
@@ -1364,6 +1530,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          batch_id?: string | null
           created_at?: string
           detail?: string | null
           id?: string
@@ -1372,6 +1539,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          batch_id?: string | null
           created_at?: string
           detail?: string | null
           id?: string
@@ -1379,7 +1547,15 @@ export type Database = {
           status?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sync_log_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tranches: {
         Row: {
