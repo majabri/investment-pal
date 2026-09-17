@@ -980,6 +980,20 @@ export function buildMiddayPrompt(ctx: PromptContext): string {
 // Amir 2026-07-25 (drafted with ChatGPT), stored verbatim.
 export type MeetingType = "Morning" | "Mid-Day" | "Evening" | "Weekly" | "Monthly";
 
+/**
+ * What each meeting is FOR, in the template's own words — the "Purpose:"
+ * line under each meeting heading below. Exported so the tab that selects a
+ * meeting can say why it exists; the test pins each line to the template so
+ * the tab and the brief cannot drift apart.
+ */
+export const MEETING_PURPOSE: Record<MeetingType, string> = {
+  Morning: "Decide what to do today.",
+  "Mid-Day": "Determine whether anything has changed enough to justify action.",
+  Evening: "Learn from today.",
+  Weekly: "Review strategy rather than daily price movement.",
+  Monthly: "Evaluate whether the portfolio strategy itself needs to change.",
+};
+
 const UNIVERSAL_TEMPLATE = (
   m: Mandate,
 ) => String.raw`You are my Chief Investment Officer (CIO) and Investment Committee.
@@ -1583,7 +1597,11 @@ Summarize:
 export function buildV6Prompt(
   ctx: PromptContext & { meeting: MeetingType; tradesToday?: string },
 ): string {
-  const header = `TODAY'S MEETING TYPE: ${ctx.meeting} CIO Meeting`;
+  // The v6 constitution names the five meetings and says what none of them
+  // is FOR. The purpose line is the universal template's, carried here so
+  // the tab that selects a meeting and the brief the model reads say the
+  // same sentence.
+  const header = `TODAY'S MEETING TYPE: ${ctx.meeting} CIO Meeting\nPurpose: ${MEETING_PURPOSE[ctx.meeting]}`;
   const rateNote = marginRatePromptLine(ctx.marginPolicy ?? MARGIN_POLICY_UNSET);
   const trades =
     ctx.meeting === "Evening" ? `\nTRADES I MADE TODAY\n${ctx.tradesToday || "(none)"}\n` : "";
