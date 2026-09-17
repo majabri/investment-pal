@@ -6,6 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { parsePositionsCsv, type ParsedHolding } from "@/lib/csvImport";
+import {
+  batchDiff,
+  committedPatch,
+  failedPatch,
+  importSyncLine,
+  sameFileNote,
+  sha256Hex,
+  stagedBatch,
+  utf8ByteLength,
+} from "@/lib/importBatch";
+import type { AccountOutcome } from "@/lib/importBatch";
 import { cashForAccount } from "@/lib/importSafety";
 import { supabase } from "@/lib/supabaseClient";
 import { fmtUSD } from "@/lib/finance";
@@ -70,6 +81,13 @@ export function PortfolioCsvImport() {
   const [cashByAccount, setCashByAccount] = useState<Record<string, number>>({});
   const [createAll, setCreateAll] = useState(true);
   const [busy, setBusy] = useState(false);
+  // §20.2: the file's own facts, recorded with the batch. NULL name for a
+  // paste — there is no file. Skipped lines are counted, not dropped silently.
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [skippedLines, setSkippedLines] = useState(0);
+  // IMP-004: whether this exact text has been committed before, said before
+  // the Save button rather than after it.
+  const [priorNote, setPriorNote] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
   const { accounts } = useAccountContext();
@@ -92,6 +110,9 @@ export function PortfolioCsvImport() {
       }
       setParsed(res.rows);
       setCashByAccount(res.cashByAccount);
+      setFileName(file.name);
+      setSkippedLines(res.skipped.length);
+      void checkPrior(text);
       initMapping(res.rows);
       toast.success(
         `${file.name}: ${res.rows.length} positions ready — choose destinations below.`,
@@ -109,7 +130,27 @@ export function PortfolioCsvImport() {
     }
     setParsed(res.rows);
     setCashByAccount(res.cashByAccount);
+    setFileName(null);
+    setSkippedLines(res.skipped.length);
+    void checkPrior(raw);
     initMapping(res.rows);
+  }
+
+  /** IMP-004: has this exact text been committed before? Read-only. */
+  async function checkPrior(text: string) {
+    setPriorNote(null);
+    try {
+      const checksum = await sha256Hex(text);
+      const { data, error } = await supabase
+        .from("import_batches")
+        .select("started_at,outcome")
+        .eq("checksum_sha256", checksum);
+      // A failed read says nothing — not "never imported".
+      if (error || !data) return;
+      setPriorNote(sameFileNote(data));
+    } catch {
+      /* the note is a courtesy; the import does not depend on it */
+    }
   }
 
   function initMapping(rows: ParsedHolding[], create = createAll) {
@@ -138,6 +179,7 @@ export function PortfolioCsvImport() {
   async function save() {
     if (!parsed?.length) return;
     setBusy(true);
+    let batchId: string | null = null;
     try {
       const { data: auth } = await supabase.auth.getUser();
       const userId = auth.user?.id;
@@ -176,9 +218,34 @@ export function PortfolioCsvImport() {
       }
       const existing = [...seen.values()];
 
+      // §20.2: the batch is opened as `staged` BEFORE anything is written, so
+      // a commit that never finishes leaves a true record rather than none.
+      // It carries the file's checksum, which is what makes a repeated
+      // import recognisable as the same file (IMP-004).
+      {
+        const { data: opened, error: openErr } = await supabase
+          .from("import_batches")
+          .insert(
+            stagedBatch({
+              userId,
+              accountId: null,
+              fileName,
+              fileSizeBytes: utf8ByteLength(raw),
+              checksum: await sha256Hex(raw),
+              parsedRows: parsed.length + skippedLines,
+              validRows: parsed.length,
+            }),
+          )
+          .select("id")
+          .single();
+        if (openErr) throw openErr;
+        batchId = opened.id;
+      }
+
       const asOf = new Date().toISOString();
       let saved = 0;
       let removed = 0;
+      const outcomes: AccountOutcome[] = [];
       for (const [name, holdings] of groups) {
         let acct = existing?.find((a) => a.name === name);
         if (!acct) {
@@ -243,6 +310,30 @@ export function PortfolioCsvImport() {
         const r = (result ?? {}) as { inserted?: number; updated?: number; removed?: number };
         saved += (r.inserted ?? 0) + (r.updated ?? 0);
         removed += r.removed ?? 0;
+        outcomes.push({
+          accountId: acct!.id,
+          accountName: name,
+          inserted: r.inserted ?? 0,
+          updated: r.updated ?? 0,
+          removed: r.removed ?? 0,
+          cash,
+        });
+      }
+      // The batch closes with what the database reported, per account, and
+      // the sync line points at it (§20.2). Written after the commits: a
+      // batch that says "committed" about commits that did not happen would
+      // be the one lie this table must never hold.
+      if (batchId !== null) {
+        const single = outcomes.length === 1 ? outcomes[0].accountId : null;
+        const { error: closeErr } = await supabase
+          .from("import_batches")
+          .update(committedPatch(batchDiff(outcomes, skippedLines), single))
+          .eq("id", batchId);
+        if (closeErr) throw closeErr;
+        const { error: logErr } = await supabase
+          .from("sync_log")
+          .insert(importSyncLine({ userId, batchId, accounts: outcomes.length, saved, removed }));
+        if (logErr) throw logErr;
       }
       // Auditable (rule 29): says what happened, including the removals,
       // which are the part the user cannot see in the file they chose.
@@ -253,8 +344,15 @@ export function PortfolioCsvImport() {
       );
       setParsed(null);
       setRaw("");
+      setFileName(null);
+      setPriorNote(null);
       void qc.invalidateQueries();
     } catch (e) {
+      // The batch records the failure too. Best effort: the error the holder
+      // sees is the import's, not the bookkeeping's.
+      if (batchId !== null) {
+        await supabase.from("import_batches").update(failedPatch(e)).eq("id", batchId);
+      }
       toast.error(e instanceof Error ? e.message : "Save failed");
     } finally {
       setBusy(false);
@@ -395,6 +493,13 @@ export function PortfolioCsvImport() {
               </Label>
               <Switch id="create-all" checked={createAll} onCheckedChange={onToggleCreateAll} />
             </div>
+            {priorNote && (
+              // IMP-004, said before the button. Not a refusal: a second
+              // import of the same statement is safe by design.
+              <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px]">
+                {priorNote}
+              </p>
+            )}
             <Button
               className="w-full"
               size="lg"
