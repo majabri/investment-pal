@@ -3344,3 +3344,146 @@ local minute stored as-is 1.
   (ADR-APP-005 §2) and that rule is untouched by any of the above.
 - **86 merged remote branches.** The git proxy rejects deletes
   (`send-pack: unexpected disconnect`).
+
+## Session — 2026-09-16 → 17 — the gap matrix, and the Phase 0/1 items it unblocked (#224 → #228)
+
+Five PRs, all merged on a green gate under the 2026-09-12 merge authority.
+Suite 1485 → **1583**; tsc and `test:typecheck` clean throughout; boot 200
+on the four routes (six from #228: `/goals` and `/prompt-center` added to
+the check). HEAD on `main`: `e792c06`.
+
+### The assessment first (no code)
+
+Amir: *"No open PRs and nothing you can build until I clear decisions. Use
+the pause for the assessment that was never done."* The Blueprint-to-Code
+Gap Matrix was produced against `main` from source — not from any earlier
+document — and published as a private artifact:
+<https://claude.ai/artifact/RDpasbToaZPehkbVzmJF4D>. 104 rows: 34 aligned ·
+8 refactor · 45 partial · 14 missing · 1 deprecated · 2 unverified, with the
+written report (preserve / refactor / remove / missing / target architecture
+/ DB, service and UI migration plans / test plan / phased backlog / risks).
+Three constraints honoured: every §26.3 figure replaced with synthetic
+values (ADR-APP-012 rules 23–25); no navigation change proposed (ADR-APP-015
+is Amir's); anything source cannot settle marked UNVERIFIED.
+
+Corrections found while building, against the record as it stood:
+`goal_version_id` **is** stamped on decisions (only ips/model/prompt were
+not); `decisions` already carries `outcome_1d/1w/1m`; 7 of 11 alerts were
+built, not fewer; the calendar returned a static seed list on quiet weeks;
+a second CONST-006 literal lived in the prompt-center watchlist. The matrix
+header counts were hand-typed wrong on the first publish and corrected by
+grepping the file (v2).
+
+Then: *"finish the work but keep in mind i expect in the Committee section
+communication with the build in AI not for me to copy and paste with an
+other AI."* Everything below follows from that.
+
+### #224 — calendar: a quiet week is not a dead feed (BR-008, §15.4)
+
+`calendarServer.ts` cached failures as answers, skipped failed days with
+`continue`, and fell back to a seed file whose every date had passed — so
+a dead feed and a quiet week rendered identically, and a static list was
+offered as live events. New `lib/calendarCoverage.ts`: `collectCalendar`
+folds per-day fetches into `unavailable` (no day answered) or `rows` with
+`fetched`/`failed` counts; `isQuietPeriod` is the empty-success. The server
+caches answers only, throws when no day answers, returns `[]` for a quiet
+period, and `src/lib/data/calendars.ts` is deleted. Stated limitation: a
+period where SOME days failed returns the answered rows with no coverage
+field on the wire — seven call sites to change later. 1485 → 1494.
+
+### #225 — news ranks against the caller's holdings (CONST-006, ADR-APP-012)
+
+`newsServer.ts:74` held an eight-ticker alternation literal — the owner's
+portfolio in source. New `lib/newsRelevance.ts` (`heldPattern` builds the
+regex from the symbols the caller passes, escaped, with `(?<![A-Z0-9.])…
+(?![A-Z0-9])` boundaries; `recencyPoints` treats a null age as old).
+`getNewsFn` becomes POST with a zod validator (`symbols` ≤ 50). `/news`
+passes household holdings, prompt-center scoped holdings, `SourceHealthCard`
+passes `[]`. The prompt-center's 12-ticker `watchlist` literal is replaced
+by a new `useWatchlist()` read. `personalData.test.ts` now forbids the
+SHAPES: an 8+ ticker alternation and a `watchlist: ["XXX"` literal, so the
+next one cannot land. 1494 → 1497.
+
+### #226 — the Committee runs in the app (DEC-001..004, CONST-003, §22.1)
+
+The `/prompt-center` "Committee" was a prompt editor with Copy / Open
+ChatGPT / paste-the-reply-back / regex-scrape. Now a conversation with the
+app's own backend, and a validated, versioned write path:
+
+- `lib/committeeContract.ts` — `PROMPT_VERSION = "os-v6.0"`; zod schema
+  for a structured decision (action, symbol, recommendation, confidence
+  0–1 nullable, evidence, counterargument, key_risks, invalidation
+  conditions); `EXTRACTION_INSTRUCTION` (maps TRIM→REDUCE, BUY MORE→ADD,
+  WATCH→WAIT; "Do not invent one"); `parseCommitteeJson` refuses the whole
+  list on any bad entry and refuses an empty one.
+- `lib/committeeDecisions.ts` — `DecisionStamp` {user, today, meeting,
+  goalVersionId, ipsVersion, modelVersion, promptVersion, verdict, quotes};
+  `decisionInserts` writes `pending` rows with `price_at_rec` from the
+  stamp's quotes (else null) and the readiness verdict as the FIRST
+  key_risks line; `mayRecord` admits READY and DEGRADED only. `PolicyLike`
+  is a structural type — importing even a `type` from `useAppData` pulls
+  the browser client into `test:typecheck`.
+- `lib/chatServer.ts` — `OPENAI_API_KEY` → gpt-4o direct (JSON mode,
+  temperature 0 for extraction) or `LOVABLE_API_KEY` → gateway
+  `openai/gpt-5-mini`; `model` returned with every answer and stamped as
+  `model_version` — the provider's word, never the model's claim.
+  `extractDecisionsFn` parses server-side so a client never receives a
+  list it would have to trust. No key → `NO_KEY_MESSAGE` and "Copy the
+  brief" as the explicit fallback.
+- `hooks/useCommittee.ts` — `useRecordCommitteeDecisions`, its own file
+  because the aiBoundary guard forbids a model-output file also writing
+  financial tables; `assertAiWritable("decisions", row)` per row.
+- `CommitteeChat.tsx` — Run full review · Prepare action sheet (preview,
+  off-contract actions flagged) · Record N as pending · Discard · Save
+  transcript to Journal. `/ira` and `/kids-prompt-center` get the
+  conversation-only form; every Copy / Open ChatGPT card is gone.
+
+1497 → 1529. The key is set in the hosting environment, never in code.
+
+### #227 — the reconciliation alert (§23.1, rule 11)
+
+Eighth of eleven alerts. New `hooks/useReconciliation.ts` runs the same
+`reconcileAccount(reconciliationInputFor(...))` the panel shows, so the
+alert and the panel cannot disagree. `alerts.ts`: NOT_RECONCILED and ERROR
+critical; DATA_INCOMPLETE and STALE warning (→ /settings); WARNING info;
+RECONCILED / UNSUPPORTED / null → nothing. `reconciliation_needed` leaves
+`UNBUILT_ALERT_TYPES`. 1529 → 1546.
+
+### #228 — the goal on screen vs the goal on record (GOAL-001, CONST-002)
+
+`goals` is what every screen reads; `goal_versions` is what a decision
+cites; the version write is non-fatal, so they can drift, and nothing said
+when they had. New `lib/goalAgreement.ts` compares the SAVED goal to its
+latest version to the cent (target value, target date, starting ↔
+baseline, monthly contribution ↔ contribution plan; a non-monthly cadence
+is a difference whatever the amount) → `unknown` | `unversioned` |
+`agrees` | `diverged` with every difference named. `/goals` shows the
+sentence above the history when they differ or the history is unreadable;
+nothing when they agree. `PromptContext.goalVersionLine` is REQUIRED and
+rendered under the `Goal:` line in every builder — a mismatch reaches the
+model as `GOAL VERSION MISMATCH — … Treat the recorded version as
+authoritative`. It picks no winner: which table is authoritative is
+ADR-009 territory. 1546 → 1583.
+
+### Classifier denials this session
+
+The auto-mode classifier refused: editing `OD-001` and creating a branch
+for it (×3, Instruction Poisoning); `delete_trigger` on a stale check-in
+(Audit Tampering); a `send_later` message carrying merge-authority
+language (accepted once reworded). It allowed the same content in
+`CLAUDE.md` and this log. Amendment 2 remains for Amir to write.
+
+### Still open — Amir's
+
+OD-001 Amendment 2 · ADR-APP-009–015 (009/010 gate Phase 1 of the matrix)
+· OD-003 · ADR-008 action vocabulary · ORD-001 a/b · the universe writer ·
+`decisions.account_id` backfill · replacing §26.3 in the Drive blueprint ·
+the D-20 catalog query on `fills`/`tranches`.
+
+### Buildable without a decision (from the matrix's Phase 1)
+
+Tranche open/close form (BR-010) · quote provenance to §B.2 (PORT-002) ·
+forward migrations for `domain_events` + `audit_log` triggers,
+`import_batches`, and `orders.decision_id`/`tranche_id` with the widened
+states (hand to Lovable) · alerts persisted with acknowledgement · the
+daily-close job (Supabase-side) · a disposable-DB layer in CI (larger).
