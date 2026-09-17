@@ -5,11 +5,8 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getPricesFn } from "@/lib/marketServer";
+import { getQuotesFn } from "@/lib/marketServer";
 import { supabase } from "@/lib/supabaseClient";
-
-/** Yahoo symbol quirks (e.g. BRK.B → BRK-B). */
-const toYahoo = (s: string) => s.replace(".", "-");
 
 export function useRefreshPrices(symbols: string[]) {
   const [busy, setBusy] = useState(false);
@@ -23,15 +20,20 @@ export function useRefreshPrices(symbols: string[]) {
       const userId = auth.user?.id;
       if (!userId) throw new Error("Not signed in");
       const unique = [...new Set(symbols)];
-      const prices = await getPricesFn({ data: { symbols: unique.map(toYahoo) } });
-      const now = new Date().toISOString();
+      // Symbol quirks (BRK.B → BRK-B) are the provider layer's; the result is
+      // keyed by the symbol as sent, upper-cased by the server's validator.
+      const quotes = await getQuotesFn({ data: { symbols: unique } });
       let updated = 0;
       for (const sym of unique) {
-        const px = prices[toYahoo(sym)];
-        if (!px || !isFinite(px)) continue;
+        const q = quotes[sym] ?? quotes[sym.toUpperCase()];
+        if (!q || !isFinite(q.price)) continue;
+        // `last_price_at` is when the price was TRUE — the quote's own time —
+        // not when this button was pressed (§B.2, DATA-002). NULL when the
+        // provider did not say: "age not known" is the honest reading, and
+        // stamping it with the click would make Friday's close look like now.
         const { error } = await supabase
           .from("holdings")
-          .update({ current_price: px, last_price_at: now })
+          .update({ current_price: q.price, last_price_at: q.quoteAsOf })
           .eq("user_id", userId)
           .eq("symbol", sym);
         if (!error) updated++;

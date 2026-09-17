@@ -119,6 +119,13 @@ export type PromptContext = {
    * as UNAVAILABLE, which is the safe reading.
    */
   headlinesCoverage?: Coverage;
+  /**
+   * Where the quoted prices in HOLDINGS came from and how current they are
+   * (§B.2, CONST-004). Optional only so existing fixtures compile; absent
+   * means the brief says nothing about quote provenance, which is what it
+   * said before this field existed. Never blank when present.
+   */
+  quoteProvenanceLine?: string;
   recentJournal?: string[];
   recentDecisions?: string[];
   committeeScorecard?: string[];
@@ -388,7 +395,7 @@ Max margin utilization: ${ctx.ipsMarginCapPct}% of net equity (margin debit \u00
 The objective never justifies overriding risk limits or the evidence contract.
 
 HOLDINGS
-${holdingsBlock}
+${ctx.quoteProvenanceLine ? `${ctx.quoteProvenanceLine}\n` : ""}${holdingsBlock}
 
 PRIORITIES I ALREADY FLAGGED
 ${ctx.priorities.length ? ctx.priorities.map((p) => `- ${p}`).join("\n") : "- (none)"}

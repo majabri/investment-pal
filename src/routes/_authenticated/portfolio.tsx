@@ -42,6 +42,7 @@ import { OrdersPanel } from "@/components/app/OrdersPanel";
 import { TranchesPanel } from "@/components/app/TranchesPanel";
 import { aggregationNote, symbolPosition } from "@/lib/tranches";
 import { unreadableNote } from "@/lib/trancheRows";
+import { quoteBanner, quoteCaption } from "@/lib/quoteProvenance";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
 import {
   DENOMINATOR_DEFINITION,
@@ -123,6 +124,7 @@ function PortfolioPage() {
     enabled: holdings.length > 0,
     refetchInterval: 60 * 1000, // live: every 60s
   });
+  const quoteNotice = quoteBanner(liveQuotes);
 
   // Swing Score (ADR-APP-002): advisory trim signal from price_history + earnings.
   const swingSymbols = holdings.map((h) => h.symbol);
@@ -344,6 +346,10 @@ function PortfolioPage() {
               <RefreshPricesButton symbols={holdings.map((h) => h.symbol)} />
             </span>
           </div>
+          {/* §B.2 / CONST-004: where the quoted prices came from, when, in
+              which session, and how many are not current. The "as of" above
+              is when the app ASKED; this is what the provider SAID. */}
+          {quoteNotice && <p className="mb-3 text-xs text-muted-foreground">{quoteNotice}</p>}
           {tranchesShort && (
             // Rows exist that could not be classified. The per-row captions
             // below are therefore understated, and saying so beats a silently
@@ -478,6 +484,7 @@ function PortfolioPage() {
                       // three side by side (P0-05).
                       const pctOfAcct = weightOf(value, denoms, "netEquity");
                       const unpriced = !q;
+                      const quoteNote = q ? quoteCaption(q) : null;
                       const trancheNote = trancheNoteOf(h.symbol);
                       return (
                         <TableRow
@@ -514,6 +521,14 @@ function PortfolioPage() {
                                   >
                                     {dayPct >= 0 ? "+" : ""}
                                     {fmtPct(dayPct)}
+                                  </div>
+                                )}
+                                {/* §B.2: the quote's own state, said only when
+                                    it is not current — a caption on every row
+                                    is a caption nobody reads. */}
+                                {quoteNote && (
+                                  <div className="text-[11px] font-normal text-amber-600 dark:text-amber-400">
+                                    {quoteNote}
                                   </div>
                                 )}
                               </>
