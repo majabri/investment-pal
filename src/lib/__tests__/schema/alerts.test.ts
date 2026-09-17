@@ -12,7 +12,7 @@ const MIGRATION = "20260917180000_alerts.sql";
 let db: PGlite;
 let acct: string;
 
-const alert = (fp: string, over: Partial<{ type: string; severity: string; message: string; href: string }> = {}) => ({
+const alert = (fp: string, over: Partial<{ type: string; severity: string; message: string; href: string; fingerprint: string }> = {}) => ({
   type: "stale_quote",
   severity: "warning",
   message: `Positions were last imported ${fp} days ago.`,
