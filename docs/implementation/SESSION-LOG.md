@@ -3596,3 +3596,76 @@ Wire `import_batches` into the import screen (write the batch, stamp
 with acknowledgement (needs a table — same migration pattern, now
 testable) · a first consumer of `domain_events` (Phase 2 gate: the
 event record exists as of #233) · the daily-close job (Supabase-side).
+
+## Session — 2026-09-17 (evening) — Lovable applies the migration; the lockfile; import batches (#235, #236)
+
+### Lovable applied `20260917150000_events_audit_imports_orders.sql`
+
+Amir pasted the line from #233's body. Lovable's account: applied
+exactly as written, file untouched; the three tables, the two order
+columns, `sync_log.batch_id`, `record_change()` and its nine triggers,
+owner-only RLS on the new tables; types regenerated; build OK; no
+pending migrations. **Checked against git:** two commits on `main`,
+`5fb6834` ("Changes") and `9dc56d3` ("Applied pending migration"), the
+same eight files. `types.ts` carries `audit_log`, `domain_events`,
+`import_batches`, `orders.decision_id` / `tranche_id` and
+`sync_log.batch_id`. Gate on `main` afterwards: tsc clean, 1663 pass.
+
+What the commits also did, which Lovable did not mention: added
+`drizzle-kit`, `drizzle-orm` and `postgres` as devDependencies, a
+`drizzle.config.ts` reading `LOVABLE_DB_MIGRATION_URL`, a blank
+`drizzle/schema.ts`, and `drizzle/migrations/0000_events_audit_imports_
+orders.sql` — a byte-identical copy of the Supabase file bar a trailing
+newline, with a journal and snapshot. That is Lovable's apply
+mechanism now. `supabase/migrations/` stays the source of truth and the
+PGlite replay reads only it. The database-side claims remain
+uncorroborated from here for the usual reason (the Supabase connector
+reaches only iCareerOS); the regenerated types plus the schema test are
+the evidence.
+
+### #235 — the lockfile resolves from the default registry
+
+The 91 new lockfile entries pointed at Lovable's private npm cache
+(`europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache`). The
+sandbox's egress proxy denies that host, so `bun install
+--frozen-lockfile` — the first line of the gate — failed here with a
+403. **CI was never red**: GitHub's runners reach the host, and the run
+on `9dc56d3` passed. (I first read the 403 as the registry's and said
+CI would break; the proxy status page showed the CONNECT was refused by
+the sandbox, and I corrected it.) The entries were normalised to the
+empty-URL form the other 620 use; a frozen install then resolved all 91
+from registry.npmjs.org with identical sha512s. Same packages, same
+versions; only where a non-Lovable environment fetches from. Lovable
+may write them back; the fix is mechanical.
+
+### #236 — every CSV import is a recorded batch (§20.2, IMP-004)
+
+The first writer for `import_batches`. `lib/importBatch.ts`:
+`sha256Hex`, `utf8ByteLength`, `stagedBatch` (opened BEFORE the commit
+loop, so a commit that never finishes leaves a true `staged` row),
+`batchDiff` (the RPC's own per-account counts), `committedPatch` /
+`failedPatch` (whole error), `sameFileNote` (a committed prior import
+of the same checksum, named by date, shown ABOVE the Save button — a
+courtesy, not a refusal), `importSyncLine` (`sync_log.batch_id`).
+`PortfolioCsvImport` opens, commits, closes. The RPC is untouched.
+1663 → 1676.
+
+### A sandbox lesson
+
+`pkill -f "vite dev"` matches the shell running it when that shell's
+command line contains the words, and kills the rest of the script. Two
+commits this session did not happen the first time for that reason and
+were redone. Kill by PID from now on.
+
+### Open — Amir's
+
+As before, minus the Lovable hand-off (done). Still: OD-001 Amendment 2;
+ADR-APP-009–015; OD-003; ORD-001; ADR-008; the universe writer;
+`decisions.account_id` backfill; §26.3 in the Drive blueprint; #221;
+pasting a balance block on Settings; the D-20 catalog query.
+
+### Buildable next
+
+Alerts persisted with acknowledgement (migration + schema test, then
+the panel) · a first `domain_events` consumer · the daily-close job
+(Supabase-side).

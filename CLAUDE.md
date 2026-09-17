@@ -117,30 +117,40 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
   testing a migration before Lovable applies it. Lovable's five duplicate
   files are not idempotent and are pinned by name there. **Write the schema
   test in the same PR as the migration from now on.**
-- Events and audit (#233): `domain_events` (fourteen §19.1 names, outbox),
-  `audit_log`, one trigger `record_change()` on nine tables; `import_batches`;
-  `orders.decision_id`/`tranche_id`; order states `untriggered`/`superseded`.
-  **Not applied in production until Lovable runs `20260917150000_…sql`.**
+- Events and audit (#233, applied by Lovable 2026-09-17): `domain_events`
+  (fourteen §19.1 names, outbox; no consumer yet), `audit_log`, one trigger
+  `record_change()` on nine tables; `import_batches` (written by the CSV
+  import since #236, `lib/importBatch.ts`); `orders.decision_id`/`tranche_id`;
+  order states `untriggered`/`superseded`.
+- Lovable applies migrations through Drizzle now: `drizzle.config.ts`,
+  `drizzle/migrations/` (a copy of each applied file plus a journal). Leave
+  it alone; `supabase/migrations/` stays the source of truth and the only
+  thing the PGlite replay reads. Its installs write lockfile entries that
+  point at Lovable's private npm cache, which the sandbox proxy cannot reach;
+  normalise them to the empty-URL form (#235) when the frozen install fails
+  here with a 403 — CI is unaffected either way.
 - The Blueprint-to-Code Gap Matrix (2026-09-16, 104 rows, private artifact):
   <https://claude.ai/artifact/RDpasbToaZPehkbVzmJF4D>. Its Phase 1 list is
   the backlog; the session log says which rows have landed since.
 
-## Current state (2026-09-17, end of day)
+## Current state (2026-09-17, evening)
 
-**HEAD on `main`:** `2ae8656`. Suite **1663 pass / 0 fail** (13 of them the
-schema replay, 3.9 s); tsc and `test:typecheck` clean; boot 200 on `/auth`,
-`/`, `/portfolio`, `/decisions`, `/goals`, `/prompt-center`.
+**HEAD on `main`:** `77be890`. Suite **1676 pass / 0 fail** (13 of them the
+schema replay); tsc and `test:typecheck` clean; boot 200 on `/auth`, `/`,
+`/portfolio`, `/decisions`, `/goals`, `/prompt-center`, `/settings`.
 
 **The execution ledger is fully on screen** (#212 → #216, applied by Lovable
-2026-09-12) **and now written from it** (#230 tranches; #216 fills).
+2026-09-12) **and written from it** (#230 tranches; #216 fills).
 
-**Since the gap matrix (#224 → #233):** calendar coverage · news relevance
+**Since the gap matrix (#224 → #236):** calendar coverage · news relevance
 from the caller's symbols · **the Committee runs in the app and records its
 own decisions** with all four versions and the readiness verdict stamped ·
 the reconciliation alert · goal-on-screen vs goal-on-record · tranche
 open/close · quote provenance to §B.2 · the gate names the missing input
 and every meeting states its purpose (live feedback, #232) · the events /
-audit / import-batch / order-links migration with the first schema test.
+audit / import-batch / order-links migration with the first schema test,
+**applied in production by Lovable** · the lockfile back on the default
+registry · every CSV import recorded as a batch with its checksum.
 Dependabot #219/#220/#222/#223 merged; **#221 (React 19.3) is red for a
 real reason** — `react-dom` not bumped with `react` — and is Amir's call.
 
@@ -166,18 +176,23 @@ real reason** — `react-dom` not bumped with `react` — and is Amir's call.
   Carry the reasons.
 - A migration is testable before Lovable sees it: replay into PGlite,
   apply the candidate twice, exercise the triggers, fault-inject the SQL.
+  Write the schema test in the same PR as the migration.
+- A record that spans a write opens BEFORE it (`staged`) and closes after
+  (`committed` / `failed`), so an interrupted write leaves a true row.
+- In the sandbox, `pkill -f "vite dev"` kills the shell that runs it. Kill
+  by PID. Two commits were silently skipped that way before it was noticed.
+- Verify a vendor's account of what it did against git before building on
+  it; Lovable's apply also added Drizzle and rewrote 91 lockfile entries.
 - **Always check whether the work was done already** before doing it.
 
 **Open, all Amir's:** OD-001 Amendment 2 (see *Merge authority*); ADR-APP-009
 –015 all `Proposed`; OD-003; ORD-001 a/b; the ADR-008 action vocabulary;
 the universe writer; `decisions.account_id` backfill; replacing §26.3 in
-the Drive blueprint; #221; **telling Lovable to apply
-`20260917150000_events_audit_imports_orders.sql`** (paste-ready line in the
-#233 body); pasting a balance block on Settings so the reconciliation can
-run; 86 merged remote branches the git proxy will not let Claude Code
-delete; the D-20 catalog query.
+the Drive blueprint; #221; pasting a balance block on Settings so the
+reconciliation can run; 86 merged remote branches the git proxy will not
+let Claude Code delete; the D-20 catalog query (now also for the three new
+tables).
 
-**Buildable without a decision:** wire `import_batches` into the import
-screen once the migration is applied · alerts persisted with acknowledgement
-(migration + schema test) · a first `domain_events` consumer · the daily-close
-job (Supabase-side).
+**Buildable without a decision:** alerts persisted with acknowledgement
+(migration + schema test in one PR, then the panel) · a first
+`domain_events` consumer · the daily-close job (Supabase-side).
