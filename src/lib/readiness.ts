@@ -74,6 +74,14 @@ export const CHECK_LABEL: Record<CheckId, string> = {
 export type ReadinessInput = {
   /** NULL = no reconciliation has been attempted for this scope. */
   reconciliation: ReconciliationStatus | null;
+  /**
+   * WHY the reconciliation could not run or could not be trusted, in the
+   * engine's own words (`ReconciliationResult.blockedBy`). Optional so older
+   * callers compile; when absent the check can only say that an input is
+   * missing, not which — which is what the Committee page said for a week
+   * before anyone could act on it.
+   */
+  reconciliationBlockedBy?: readonly string[];
   positions: Freshness;
   quotes: Freshness;
   /** NULL = not known. Rule 13 — this is not a balance of zero. */
@@ -102,7 +110,7 @@ export type ReadinessInput = {
  */
 export function runChecks(input: ReadinessInput): ReadinessCheck[] {
   return [
-    checkReconciliation(input.reconciliation),
+    checkReconciliation(input.reconciliation, input.reconciliationBlockedBy ?? []),
     checkFreshness("positions", input.positions),
     checkFreshness("quotes", input.quotes),
     checkCash(input.cash),
@@ -112,8 +120,26 @@ export function runChecks(input: ReadinessInput): ReadinessCheck[] {
   ];
 }
 
-function checkReconciliation(status: ReconciliationStatus | null): ReadinessCheck {
+/**
+ * What the holder can DO about a named blocker. The engine names the missing
+ * input; this names the screen. Unrecognised reasons pass through unchanged
+ * rather than being paraphrased.
+ */
+const REMEDY: Record<string, string> = {
+  "no broker figure has been imported":
+    "no broker figure has been imported — paste a balance block on Settings to record one",
+  "the app cannot compute a total — a balance is not known":
+    "the app cannot compute a total — a balance is not known; enter cash on Settings",
+};
+
+function checkReconciliation(
+  status: ReconciliationStatus | null,
+  blockedBy: readonly string[],
+): ReadinessCheck {
   const base = { id: "reconciliation" as const, label: CHECK_LABEL.reconciliation };
+  // The engine's reasons, each with its remedy where one is known. Joined
+  // with "; " because a check has one detail line and there may be two.
+  const named = blockedBy.map((r) => REMEDY[r] ?? r).join("; ");
   if (status === null) {
     return { ...base, state: "unknown", detail: "No reconciliation has been run for this scope." };
   }
@@ -135,10 +161,12 @@ function checkReconciliation(status: ReconciliationStatus | null): ReadinessChec
       state: "unknown",
       detail:
         status === "STALE"
-          ? "The figures are too old to compare meaningfully."
+          ? `The figures are too old to compare meaningfully${named ? `: ${named}` : ""}.`
           : status === "ERROR"
             ? "The comparison itself failed."
-            : "An input is missing, so the comparison did not run.",
+            : // DATA_INCOMPLETE. Named, because "an input is missing" is not
+              // actionable and the engine knows exactly which one.
+              `The comparison did not run: ${named || "an input is missing"}.`,
     };
   }
   // WARNING passes: rule 11 made it the band that is worth seeing and not

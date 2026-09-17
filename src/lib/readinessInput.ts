@@ -61,7 +61,7 @@ export function readinessInputFor({
       ? "UNAVAILABLE"
       : freshnessOf(positionsValue, { sourceType: "live_quote", asOf: now.toISOString() }, now);
 
-  const reconciliation =
+  const reconciled =
     account === null
       ? null
       : reconcileAccount(
@@ -81,10 +81,13 @@ export function readinessInputFor({
           // that supplied a `now`, which is every test. Found by the Phase 8
           // regression suite.
           now,
-        ).status;
+        );
 
   return {
-    reconciliation,
+    reconciliation: reconciled?.status ?? null,
+    // The engine's own reasons travel with the status, so the gate can say
+    // WHICH input is missing rather than that one is.
+    reconciliationBlockedBy: reconciled?.blockedBy ?? [],
     positions,
     quotes,
     cash: account?.cash ?? null,

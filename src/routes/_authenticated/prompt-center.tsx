@@ -21,7 +21,7 @@ import {
   riskToVol,
   riskToExpectedReturn,
 } from "@/lib/finance";
-import { buildV6Prompt, type MeetingType, type PromptContext } from "@/lib/prompts";
+import { MEETING_PURPOSE, buildV6Prompt, type MeetingType, type PromptContext } from "@/lib/prompts";
 import { goalAgreement, goalOnScreen, goalVersionLine } from "@/lib/goalAgreement";
 import { quoteBanner } from "@/lib/quoteProvenance";
 import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
@@ -405,6 +405,12 @@ function PromptCenter() {
           <TabsTrigger value="weekly">Weekly</TabsTrigger>
           <TabsTrigger value="monthly">Monthly</TabsTrigger>
         </TabsList>
+
+        {/* Why this meeting exists, in the brief's own words. Five tabs with
+            no stated purpose read as five copies of the same thing. */}
+        <p className="mt-3 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{meeting}</span> — {MEETING_PURPOSE[meeting]}
+        </p>
 
         <TabsContent value="morning" className="mt-4 space-y-4">
           <NotesCard notes={userNotes} setNotes={setUserNotes} />

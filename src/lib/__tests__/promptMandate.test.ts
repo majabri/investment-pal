@@ -7,6 +7,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  MEETING_PURPOSE,
   buildV6Prompt,
   buildMorningPrompt,
   buildEODPrompt,
@@ -17,6 +18,7 @@ import {
   mandateOf,
   DEFAULT_OFFICE_NAME,
   type PromptContext,
+  type MeetingType,
 } from "../prompts";
 import type { Objective } from "../objective";
 
@@ -515,4 +517,18 @@ describe("the office identity in the constitutions is configuration, not a perso
       for (const slot of slots[name](DEFAULT_OFFICE_NAME)) expect(out).not.toContain(slot);
     });
   }
+});
+
+describe("MEETING_PURPOSE", () => {
+  // The tab says why a meeting exists; the template says it too. One source.
+  test("each purpose line is the template's own, verbatim", () => {
+    for (const [meeting, purpose] of Object.entries(MEETING_PURPOSE)) {
+      const out = buildV6Prompt({ ...ctx(), meeting: meeting as MeetingType });
+      expect(out).toContain(`Purpose: ${purpose}`);
+    }
+  });
+
+  test("NEGATIVE CONTROL: a line that is not in the template is caught", () => {
+    expect(buildV6Prompt({ ...ctx(), meeting: "Morning" })).not.toContain("Purpose: Something else.");
+  });
 });
