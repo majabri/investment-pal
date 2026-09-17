@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
 import { nextContributionDate } from "@/lib/accountObjective";
@@ -290,41 +288,26 @@ ${data}`;
   return (
     <AppShell
       title="Kids Prompt Center"
-      subtitle="Biweekly Family Investment Committee — live-priced data, chat in-app or copy to ChatGPT"
+      subtitle="Biweekly Family Investment Committee — live-priced data, run in the app"
     >
       <ReadinessPanel
         checks={readiness}
         capability="committee_recommendation"
         what="a committee brief for these accounts"
       />
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Family Committee Prompt</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">
-              {prompt}
-            </pre>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => {
-                  void navigator.clipboard.writeText(prompt);
-                  toast.success("Copied");
-                }}
-              >
-                Copy Prompt
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => window.open("https://chatgpt.com", "_blank")}
-              >
-                Open ChatGPT
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-        <CommitteeChat systemPrompt={prompt} title="Family Committee Chat" />
+      <div className="space-y-4">
+        {/* Conversation only: the family brief spans several accounts and has
+            no single readiness verdict to record against yet — the record
+            button is absent rather than disabled. Follow-up. */}
+        <CommitteeChat systemPrompt={prompt} title="Family Committee" />
+        <details className="rounded-2xl border bg-card p-5">
+          <summary className="cursor-pointer text-sm font-medium">
+            The brief the committee received
+          </summary>
+          <pre className="mt-3 max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">
+            {prompt}
+          </pre>
+        </details>
       </div>
     </AppShell>
   );

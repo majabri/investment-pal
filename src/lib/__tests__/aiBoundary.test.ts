@@ -111,8 +111,11 @@ describe("the provenance exemptions", () => {
     expect(() =>
       assertAiWritable("decisions", { symbol: "MSFT", price_at_rec: 401.22 }),
     ).not.toThrow();
-    const src = readFileSync("src/routes/_authenticated/prompt-center.tsx", "utf8");
-    expect(src).toMatch(/price_at_rec:\s*a\.symbol\s*\?\s*\(?liveQuotes/);
+    // The call site moved from the regex scrape in prompt-center to the
+    // structured path: `committeeDecisions.decisionInsert` reads the price
+    // from the stamp's quote map, keyed by the decision's symbol.
+    const src = readFileSync("src/lib/committeeDecisions.ts", "utf8");
+    expect(src).toMatch(/stamp\.quotes\[d\.symbol\]/);
   });
 });
 
@@ -140,7 +143,10 @@ describe("every AI-derived write goes through the boundary", () => {
    * surface that starts writing, and a new surface will hold the response in
    * something named like these.
    */
-  const AI_RESPONSE_MARKERS = /\baiResponse\b|\bcommitteeResponse\b|\bmodelResponse\b/;
+  // `CommitteeOutput` and `StructuredDecision` are the types that exist ONLY
+  // for validated model output; a file that names them holds a response.
+  const AI_RESPONSE_MARKERS =
+    /\baiResponse\b|\bcommitteeResponse\b|\bmodelResponse\b|\bCommitteeOutput\b|\bStructuredDecision\b/;
   const WRITE = /\.from\(\s*["']([a-z_]+)["'](?:\s+as\s+never)?\s*\)[\s\S]{0,80}?\.(insert|update|upsert)\(/g;
 
   test("files that handle a model response write only to allowed tables", () => {
@@ -172,7 +178,10 @@ describe("every AI-derived write goes through the boundary", () => {
   test("NEGATIVE CONTROL: the scan finds the write that IS there", () => {
     // Both assertions above pass vacuously if the marker or the write pattern
     // matches nothing. This pins that they match the one real call site.
-    const code = strip(readFileSync("src/routes/_authenticated/prompt-center.tsx", "utf8"));
+    // The one real call site is `useCommittee.ts`: it takes `CommitteeOutput`,
+    // writes `decisions`, calls the boundary first — and writes nothing else,
+    // which is why it is not in `useAppData.ts`.
+    const code = strip(readFileSync("src/hooks/useCommittee.ts", "utf8"));
     expect(AI_RESPONSE_MARKERS.test(code)).toBe(true);
     const writes = [...code.matchAll(WRITE)].map((m) => m[1]);
     expect(writes).toContain("decisions");

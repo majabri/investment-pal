@@ -1,10 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Copy, ExternalLink, Save, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/app/AppShell";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -27,7 +25,7 @@ import { buildV6Prompt, type MeetingType, type PromptContext } from "@/lib/promp
 import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
 import { AccountNotice } from "@/components/app/AccountNotice";
 import { scorecardByAction, formatScorecardLines } from "@/lib/committeeScorecard";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getNewsFn } from "@/lib/newsServer";
 import { useWatchlist } from "@/hooks/useAppData";
 import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
@@ -35,53 +33,16 @@ import { useJournal } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
 import { supabase } from "@/lib/supabaseClient";
 import { localIsoDate } from "@/lib/localDate";
-import type { Insert } from "@/lib/dbRows";
 import { CommitteeChat } from "@/components/app/CommitteeChat";
+import { useRecordCommitteeDecisions } from "@/hooks/useCommittee";
+import { gateState } from "@/lib/readinessGate";
+import { ipsVersionOf } from "@/lib/committeeDecisions";
+import { PROMPT_VERSION, type CommitteeOutput } from "@/lib/committeeContract";
 import { objectiveOf } from "@/lib/objective";
 import { accountTotals } from "@/lib/accountTotals";
-import { assertAiWritable } from "@/lib/aiBoundary";
 import { coverageOf } from "@/lib/coverage";
 import { useReadiness } from "@/hooks/useReadiness";
 import { ReadinessPanel } from "@/components/app/ReadinessPanel";
-
-// Map the Action Sheet's action verbs to a canonical set for the `action` column.
-// Priority markers ("HIGHEST PRIORITY ACTION") aren't a trade action → null.
-const ACTION_CANON: Record<string, string> = {
-  BUY: "BUY",
-  "BUY MORE": "ADD",
-  ADD: "ADD",
-  SELL: "SELL",
-  TRIM: "TRIM",
-  HOLD: "HOLD",
-  WATCH: "WATCH",
-  MARGIN: "MARGIN",
-};
-function canonicalAction(raw: string): string | null {
-  return ACTION_CANON[raw.trim().toUpperCase()] ?? null;
-}
-
-// Best-effort confidence, in [0,1] (matches the decisions_confidence_range CHECK).
-// Only reads a value when "confidence"/"conf" is present, so a trim size like
-// "TRIM 25%" is never mistaken for confidence. Returns null when absent.
-function parseConfidence(text: string): number | null {
-  const l = text.toLowerCase();
-  let m = /conf(?:idence)?[^0-9]{0,6}(\d{1,3})\s*%/.exec(l);
-  if (m) {
-    const p = Number(m[1]);
-    if (p >= 0 && p <= 100) return Math.round(p) / 100;
-  }
-  m = /conf(?:idence)?[^0-9]{0,6}(\d{1,2})\s*\/\s*10/.exec(l);
-  if (m) {
-    const n = Number(m[1]);
-    if (n >= 0 && n <= 10) return n / 10;
-  }
-  m = /conf(?:idence)?[^0-9]{0,6}(\d{1,2})\b/.exec(l);
-  if (m) {
-    const n = Number(m[1]);
-    if (n >= 1 && n <= 10) return n / 10;
-  }
-  return null;
-}
 
 export const Route = createFileRoute("/_authenticated/prompt-center")({
   validateSearch: (
@@ -93,8 +54,8 @@ export const Route = createFileRoute("/_authenticated/prompt-center")({
   }),
   head: () => ({
     meta: [
-      { title: "Prompt Center — Investment Companion" },
-      { name: "description", content: "Build your Morning and End-of-Day ChatGPT prompts." },
+      { title: "Committee — Investment Companion" },
+      { name: "description", content: "Run your committee reviews in the app and record the decisions." },
     ],
   }),
   component: PromptCenter,
@@ -177,8 +138,7 @@ function PromptCenter() {
 
   const [userNotes, setUserNotes] = useState("");
   const [tradesToday, setTradesToday] = useState("");
-  const [aiResponse, setAiResponse] = useState("");
-  const qc = useQueryClient();
+  const recordDecisions = useRecordCommitteeDecisions();
   const { tab: urlTab } = Route.useSearch();
   const [tab, setTab] = useState<string>(urlTab ?? "morning");
   useEffect(() => {
@@ -367,90 +327,48 @@ function PromptCenter() {
   };
   const prompt = buildV6Prompt({ ...ctx, meeting: MEETING[tab] ?? "Morning", tradesToday });
 
-  const copy = async () => {
-    await navigator.clipboard.writeText(prompt);
-    toast.success("Prompt copied");
-  };
-  const openChatGPT = () => window.open("https://chat.openai.com/", "_blank", "noopener");
-  const extractActionSheet = async () => {
-    if (!aiResponse.trim()) return toast.error("Paste the committee response first");
-    const lines = aiResponse.split("\n").map((l) => l.trim());
-    const actions: { action: string; line: string; symbol: string | null }[] = [];
-    const ACT =
-      /^[-*•\s]*\**(BUY MORE|BUY|SELL|TRIM|MARGIN|HIGHEST PRIORITY ACTION|SINGLE HIGHEST PRIORITY ACTION)\**[:\s|—-]/i;
-    for (const l of lines) {
-      const m = ACT.exec(l);
-      if (!m) continue;
-      const body = l.replace(ACT, "").trim();
-      if (!body || /^(none|n\/a|no action)/i.test(body)) continue;
-      const sym = /\b([A-Z]{1,5}(?:\.[A-B])?)\b/.exec(body)?.[1] ?? null;
-      actions.push({
-        action: m[1].toUpperCase(),
-        line: `${m[1].toUpperCase()}: ${body}`.slice(0, 300),
-        symbol: sym,
-      });
-      if (actions.length >= 12) break;
+  // DEC-004: the gate's verdict travels with the review. BLOCKED refuses the
+  // record; DEGRADED records with the caveat as each decision's first risk.
+  const verdict = useMemo(() => gateState("committee_recommendation", readiness), [readiness]);
+  const meeting: MeetingType = MEETING[tab] ?? "Morning";
+
+  const recordActionSheet = async (output: CommitteeOutput, modelVersion: string | null) => {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
+      toast.error("Not signed in");
+      return;
     }
-    if (!actions.length) return toast.error("No Action Sheet lines found (BUY/SELL/TRIM/MARGIN…)");
+    const stamp = {
+      userId: auth.user.id,
+      today: localIsoDate(),
+      meeting,
+      goalVersionId,
+      ipsVersion: ipsVersionOf(ipsLite),
+      modelVersion,
+      promptVersion: PROMPT_VERSION,
+      verdict,
+      quotes: liveQuotes ?? {},
+    };
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) throw new Error("Not signed in");
-      const today = localIsoDate();
-      // Typed to the generated shape rather than inferred, so a column this
-      // screen invents — or a NOT NULL one it forgets — is a compile error.
-      // Every row here is model-derived text, which is exactly where a silent
-      // shape mistake is most likely and least visible.
-      const rows: Insert<"decisions">[] = actions.map((a) => ({
-        user_id: auth.user!.id,
-        decided_on: today,
-        symbol: a.symbol,
-        recommendation: a.line,
-        decision: "pending",
-        // Evidence-contract columns: populate what a line-based extract can.
-        // The Action Sheet carries the action verb; per-line evidence/risks/
-        // confidence live in the committee body, so those stay null here.
-        action: canonicalAction(a.action),
-        confidence: parseConfidence(a.line),
-        // Outcome grading: anchor the live price now so the decision can be
-        // graded at 1d/1w/1m later (null if the symbol has no live quote).
-        price_at_rec: a.symbol ? (liveQuotes?.[a.symbol]?.price ?? null) : null,
-        // GOAL-002: which goal these recommendations were produced under. The
-        // committee prompt carries the objective, so a decision read back in
-        // six months has to be readable against the goal that was IN the
-        // prompt, not against whatever the goal has since become.
-        goal_version_id: goalVersionId,
-      }));
-      // Rule 18: AI is downstream. Every row here is derived from the model's
-      // text, so it passes the boundary before it reaches the database. The
-      // check throws rather than filtering — silently dropping a field would
-      // leave this code believing it had been saved.
-      for (const row of rows) assertAiWritable("decisions", row);
-      const { error } = await supabase.from("decisions").insert(rows);
-      if (error) throw error;
-      toast.success(`Action Sheet extracted: ${actions.length} items logged as pending decisions`);
-      void qc.invalidateQueries({
-        predicate: (q: { queryKey: readonly unknown[] }) =>
-          String(q.queryKey[0]).startsWith("decisions"),
-      });
+      const n = await recordDecisions.mutateAsync({ output, stamp });
+      toast.success(
+        `${n} decision${n === 1 ? "" : "s"} recorded as pending. Dispose of them on the Decisions page.`,
+      );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Extract failed");
+      toast.error(e instanceof Error ? e.message : "Could not record the decisions");
     }
   };
 
-  const saveSummary = () => {
-    if (!aiResponse.trim()) return toast.error("Paste the AI response first");
+  const saveTranscript = (transcript: string) => {
     addJournal.mutate(
       {
         entry_type: tab === "morning" ? "morning_review" : "eod_review",
-        title: `${tab === "morning" ? "Morning" : "EOD"} review — ${new Date().toLocaleDateString()}`,
+        title: `${meeting} committee — ${new Date().toLocaleDateString()}`,
         body: prompt,
-        ai_summary: aiResponse,
+        ai_summary: transcript,
       },
       {
-        onSuccess: () => {
-          toast.success("Saved to Journal");
-          setAiResponse("");
-        },
+        onSuccess: () => toast.success("Transcript saved to Journal"),
         onError: (e) => toast.error((e as Error).message),
       },
     );
@@ -458,8 +376,8 @@ function PromptCenter() {
 
   return (
     <AppShell
-      title="Prompt Center"
-      subtitle="Build a complete review prompt, run it in ChatGPT, save the summary."
+      title="Committee"
+      subtitle="Run the review with the committee, decide, and record the decisions."
     >
       <AccountNotice status={accountStatus} />
       <ReadinessPanel
@@ -477,17 +395,7 @@ function PromptCenter() {
         </TabsList>
 
         <TabsContent value="morning" className="mt-4 space-y-4">
-          <PromptEditor
-            prompt={prompt}
-            notes={userNotes}
-            setNotes={setUserNotes}
-            aiResponse={aiResponse}
-            setAiResponse={setAiResponse}
-            onCopy={copy}
-            onOpen={openChatGPT}
-            onSave={saveSummary}
-            onExtract={extractActionSheet}
-          />
+          <NotesCard notes={userNotes} setNotes={setUserNotes} />
         </TabsContent>
 
         <TabsContent value="evening" className="mt-4 space-y-4">
@@ -500,132 +408,53 @@ function PromptCenter() {
               placeholder="e.g., Bought 20 NVDA @ 480, trimmed 10 AAPL @ 225…"
             />
           </div>
-          <PromptEditor
-            prompt={prompt}
-            notes={userNotes}
-            setNotes={setUserNotes}
-            aiResponse={aiResponse}
-            setAiResponse={setAiResponse}
-            onCopy={copy}
-            onOpen={openChatGPT}
-            onSave={saveSummary}
-            onExtract={extractActionSheet}
-          />
+          <NotesCard notes={userNotes} setNotes={setUserNotes} />
         </TabsContent>
         <TabsContent value="midday" className="mt-4 space-y-4">
-          <PromptEditor
-            prompt={prompt}
-            notes={userNotes}
-            setNotes={setUserNotes}
-            aiResponse={aiResponse}
-            setAiResponse={setAiResponse}
-            onCopy={copy}
-            onOpen={openChatGPT}
-            onSave={saveSummary}
-            onExtract={extractActionSheet}
-          />
+          <NotesCard notes={userNotes} setNotes={setUserNotes} />
         </TabsContent>
         <TabsContent value="weekly" className="mt-4 space-y-4">
-          <PromptEditor
-            prompt={prompt}
-            notes={userNotes}
-            setNotes={setUserNotes}
-            aiResponse={aiResponse}
-            setAiResponse={setAiResponse}
-            onCopy={copy}
-            onOpen={openChatGPT}
-            onSave={saveSummary}
-            onExtract={extractActionSheet}
-          />
+          <NotesCard notes={userNotes} setNotes={setUserNotes} />
         </TabsContent>
         <TabsContent value="monthly" className="mt-4 space-y-4">
-          <PromptEditor
-            prompt={prompt}
-            notes={userNotes}
-            setNotes={setUserNotes}
-            aiResponse={aiResponse}
-            setAiResponse={setAiResponse}
-            onCopy={copy}
-            onOpen={openChatGPT}
-            onSave={saveSummary}
-            onExtract={extractActionSheet}
-          />
+          <NotesCard notes={userNotes} setNotes={setUserNotes} />
         </TabsContent>
       </Tabs>
       <div className="mt-6">
+        {/* Keyed by meeting: a different brief is a different conversation. */}
         <CommitteeChat
+          key={tab}
           systemPrompt={prompt}
-          title={`Investment Committee Chat — ${MEETING[tab] ?? "Morning"}`}
+          meeting={meeting}
+          verdict={verdict}
+          onRecord={recordActionSheet}
+          onSaveTranscript={saveTranscript}
+          recording={recordDecisions.isPending}
         />
       </div>
+      <details className="mt-4 rounded-2xl border bg-card p-5">
+        <summary className="cursor-pointer text-sm font-medium">
+          The brief the committee received
+        </summary>
+        <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-background p-3 text-xs leading-relaxed text-foreground/90">
+          {prompt}
+        </pre>
+      </details>
     </AppShell>
   );
 }
 
-function PromptEditor({
-  prompt,
-  notes,
-  setNotes,
-  aiResponse,
-  setAiResponse,
-  onCopy,
-  onOpen,
-  onSave,
-  onExtract,
-}: {
-  prompt: string;
-  notes: string;
-  setNotes: (v: string) => void;
-  aiResponse: string;
-  setAiResponse: (v: string) => void;
-  onCopy: () => void;
-  onOpen: () => void;
-  onSave: () => void;
-  onExtract?: () => void;
-}) {
+function NotesCard({ notes, setNotes }: { notes: string; setNotes: (v: string) => void }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <div className="space-y-3">
-        <div className="rounded-2xl border bg-card p-5">
-          <div className="mb-2 text-sm font-medium">My notes / questions for AI</div>
-          <Textarea
-            rows={5}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Anything you want ChatGPT to consider today…"
-          />
-        </div>
-        <div className="rounded-2xl border bg-card p-5">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-sm font-medium">Generated prompt</div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={onCopy}>
-                <Copy className="mr-2 h-4 w-4" /> Copy
-              </Button>
-              <Button size="sm" onClick={onOpen}>
-                <ExternalLink className="mr-2 h-4 w-4" /> Open ChatGPT
-              </Button>
-            </div>
-          </div>
-          <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-background p-3 text-xs leading-relaxed text-foreground/90">
-            {prompt}
-          </pre>
-        </div>
-      </div>
-      <div className="rounded-2xl border bg-card p-5">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-medium">Paste AI summary</div>
-          <Button size="sm" onClick={onSave}>
-            <Save className="mr-2 h-4 w-4" /> Save to Journal
-          </Button>
-        </div>
-        <Textarea
-          rows={20}
-          value={aiResponse}
-          onChange={(e) => setAiResponse(e.target.value)}
-          placeholder="Paste ChatGPT's response here to archive it in your Journal…"
-        />
-      </div>
+    <div className="rounded-2xl border bg-card p-5">
+      <div className="mb-2 text-sm font-medium">My notes / questions for the committee</div>
+      <Textarea
+        id="committee-notes"
+        rows={4}
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Anything you want the committee to consider today…"
+      />
     </div>
   );
 }
