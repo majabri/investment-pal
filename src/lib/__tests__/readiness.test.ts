@@ -92,6 +92,44 @@ describe("the individual checks", () => {
   const state = (id: string, over: Partial<ReadinessInput>) =>
     checksFor(over).find((c) => c.id === id)!.state;
 
+  test("DATA_INCOMPLETE names the missing input and where to fix it", () => {
+    // "An input is missing" was the whole message on the Committee page,
+    // and the engine had known which one all along.
+    const c = checksFor({
+      reconciliation: "DATA_INCOMPLETE",
+      reconciliationBlockedBy: ["no broker figure has been imported"],
+    }).find((x) => x.id === "reconciliation")!;
+    expect(c.state).toBe("unknown");
+    expect(c.detail).toContain("no broker figure has been imported");
+    expect(c.detail).toContain("Settings");
+  });
+
+  test("two missing inputs are both named", () => {
+    const c = checksFor({
+      reconciliation: "DATA_INCOMPLETE",
+      reconciliationBlockedBy: [
+        "no broker figure has been imported",
+        "the app cannot compute a total — a balance is not known",
+      ],
+    }).find((x) => x.id === "reconciliation")!;
+    expect(c.detail).toContain("no broker figure");
+    expect(c.detail).toContain("cannot compute a total");
+  });
+
+  test("a reason the gate does not recognise passes through unparaphrased", () => {
+    const c = checksFor({
+      reconciliation: "DATA_INCOMPLETE",
+      reconciliationBlockedBy: ["the moon is in the wrong phase"],
+    }).find((x) => x.id === "reconciliation")!;
+    expect(c.detail).toContain("the moon is in the wrong phase");
+  });
+
+  test("NEGATIVE CONTROL: without reasons the check still says an input is missing", () => {
+    const c = checksFor({ reconciliation: "DATA_INCOMPLETE" }).find((x) => x.id === "reconciliation")!;
+    expect(c.detail).toContain("an input is missing");
+    expect(c.detail).not.toContain("Settings");
+  });
+
   test("UNSUPPORTED reconciliation is unknown, not a failure", () => {
     // An account with no broker figure can never reconcile. Treating "no such
     // comparison exists" as a fault would block every manually-tracked

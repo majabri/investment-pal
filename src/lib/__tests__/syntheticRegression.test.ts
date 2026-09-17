@@ -495,7 +495,7 @@ describe("recommendation blocking and recovery after reconciliation", () => {
     ...over,
   });
 
-  const checksFor = (over = {}, latest = 50_000, calculated = 50_000) =>
+  const checksFor = (over = {}, latest: number | null = 50_000, calculated = 50_000) =>
     readinessChecksFor({
       account: account(over),
       totalAccountValue: calculated,
@@ -505,6 +505,15 @@ describe("recommendation blocking and recovery after reconciliation", () => {
       policySource: "user_set",
       now: NOW,
     });
+
+  test("a missing broker figure is NAMED on the reconciliation check, with its remedy", () => {
+    // The engine knew which input was missing; the gate used to say only
+    // that one was. This is the path from the rows to the sentence.
+    const c = checksFor({}, null).find((x) => x.id === "reconciliation")!;
+    expect(c.state).toBe("unknown");
+    expect(c.detail).toContain("no broker figure has been imported");
+    expect(c.detail).toContain("Settings");
+  });
 
   test("a fully ready account blocks nothing", () => {
     const checks = checksFor();
