@@ -26,6 +26,14 @@ export const ORDER_STATUSES = [
   "rejected",
   "expired",
   /**
+   * A stop or conditional order the broker holds but has not activated
+   * (§12.1). Committed — the capital is spoken for the moment it triggers —
+   * and not "open" in the sense of resting on the book.
+   */
+  "untriggered",
+  /** Replaced by another order without being cancelled (§12.1, DEC-005). */
+  "superseded",
+  /**
    * A real status, not a parse failure swallowed.
    *
    * An import may carry an order whose state the adapter cannot map. Holding
@@ -103,6 +111,10 @@ const COMMITTED: ReadonlySet<string> = new Set<string>([
   "pending_new",
   "open",
   "partially_filled",
+  // A stop that has not fired is still a commitment: the buy happens the
+  // moment the price is touched, and a recommendation made as if it were
+  // not there can double the position.
+  "untriggered",
   "unknown",
 ]);
 

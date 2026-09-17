@@ -31,13 +31,13 @@ const order = (over: Partial<Parameters<typeof remainingQuantity>[0]> = {}) => (
 
 describe("isCommitted", () => {
   test("working statuses commit capital", () => {
-    for (const s of ["pending_new", "open", "partially_filled"]) {
+    for (const s of ["pending_new", "open", "partially_filled", "untriggered"]) {
       expect(isCommitted(s)).toBe(true);
     }
   });
 
   test("finished statuses do not", () => {
-    for (const s of ["filled", "cancelled", "rejected", "expired"]) {
+    for (const s of ["filled", "cancelled", "rejected", "expired", "superseded"]) {
       expect(isCommitted(s)).toBe(false);
     }
   });
@@ -198,7 +198,11 @@ describe("the vocabularies stay broker-neutral", () => {
     // Two lists that must agree, in two languages. When they drift, a value
     // the app considers valid is rejected by the database at write time —
     // which surfaces as a Postgres error on the user's screen.
-    const sql = readFileSync("supabase/migrations/20260905280000_orders.sql", "utf8");
+    // Two migrations carry the CHECK: the original, and the one that
+    // replaced it whole to admit 'untriggered' and 'superseded'.
+    const sql =
+      readFileSync("supabase/migrations/20260905280000_orders.sql", "utf8") +
+      readFileSync("supabase/migrations/20260917150000_events_audit_imports_orders.sql", "utf8");
     for (const s of ORDER_STATUSES) expect(sql).toContain(`'${s}'`);
     for (const e of EXECUTION_SOURCES) expect(sql).toContain(`'${e}'`);
     expect(sql).toContain("execution_source IN ('imported', 'user_entry')");
