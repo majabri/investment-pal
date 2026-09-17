@@ -23,6 +23,7 @@ const quiet: AlertInput = {
   sources: [],
   positionsStaleDays: 0,
   valuationUnknown: false,
+  reconciliation: null,
   goalProbability: 0.8,
   upcomingEvents: [],
 };
@@ -137,6 +138,53 @@ describe("ordering and counting", () => {
   });
 });
 
+describe("reconciliation", () => {
+  test("NEGATIVE CONTROL: RECONCILED raises nothing", () => {
+    expect(raiseAlerts({ ...quiet, reconciliation: "RECONCILED" })).toEqual([]);
+  });
+
+  test("no account in scope raises nothing — there is no account to ask", () => {
+    expect(raiseAlerts({ ...quiet, reconciliation: null })).toEqual([]);
+  });
+
+  test("a material difference is CRITICAL and points at the portfolio", () => {
+    const [a] = raiseAlerts({ ...quiet, reconciliation: "NOT_RECONCILED" });
+    expect(a.type).toBe("reconciliation_needed");
+    expect(a.severity).toBe("critical");
+    expect(a.href).toBe("/portfolio");
+  });
+
+  test("a difference beyond rounding but not material is INFO", () => {
+    const [a] = raiseAlerts({ ...quiet, reconciliation: "WARNING" });
+    expect(a.type).toBe("reconciliation_needed");
+    expect(a.severity).toBe("info");
+  });
+
+  test("could not be checked is an alert too — not 'checked and fine'", () => {
+    // Rule 11: a dashboard that only alerts on a material difference is silent
+    // exactly when the comparison never ran.
+    for (const status of ["DATA_INCOMPLETE", "STALE"] as const) {
+      const [a] = raiseAlerts({ ...quiet, reconciliation: status });
+      expect(a.type).toBe("reconciliation_needed");
+      expect(a.severity).toBe("warning");
+      expect(a.href).toBe("/settings");
+    }
+  });
+
+  test("the check itself failing is CRITICAL", () => {
+    const [a] = raiseAlerts({ ...quiet, reconciliation: "ERROR" });
+    expect(a.severity).toBe("critical");
+  });
+
+  test("UNSUPPORTED raises nothing — not checkable in principle is not a fault", () => {
+    expect(raiseAlerts({ ...quiet, reconciliation: "UNSUPPORTED" })).toEqual([]);
+  });
+
+  test("reconciliation_needed is no longer declared unbuilt", () => {
+    expect(UNBUILT_ALERT_TYPES.reconciliation_needed).toBeUndefined();
+  });
+});
+
 describe("the unbuilt types are declared, not omitted", () => {
   test("every §23.1 type is named in ALERT_TYPES", () => {
     expect(ALERT_TYPES).toHaveLength(11);
@@ -164,6 +212,7 @@ describe("the unbuilt types are declared, not omitted", () => {
       })),
       positionsStaleDays: null,
       valuationUnknown: true,
+      reconciliation: "NOT_RECONCILED",
       goalProbability: 0.1,
       upcomingEvents: [{ date: "2026-09-12", text: "NVDA earnings" }],
     });
