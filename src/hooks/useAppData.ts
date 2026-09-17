@@ -21,6 +21,16 @@ import type { Strategy, StrategySymbol } from "@/lib/strategy";
 import type { Order } from "@/lib/orders";
 import type { Lot } from "@/lib/lots";
 import { readTranches, type TrancheRead } from "@/lib/trancheRows";
+import {
+  canCloseTranche,
+  canOpenTranche,
+  closeRejection,
+  trancheClosePatch,
+  trancheInsert,
+  validateTrancheDraft,
+} from "@/lib/trancheDraft";
+import type { TrancheDraft } from "@/lib/trancheDraft";
+import type { Tranche } from "@/lib/tranches";
 import { readFills, type FillRead } from "@/lib/fillRows";
 import { canRecordFill, fillInsert, validateFillDraft } from "@/lib/fillDraft";
 import type { FillDraft } from "@/lib/fillDraft";
@@ -711,6 +721,61 @@ export function useRecordFill() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fills"] });
     },
+  });
+}
+
+/**
+ * Open a tranche (§12.4, write side). The first caller `tranches` has had for
+ * a write; `useTranches` stayed read-only until a form existed to call this.
+ *
+ * Nothing about the holding changes. The tranche is the holder's account of
+ * which part of a position is which; `trancheCoverage` compares it to what
+ * the broker reports and says when they disagree.
+ */
+export function useOpenTranche() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { accountId: string; draft: TrancheDraft }) => {
+      if (!canOpenTranche(p.draft)) {
+        // The form blocks this; the guard is here because a caller that
+        // skipped the form would otherwise reach the CHECK and get a Postgres
+        // error about a constraint.
+        throw new Error(validateTrancheDraft(p.draft)[0]?.message ?? "That tranche cannot be opened.");
+      }
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not signed in");
+      const { error } = await supabase
+        .from("tranches")
+        .insert(trancheInsert({ userId: userData.user.id, accountId: p.accountId, draft: p.draft }));
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tranches"] }),
+  });
+}
+
+/**
+ * Close a tranche: the one change a tranche takes after opening. Sets
+ * `closed_at` and nothing else — the opened quantity is history, and what
+ * remained at the close is the fills' question, not a column.
+ */
+export function useCloseTranche() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (p: { tranche: Tranche; closedAt: string }) => {
+      if (!canCloseTranche(p.tranche, p.closedAt)) {
+        throw new Error(closeRejection(p.tranche, p.closedAt) ?? "That tranche cannot be closed.");
+      }
+      const { error } = await supabase
+        .from("tranches")
+        .update(trancheClosePatch(p.closedAt))
+        .eq("id", p.tranche.id)
+        // Belt and braces with `closeRejection`: the row must still be open
+        // when the write lands. A tranche closed from another tab between the
+        // check and the write is left as it was closed.
+        .is("closed_at", null);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tranches"] }),
   });
 }
 

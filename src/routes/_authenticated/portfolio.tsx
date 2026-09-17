@@ -39,6 +39,7 @@ import {
   type Holding,
 } from "@/hooks/useAppData";
 import { OrdersPanel } from "@/components/app/OrdersPanel";
+import { TranchesPanel } from "@/components/app/TranchesPanel";
 import { aggregationNote, symbolPosition } from "@/lib/tranches";
 import { unreadableNote } from "@/lib/trancheRows";
 import { accountTotals, scopeIsEmpty, scopeLabel } from "@/lib/accountTotals";
@@ -764,6 +765,10 @@ function PortfolioPage() {
             move. */}
         {/* §12.3, read side. Same siting reasoning as the cash flows: orders
             are account-scoped data, which is what this page already is. */}
+        {/* §12.4 / BR-010, write side. Opening and closing tranches, beside
+            the holdings they describe. Same siting reasoning again. */}
+        <TranchesPanel account={selectedAccount ?? null} read={trancheRead} holdings={holdings} />
+
         <OrdersPanel account={selectedAccount ?? null} orders={orders} />
 
         <CashFlowPanel
