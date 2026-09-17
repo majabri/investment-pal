@@ -96,17 +96,36 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 - Hooks: `src/hooks/useAppData.ts` — every table read is account-scoped
   server-side; a client-side filter shows the wrong account for as long as it
   is wrong.
+- Committee (in-app since #226): `src/lib/chatServer.ts` (provider: `OPENAI_API_KEY`
+  or `LOVABLE_API_KEY`, set in the hosting environment, never in code),
+  `committeeContract.ts` (schema, `PROMPT_VERSION`, `parseCommitteeJson`),
+  `committeeDecisions.ts` (`DecisionStamp`, `decisionInserts`),
+  `src/hooks/useCommittee.ts` (the one write, `assertAiWritable` per row),
+  `src/components/app/CommitteeChat.tsx`. There is no copy/paste path to an
+  outside AI any more, and Amir does not want one back.
+- Honesty helpers: `calendarCoverage.ts` (quiet ≠ dead), `newsRelevance.ts`
+  (symbols from the caller, never a literal), `goalAgreement.ts` (screen vs
+  record), `src/hooks/useReconciliation.ts` (one comparison, panel and alert).
+- The Blueprint-to-Code Gap Matrix (2026-09-16, 104 rows, private artifact):
+  <https://claude.ai/artifact/RDpasbToaZPehkbVzmJF4D>. Its Phase 1 list is
+  the backlog; the session log says which rows have landed since.
 
-## Current state (2026-09-14)
+## Current state (2026-09-17)
 
-**HEAD on `main`:** `bbc7407`. Suite **1485 pass / 0 fail**; tsc and
-`test:typecheck` clean; boot 200 on the four routes.
+**HEAD on `main`:** `e792c06`. Suite **1583 pass / 0 fail**; tsc and
+`test:typecheck` clean; boot 200 on `/auth`, `/`, `/portfolio`, `/decisions`,
+`/goals`, `/prompt-center`.
 
-**The execution ledger is fully on screen.** #212 (schema + arithmetic, applied
-by Lovable 2026-09-12 as `20260912014851_…sql`, byte-identical to
-`20260912120000_execution_ledger.sql` which remains as a harmless duplicate) →
-#213 tranches on `/portfolio` → #214 supersession on `/decisions` → #215
-orders panel → #216 record-a-fill form → #217 session log.
+**The execution ledger is fully on screen** (#212 → #216, applied by Lovable
+2026-09-12 as `20260912014851_…sql`, byte-identical to
+`20260912120000_execution_ledger.sql` which remains as a harmless duplicate).
+
+**Since then (#224 → #228):** calendar coverage (BR-008) · news relevance
+from the caller's symbols (CONST-006) · **the Committee runs in the app and
+records its own decisions** with goal/ips/model/prompt versions and the
+readiness verdict stamped (DEC-001..004, CONST-003) · the reconciliation
+alert (8 of 11 alerts built) · goal-on-screen vs goal-on-record agreement
+on `/goals` and in every brief (GOAL-001).
 
 **Standing rules learnt the hard way:**
 - Unknown ≠ zero ≠ empty ≠ error ≠ stale. `not_recorded` is its own state.
@@ -117,13 +136,25 @@ orders panel → #216 record-a-fill form → #217 session log.
   cannot be read; never drop, never default.
 - Presentation logic lives in `lib/*View.ts`, not components — mounting a
   component in a test once pulled the browser Supabase client into
-  `test:typecheck`.
+  `test:typecheck`. So does importing even a `type` from `useAppData.ts`
+  into a lib: declare a structural type instead (`PolicyLike`).
 - `orders.filled_quantity` is the broker's claim; fills are the evidence;
   `reconcileFills` is where they meet. Never write Σ fills back onto the order.
+- A file that names model output (`aiBoundary.test.ts` markers) may write
+  only `decisions`/`journal_entries`; put such a hook in its own file.
+- The owner's name, figures, and the SHAPE of a ticker list are all
+  forbidden in `src` (`personalData.test.ts`), comments included.
+- **Always check whether the work was done already** before doing it.
 
-**Open, all Amir's:** OD-001 Amendment 2 (see *Merge authority*); ADR-APP-012
-(enforced, never Accepted), 013 (D2 blocks D-10), 014, 015 — all `Proposed`;
+**Open, all Amir's:** OD-001 Amendment 2 (see *Merge authority*); ADR-APP-009
+–015 all `Proposed` (009/010 gate the matrix's Phase 1; 013 D2 blocks D-10);
+OD-003; ORD-001 a/b; the ADR-008 action vocabulary; the universe writer;
+`decisions.account_id` backfill; replacing §26.3 in the Drive blueprint;
 86 merged remote branches the git proxy will not let Claude Code delete; the
 D-20 catalog query has not been run against `fills`/`tranches`.
 
-**Nothing is buildable without one of those moving.**
+**Buildable without a decision:** tranche open/close form (BR-010) · quote
+provenance to §B.2 (PORT-002) · forward migrations for `domain_events` +
+`audit_log`, `import_batches`, `orders.decision_id`/`tranche_id` and the
+widened order states (hand to Lovable) · alerts persisted with
+acknowledgement · daily-close job (Supabase-side) · disposable-DB CI layer.
