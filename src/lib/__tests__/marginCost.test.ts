@@ -158,6 +158,7 @@ function setObjective(
 function ctx(overrides: Partial<PromptContext> = {}): PromptContext {
   return {
     accountName: "Growth Brokerage",
+    goalVersionLine: "Goal version: recorded 2026-09-01 — matches the goal above.",
     portfolioValue: 72_500,
     cash: 2_500,
     marginUsed: 0,

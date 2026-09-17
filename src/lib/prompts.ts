@@ -60,6 +60,17 @@ export type PromptContext = {
   /** NULL when the objective is unset. Never 0% — that reads as no chance. */
   probability: number | null;
   /**
+   * Whether the goal above is the goal on record (GOAL-001, CONST-002).
+   *
+   * The brief reads the objective from `goals`; a decision cites a row of
+   * `goal_versions`. The same save writes both, but the version write is
+   * non-fatal, so they can drift — and when they have, the model reasons
+   * from one goal while the decision it produces is stamped with another.
+   * Required, never blank: `goalVersionLine()` in `lib/goalAgreement.ts`
+   * produces the one sentence for every state, including "not known".
+   */
+  goalVersionLine: string;
+  /**
    * The IPS-lite caps, and WHERE THEY CAME FROM (Phase 4, rules 15 and 21).
    *
    * These were optional with `?? 30` / `?? 25` fallbacks at the template, so a
@@ -365,6 +376,7 @@ Gross investments: ${money(ctx.grossValue ?? ctx.portfolioValue)} | Account equi
 Today's P/L (vs prior close, live-quoted positions): ${fmtUSD(ctx.todaysPL)} (${ctx.todaysPLPct === null ? NOT_KNOWN : fmtPct(ctx.todaysPLPct)})
 Cash: ${money(ctx.cash)} | Margin used: ${money(ctx.marginUsed)} | Buying power: ${money(ctx.buyingPower)}
 Goal: ${objectiveLine(ctx)}
+${ctx.goalVersionLine}
 Required pace: ${paceLine(ctx.requiredCagr)}
 
 ${readinessBlock(ctx.readiness)}

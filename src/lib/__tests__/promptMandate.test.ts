@@ -37,6 +37,7 @@ function setObjective(
 function ctx(overrides: Partial<PromptContext> = {}): PromptContext {
   return {
     accountName: "Growth Brokerage",
+    goalVersionLine: "Goal version: recorded 2026-09-01 — matches the goal above.",
     portfolioValue: 72_500,
     cash: 2_500,
     marginUsed: 0,
@@ -412,6 +413,22 @@ describe("an unset objective reaches the model as unset, not as zero", () => {
       expect(out).toContain("Goal: NOT SET. No target, date or probability is available");
       expect(out).not.toContain("Required CAGR: 0.0%");
       expect(out).not.toContain("Model probability: 0.0%");
+    });
+
+    // GOAL-001: the brief says whether the goal it reads is the goal a
+    // decision will cite. Every state has a sentence, and a mismatch is
+    // not softened on the way to the model.
+    test(`${name}: states the goal's version provenance beside the goal`, () => {
+      const out = build(ctx());
+      expect(out).toMatch(/Goal: .*\nGoal version: recorded 2026-09-01 — matches the goal above\./);
+    });
+
+    test(`${name}: a goal-version mismatch reaches the model verbatim`, () => {
+      const mismatch =
+        "GOAL VERSION MISMATCH — the goal above differs from its latest recorded version (2026-09-01): target value 120,000 now vs 100,000 on record. Treat the recorded version as authoritative and say so if a recommendation depends on the difference.";
+      expect(build(ctx({ goalVersionLine: mismatch }))).toContain(mismatch);
+      // NEGATIVE CONTROL: the default fixture does not carry it.
+      expect(build(ctx())).not.toContain("GOAL VERSION MISMATCH");
     });
 
     test(`${name}: emits no required pace it cannot compute`, () => {
