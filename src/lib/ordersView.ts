@@ -24,6 +24,8 @@ export const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelled",
   rejected: "Rejected",
   expired: "Expired",
+  untriggered: "Untriggered",
+  superseded: "Superseded",
   unknown: "Status unknown",
 };
 
