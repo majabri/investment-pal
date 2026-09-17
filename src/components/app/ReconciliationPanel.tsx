@@ -11,18 +11,10 @@
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 
-import { useAccountScope } from "@/contexts/AccountContext";
-import { useAccounts, useLatestBalance } from "@/hooks/useAppData";
+import { useReconciliation } from "@/hooks/useReconciliation";
 import type { AccountTotals } from "@/lib/accountTotals";
 import { fmtPct, fmtUSD } from "@/lib/finance";
-import {
-  DEFAULT_TOLERANCE,
-  reconcileAccount,
-  reconciliationHeadline,
-  wasChecked,
-  type ReconciliationStatus,
-} from "@/lib/reconciliation";
-import { reconciliationInputFor } from "@/lib/reconciliationInput";
+import { reconciliationHeadline, wasChecked, type ReconciliationStatus } from "@/lib/reconciliation";
 import { usdOrUnavailable } from "@/lib/unavailable";
 
 /** Colour by what the status MEANS, not by severity alone: the four unchecked
@@ -39,27 +31,14 @@ const TONE: Record<ReconciliationStatus, string> = {
 };
 
 export function ReconciliationPanel({ totals }: { totals: AccountTotals | null }) {
-  const scope = useAccountScope();
-  const { data: accounts = [] } = useAccounts();
-  const { data: latest, isLoading } = useLatestBalance(scope);
+  // The same comparison the dashboard's alerts read, from the same hook, so
+  // the panel and the alert cannot disagree about whether the account
+  // reconciles while both render a confident answer.
+  const rec = useReconciliation(totals);
   const [open, setOpen] = useState(false);
 
-  if (scope.kind !== "account" || isLoading) return null;
-  const account = accounts.find((a) => a.id === scope.accountId) ?? null;
-
-  // Built by `reconciliationInputFor` rather than inline, because the
-  // readiness gate (Phase 5, rule 17) reconciles the same account and two
-  // copies of this mapping would eventually disagree about what the app is
-  // comparing — while both rendered a confident status.
-  const result = reconcileAccount(
-    reconciliationInputFor({
-      latestValue: latest?.total_account_value ?? null,
-      latestAsOf: latest?.imported_at ?? null,
-      account,
-      calculatedValue: totals?.totalAccountValue ?? null,
-    }),
-    DEFAULT_TOLERANCE,
-  );
+  if (rec.result === null) return null;
+  const { result, latest, account } = rec;
 
   const age = latest?.imported_at
     ? formatDistanceToNow(new Date(latest.imported_at), { addSuffix: true })
@@ -70,7 +49,7 @@ export function ReconciliationPanel({ totals }: { totals: AccountTotals | null }
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="font-medium">
           {reconciliationHeadline(result)}{" "}
-          <span className="font-normal text-muted-foreground">— {scope.accountName}</span>
+          <span className="font-normal text-muted-foreground">— {account?.name ?? "this account"}</span>
         </span>
         <button
           type="button"

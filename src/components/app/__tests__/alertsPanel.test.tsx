@@ -32,6 +32,7 @@ const QUIET: AlertInput = {
   sources: [],
   positionsStaleDays: 0,
   valuationUnknown: false,
+  reconciliation: null,
   goalProbability: 0.8,
   upcomingEvents: [],
 };

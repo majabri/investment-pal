@@ -33,6 +33,7 @@
 //     are declared in `UNBUILT_ALERT_TYPES` below rather than omitted, so the
 //     gap is visible in the code rather than only in an audit.
 import type { ConstitutionVerdict } from "./constitutionCheck";
+import type { ReconciliationStatus } from "./reconciliation";
 import type { SourceHealth } from "./sourceHealth";
 
 /** Every alert type §23.1 names. The full list, built or not. */
@@ -62,7 +63,6 @@ export type AlertType = (typeof ALERT_TYPES)[number];
 export const UNBUILT_ALERT_TYPES: Record<string, string> = {
   decision_trigger: "No stored trigger conditions to evaluate against.",
   invalidation_reached: "Invalidation conditions are recorded on decisions but not evaluated.",
-  reconciliation_needed: "Reconciliation runs on the Portfolio page but raises no standing alert.",
   model_health: "No backtest or calibration exists to be healthy or unhealthy (deferred, §4).",
 };
 
@@ -92,6 +92,13 @@ export type AlertInput = {
   goalProbability: number | null;
   /** Events inside the alerting window, already filtered by the caller. */
   upcomingEvents: readonly { date: string; text: string }[];
+  /**
+   * The account's reconciliation status — broker equity against the app's
+   * own arithmetic. NULL when no single account is in scope, which raises
+   * nothing: reconciliation is a per-account question and there is no account
+   * to ask it of.
+   */
+  reconciliation: ReconciliationStatus | null;
 };
 
 /** Below this, the goal is off pace enough to say so. */
@@ -180,6 +187,13 @@ export function raiseAlerts(input: AlertInput): Alert[] {
     });
   }
 
+  // Every status that is not "checked and fine" says so. The four unchecked
+  // states are alerts too — "could not be checked" is not "checked and fine",
+  // and a dashboard that only alerts on a material difference is silent
+  // exactly when the comparison never ran (rule 11).
+  const rec = reconciliationAlert(input.reconciliation);
+  if (rec) out.push(rec);
+
   for (const e of input.upcomingEvents) {
     out.push({
       type: "event_proximity",
@@ -190,6 +204,54 @@ export function raiseAlerts(input: AlertInput): Alert[] {
   }
 
   return out.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
+}
+
+function reconciliationAlert(status: ReconciliationStatus | null): Alert | null {
+  const type = "reconciliation_needed" as const;
+  switch (status) {
+    case null:
+    case "RECONCILED":
+    // Not checkable in principle: no broker figure exists for this account and
+    // none ever will without an import path. Not a condition to alert on.
+    case "UNSUPPORTED":
+      return null;
+    case "NOT_RECONCILED":
+      return {
+        type,
+        severity: "critical",
+        message:
+          "Broker equity and the app's arithmetic disagree materially. Reconcile before acting on any figure.",
+        href: "/portfolio",
+      };
+    case "WARNING":
+      return {
+        type,
+        severity: "info",
+        message: "Broker equity and the app's arithmetic differ by more than rounding. Worth watching.",
+        href: "/portfolio",
+      };
+    case "DATA_INCOMPLETE":
+      return {
+        type,
+        severity: "warning",
+        message: "Reconciliation could not run — a broker balance is missing. Import balances to check.",
+        href: "/settings",
+      };
+    case "STALE":
+      return {
+        type,
+        severity: "warning",
+        message: "Reconciliation could not run — the inputs are too old to compare. Refresh and re-import.",
+        href: "/settings",
+      };
+    case "ERROR":
+      return {
+        type,
+        severity: "critical",
+        message: "The reconciliation check itself failed. This is not a clean result.",
+        href: "/portfolio",
+      };
+  }
 }
 
 /** Counts by severity, for a badge. */

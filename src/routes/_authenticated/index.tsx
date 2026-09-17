@@ -39,6 +39,7 @@ import { HouseholdStrip } from "@/components/app/dashboard/HouseholdStrip";
 import { householdRollup } from "@/lib/householdTotals";
 import { CommandCenterStrip } from "@/components/app/dashboard/CommandCenterStrip";
 import { AlertsPanel } from "@/components/app/AlertsPanel";
+import { useReconciliation } from "@/hooks/useReconciliation";
 import { GoalOutlookPanel } from "@/components/app/dashboard/GoalOutlookPanel";
 import { PrioritiesPanel } from "@/components/app/dashboard/PrioritiesPanel";
 import {
@@ -213,6 +214,9 @@ function Dashboard() {
     () => accountTotals(holdings, balance, px),
     [holdings, balance, liveQuotes],
   );
+  // The same comparison the ReconciliationPanel below shows, so the alert
+  // and the panel cannot disagree (rule 11).
+  const reconciliation = useReconciliation(totals);
   const { cash, marginDebit: marginUsed, grossValue, totalAccountValue: portfolioValue } = totals;
   const scopeName = scopeLabel(scope);
   const noScope = scopeIsEmpty(scope) || balance === null;
@@ -332,6 +336,7 @@ function Dashboard() {
           valuationUnknown: totals.totalAccountValue === null,
           goalProbability: goalMetrics?.prob ?? null,
           upcomingEvents: alerts.map((a) => ({ date: a.date, text: a.text })),
+          reconciliation: reconciliation.result?.status ?? null,
         }}
       />
       <CommandCenterStrip
