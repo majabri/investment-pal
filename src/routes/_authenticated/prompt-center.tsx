@@ -23,6 +23,7 @@ import {
 } from "@/lib/finance";
 import { buildV6Prompt, type MeetingType, type PromptContext } from "@/lib/prompts";
 import { goalAgreement, goalOnScreen, goalVersionLine } from "@/lib/goalAgreement";
+import { quoteBanner } from "@/lib/quoteProvenance";
 import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
 import { AccountNotice } from "@/components/app/AccountNotice";
 import { scorecardByAction, formatScorecardLines } from "@/lib/committeeScorecard";
@@ -294,6 +295,11 @@ function PromptCenter() {
         ),
       topHeadlines: news.slice(0, 6).map((n) => `${n.title} (${n.source})`),
       headlinesCoverage,
+      // §B.2 / CONST-004: the model is told where the prices came from and
+      // how current they are, in the same block as the prices.
+      quoteProvenanceLine:
+        quoteBanner(liveQuotes) ??
+        "Quotes: none retrieved for this brief — the prices below are the last stored ones, and their age is per holding.",
       recentDecisions: decisions.map(
         (d) =>
           `${d.decided_on}${d.symbol ? ` ${d.symbol}` : ""}: "${d.recommendation}" → ${d.decision}${d.outcome_pl != null ? ` → ${d.outcome_pl >= 0 ? "+" : ""}$${d.outcome_pl.toFixed(2)}` : ""}`,
