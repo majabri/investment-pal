@@ -106,55 +106,78 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 - Honesty helpers: `calendarCoverage.ts` (quiet ≠ dead), `newsRelevance.ts`
   (symbols from the caller, never a literal), `goalAgreement.ts` (screen vs
   record), `src/hooks/useReconciliation.ts` (one comparison, panel and alert).
+- Ledger write side (#230): `trancheDraft.ts` (pinned to `tranches_bounds` by
+  a test that reads the migration), `tranchesView.ts`, `TranchesPanel.tsx`.
+- Quotes (#231): `quoteProvenance.ts` — §B.2 shape, freshness against the
+  market clock; the brief's `quoteProvenanceLine`; the refresh button writes
+  the quote's own time to `last_price_at`.
+- **Schema tests (#233):** `src/lib/__tests__/schema/replay.ts` replays every
+  migration into PGlite (Postgres in WebAssembly, devDependency) with
+  `auth.uid()` and the roles stubbed; `eventsAudit.test.ts` is the model for
+  testing a migration before Lovable applies it. Lovable's five duplicate
+  files are not idempotent and are pinned by name there. **Write the schema
+  test in the same PR as the migration from now on.**
+- Events and audit (#233): `domain_events` (fourteen §19.1 names, outbox),
+  `audit_log`, one trigger `record_change()` on nine tables; `import_batches`;
+  `orders.decision_id`/`tranche_id`; order states `untriggered`/`superseded`.
+  **Not applied in production until Lovable runs `20260917150000_…sql`.**
 - The Blueprint-to-Code Gap Matrix (2026-09-16, 104 rows, private artifact):
   <https://claude.ai/artifact/RDpasbToaZPehkbVzmJF4D>. Its Phase 1 list is
   the backlog; the session log says which rows have landed since.
 
-## Current state (2026-09-17)
+## Current state (2026-09-17, end of day)
 
-**HEAD on `main`:** `e792c06`. Suite **1583 pass / 0 fail**; tsc and
-`test:typecheck` clean; boot 200 on `/auth`, `/`, `/portfolio`, `/decisions`,
-`/goals`, `/prompt-center`.
+**HEAD on `main`:** `2ae8656`. Suite **1663 pass / 0 fail** (13 of them the
+schema replay, 3.9 s); tsc and `test:typecheck` clean; boot 200 on `/auth`,
+`/`, `/portfolio`, `/decisions`, `/goals`, `/prompt-center`.
 
 **The execution ledger is fully on screen** (#212 → #216, applied by Lovable
-2026-09-12 as `20260912014851_…sql`, byte-identical to
-`20260912120000_execution_ledger.sql` which remains as a harmless duplicate).
+2026-09-12) **and now written from it** (#230 tranches; #216 fills).
 
-**Since then (#224 → #228):** calendar coverage (BR-008) · news relevance
-from the caller's symbols (CONST-006) · **the Committee runs in the app and
-records its own decisions** with goal/ips/model/prompt versions and the
-readiness verdict stamped (DEC-001..004, CONST-003) · the reconciliation
-alert (8 of 11 alerts built) · goal-on-screen vs goal-on-record agreement
-on `/goals` and in every brief (GOAL-001).
+**Since the gap matrix (#224 → #233):** calendar coverage · news relevance
+from the caller's symbols · **the Committee runs in the app and records its
+own decisions** with all four versions and the readiness verdict stamped ·
+the reconciliation alert · goal-on-screen vs goal-on-record · tranche
+open/close · quote provenance to §B.2 · the gate names the missing input
+and every meeting states its purpose (live feedback, #232) · the events /
+audit / import-batch / order-links migration with the first schema test.
+Dependabot #219/#220/#222/#223 merged; **#221 (React 19.3) is red for a
+real reason** — `react-dom` not bumped with `react` — and is Amir's call.
 
 **Standing rules learnt the hard way:**
 - Unknown ≠ zero ≠ empty ≠ error ≠ stale. `not_recorded` is its own state.
 - A library with no caller is inert code (PERF-001, UNIV-001, `useOrders`
-  until #215). Migration first, wiring second; read before write.
+  until #215, `getPricesFn` until #231). Migration first, wiring second;
+  read before write.
 - The generated types are honest for columns typed `string` in the domain
   and lie for narrow unions — validate at the boundary and **count** what
   cannot be read; never drop, never default.
-- Presentation logic lives in `lib/*View.ts`, not components — mounting a
-  component in a test once pulled the browser Supabase client into
-  `test:typecheck`. So does importing even a `type` from `useAppData.ts`
-  into a lib: declare a structural type instead (`PolicyLike`).
+- Presentation logic lives in `lib/*View.ts`, not components. Importing even
+  a `type` from `useAppData.ts` into a lib pulls the browser client into
+  `test:typecheck`: declare a structural type instead (`PolicyLike`).
 - `orders.filled_quantity` is the broker's claim; fills are the evidence;
   `reconcileFills` is where they meet. Never write Σ fills back onto the order.
 - A file that names model output (`aiBoundary.test.ts` markers) may write
   only `decisions`/`journal_entries`; put such a hook in its own file.
 - The owner's name, figures, and the SHAPE of a ticker list are all
   forbidden in `src` (`personalData.test.ts`), comments included.
+- A boundary that carries a status and drops the reason behind it produces
+  a screen that says "an input is missing" and cannot say which (#232).
+  Carry the reasons.
+- A migration is testable before Lovable sees it: replay into PGlite,
+  apply the candidate twice, exercise the triggers, fault-inject the SQL.
 - **Always check whether the work was done already** before doing it.
 
 **Open, all Amir's:** OD-001 Amendment 2 (see *Merge authority*); ADR-APP-009
-–015 all `Proposed` (009/010 gate the matrix's Phase 1; 013 D2 blocks D-10);
-OD-003; ORD-001 a/b; the ADR-008 action vocabulary; the universe writer;
-`decisions.account_id` backfill; replacing §26.3 in the Drive blueprint;
-86 merged remote branches the git proxy will not let Claude Code delete; the
-D-20 catalog query has not been run against `fills`/`tranches`.
+–015 all `Proposed`; OD-003; ORD-001 a/b; the ADR-008 action vocabulary;
+the universe writer; `decisions.account_id` backfill; replacing §26.3 in
+the Drive blueprint; #221; **telling Lovable to apply
+`20260917150000_events_audit_imports_orders.sql`** (paste-ready line in the
+#233 body); pasting a balance block on Settings so the reconciliation can
+run; 86 merged remote branches the git proxy will not let Claude Code
+delete; the D-20 catalog query.
 
-**Buildable without a decision:** tranche open/close form (BR-010) · quote
-provenance to §B.2 (PORT-002) · forward migrations for `domain_events` +
-`audit_log`, `import_batches`, `orders.decision_id`/`tranche_id` and the
-widened order states (hand to Lovable) · alerts persisted with
-acknowledgement · daily-close job (Supabase-side) · disposable-DB CI layer.
+**Buildable without a decision:** wire `import_batches` into the import
+screen once the migration is applied · alerts persisted with acknowledgement
+(migration + schema test) · a first `domain_events` consumer · the daily-close
+job (Supabase-side).
