@@ -65,6 +65,14 @@ const FORBIDDEN: { label: string; re: RegExp }[] = [
   // as string literals; stating them here to forbid them would reintroduce
   // them. The shape catches any of them, and any sibling nobody has seen yet.
   { label: "a brokerage-account-number-shaped literal", re: /\bZ\d{8}\b/ },
+  // Shape again. `newsServer.ts` ranked headlines against a regex alternation
+  // of fourteen real tickers, and `prompt-center.tsx` carried a twelve-ticker
+  // watchlist array. Naming them here would reintroduce them; the shapes —
+  // an alternation of eight or more uppercase tickers, and a `watchlist:`
+  // array opening with an uppercase ticker literal — catch both and any
+  // sibling nobody has seen yet.
+  { label: "a hard-coded ticker alternation", re: /\(([A-Z]{1,5}(\.[A-Z])?\|){7,}[A-Z]{1,5}(\.[A-Z])?\)/ },
+  { label: "a hard-coded watchlist array", re: /watchlist:\s*\[\s*"[A-Z]{1,5}(\.[A-Z])?"/ },
 ];
 
 // Exemptions are per FILE AND PER NEEDLE, not per file.

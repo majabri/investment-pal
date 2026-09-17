@@ -3,6 +3,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { enforceProviderRateLimit } from "./serverRateLimit";
+import { newsInputSchema } from "./serverInput";
+import { heldPattern, scoreHeadline } from "./newsRelevance";
 
 export type NewsCategory = "Markets" | "Economy" | "Technology" | "Business" | "World" | "Crypto";
 export interface NewsItem {
@@ -67,16 +69,14 @@ async function fetchFeed(url: string, source: string, category: NewsCategory): P
   }
 }
 
-const T1 =
-  /\b(fed|fomc|cpi|inflation|crash|plunge|surge|record|war|tariff|rate (cut|hike)|recession)\b/i;
-const T2 =
-  /\b(earnings|guidance|ai|jobs|payrolls|gdp|oil|treasury|yield|nvidia|upgrade|downgrade|merger)\b/i;
-const HELD = /\b(CRWD|LRCX|TSLA|RY|MSFT|AMZN|GOOGL|INTU|GBTC|AVGO|ABT|BLK|NVDA|META)\b/;
-
-export const getNewsFn = createServerFn({ method: "GET" })
+// Scoring lives in `newsRelevance.ts`. The held set is the CALLER's — this
+// function has no list of its own (CONST-006, ADR-APP-012).
+export const getNewsFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<NewsItem[]> => {
+  .validator((input) => newsInputSchema.parse(input))
+  .handler(async ({ data, context }): Promise<NewsItem[]> => {
     await enforceProviderRateLimit(context.supabase, "news");
+    const held = heldPattern(data.symbols ?? []);
     const all = (await Promise.all(FEEDS.map(([u, s, c]) => fetchFeed(u, s, c)))).flat();
     const seen = new Set<string>();
     const now = Date.now();
@@ -87,11 +87,9 @@ export const getNewsFn = createServerFn({ method: "GET" })
       return true;
     });
     for (const it of items) {
-      const ageH = it.publishedAt ? (now - new Date(it.publishedAt).getTime()) / 3.6e6 : 48;
-      it.score =
-        (ageH < 1 ? 40 : ageH < 3 ? 32 : ageH < 6 ? 24 : ageH < 12 ? 16 : ageH < 24 ? 9 : 3) +
-        (T1.test(it.title) ? 25 : T2.test(it.title) ? 12 : 0) +
-        (HELD.test(it.title) ? 30 : 0);
+      // Unknown age is passed as unknown; `recencyPoints` treats it as old.
+      const ageH = it.publishedAt ? (now - new Date(it.publishedAt).getTime()) / 3.6e6 : null;
+      it.score = scoreHeadline(it.title, ageH, held);
     }
     return items.sort((a, b) => b.score - a.score).slice(0, 40);
   });

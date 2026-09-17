@@ -5,6 +5,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getNewsFn, type NewsCategory } from "@/lib/newsServer";
+import { useAllHoldings } from "@/hooks/useAppData";
 import { coverageNotice, coverageOf } from "@/lib/coverage";
 import { cn } from "@/lib/utils";
 
@@ -31,9 +32,14 @@ function NewsPage() {
   // The whole query, not just its data (rule 30). A failed fetch settles
   // `isLoading` to false and rendered an empty grid with no message, which
   // reads as "no news" — a claim, and one the committee prompt repeated.
+  // Relevance is ranked against what the household holds — every account,
+  // because news is not account-scoped. A user with no holdings is ranked on
+  // recency and magnitude alone; there is no fallback list (CONST-006).
+  const { data: holdings = [] } = useAllHoldings();
+  const symbols = [...new Set(holdings.map((h) => h.symbol))].sort();
   const query = useQuery({
-    queryKey: ["news"],
-    queryFn: () => getNewsFn(),
+    queryKey: ["news", symbols.join(",")],
+    queryFn: () => getNewsFn({ data: { symbols } }),
     refetchInterval: 10 * 60 * 1000,
   });
   const { data } = query;

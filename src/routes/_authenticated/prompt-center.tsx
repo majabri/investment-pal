@@ -29,6 +29,7 @@ import { AccountNotice } from "@/components/app/AccountNotice";
 import { scorecardByAction, formatScorecardLines } from "@/lib/committeeScorecard";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getNewsFn } from "@/lib/newsServer";
+import { useWatchlist } from "@/hooks/useAppData";
 import { getEarningsCalendarFn, getEconCalendarFn } from "@/lib/calendarServer";
 import { useJournal } from "@/hooks/useAppData";
 import { getQuotesFn } from "@/lib/marketServer";
@@ -111,6 +112,9 @@ function PromptCenter() {
   const { data: priorities = [] } = usePriorities();
   const { data: ipsLite } = useIpsLite();
   const { data: universe = [] } = useUniverse();
+  // The user's stored watchlist. Twelve tickers were a literal here — one
+  // household's list, compiled into every user's committee brief (CONST-006).
+  const { data: watchlistRows = [] } = useWatchlist();
   // The readiness gate (Phase 5, rule 17). This screen's output is a brief
   // that asks a model to recommend against a real account, so it is gated on
   // the inputs that recommendation would rest on. Nothing else on the screen
@@ -122,9 +126,10 @@ function PromptCenter() {
   const readiness = useReadiness(readinessTotals);
   const addJournal = useAddJournal();
   const { data: journalEntries = [] } = useJournal("");
+  const newsSymbols = [...new Set(scopedHoldings.map((h) => h.symbol))].sort();
   const newsQuery = useQuery({
-    queryKey: ["news"],
-    queryFn: () => getNewsFn(),
+    queryKey: ["news", newsSymbols.join(",")],
+    queryFn: () => getNewsFn({ data: { symbols: newsSymbols } }),
     staleTime: 10 * 60 * 1000,
   });
   const news = newsQuery.data ?? [];
@@ -312,20 +317,7 @@ function PromptCenter() {
       })),
       priorities: priorities.map((p) => p.label),
       userNotes,
-      watchlist: [
-        "NVDA",
-        "AVGO",
-        "TSM",
-        "AMD",
-        "META",
-        "COST",
-        "NFLX",
-        "NOW",
-        "PANW",
-        "MA",
-        "LLY",
-        "BRK.B",
-      ],
+      watchlist: watchlistRows.map((w) => w.symbol),
       upcomingEarnings: liveEarnCal.map(
         (e) =>
           `${e.date} ${e.symbol} (${e.session === "bmo" ? "pre-market" : "after close"})${scopedHoldings.some((h) => h.symbol === e.symbol) ? " — HELD" : ""}`,
@@ -363,6 +355,7 @@ function PromptCenter() {
     liveEarnCal,
     readiness,
     headlinesCoverage,
+    watchlistRows,
   ]);
 
   const MEETING: Record<string, MeetingType> = {

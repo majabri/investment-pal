@@ -1458,6 +1458,21 @@ export function useUniverse() {
 // Still defaults, and still legitimate — what changed in Phase 4 is that they
 // now carry `caps_source: "default"` so nothing downstream can present them as
 // the user's decision (rule 15).
+/**
+ * The stored watchlist, symbols only. Like `useUniverse`: no fallback list.
+ * An empty watchlist is an empty watchlist, and the committee brief says so.
+ */
+export function useWatchlist() {
+  return useQuery({
+    queryKey: ["watchlist"],
+    queryFn: async (): Promise<{ symbol: string }[]> => {
+      const { data, error } = await supabase.from("watchlist").select("symbol").order("symbol");
+      if (error) throw error;
+      return (data ?? []) as { symbol: string }[];
+    },
+  });
+}
+
 export const IPS_LITE_DEFAULTS: IpsLite = {
   position_cap_pct: 30,
   position_cap_hard: false,

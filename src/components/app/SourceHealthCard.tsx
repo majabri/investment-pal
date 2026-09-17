@@ -28,9 +28,12 @@ export function SourceHealthCard() {
     queryFn: () => getMarketSnapshotFn(),
     staleTime: 5 * 60 * 1000,
   });
+  // Probed with no symbols: the health question is whether the feed answers,
+  // not how it ranks. Same key shape as the screens so a screen's fetch is
+  // reused when one has already asked with an empty set.
   const news = useQuery({
-    queryKey: ["news"],
-    queryFn: () => getNewsFn(),
+    queryKey: ["news", ""],
+    queryFn: () => getNewsFn({ data: { symbols: [] } }),
     staleTime: 10 * 60 * 1000,
   });
   const geo = useQuery({

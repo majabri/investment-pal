@@ -26,6 +26,15 @@ export const economicCalendarInputSchema = z.object({
   days: z.number().int().min(1).max(MAX_CALENDAR_DAYS).optional(),
 });
 
+/**
+ * The symbols a news request should rank against. Optional and possibly
+ * empty: a caller with no holdings gets recency and magnitude only. There is
+ * no server-side default list (CONST-006).
+ */
+export const newsInputSchema = z.object({
+  symbols: z.array(symbolSchema).max(MAX_SYMBOLS_PER_REQUEST).optional(),
+});
+
 const chatMessageSchema = z.object({
   role: z.enum(["system", "user", "assistant"]),
   content: z.string().trim().min(1).max(75_000),
