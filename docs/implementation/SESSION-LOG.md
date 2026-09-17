@@ -3487,3 +3487,112 @@ forward migrations for `domain_events` + `audit_log` triggers,
 `import_batches`, and `orders.decision_id`/`tranche_id` with the widened
 states (hand to Lovable) · alerts persisted with acknowledgement · the
 daily-close job (Supabase-side) · a disposable-DB layer in CI (larger).
+
+## Session — 2026-09-17 (continued) — Phase 1 items, the first schema test, and live feedback (#229 → #233)
+
+Five more PRs merged on a green gate, four Dependabot bumps merged, one
+Dependabot bump left open and explained. Suite 1583 → **1663** (after #233).
+HEAD on `main`: `2ae8656`.
+
+### #229 — session log for #224 → #228 and CLAUDE.md state
+
+### #230 — open and close a tranche from `/portfolio` (§12.4, BR-010)
+
+`lib/trancheDraft.ts` (validator per box; kind has no default; every
+rule restates a clause of `tranches_bounds`, and the test reads the
+migration and pins each rule to its clause), `lib/tranchesView.ts`
+(coverage sentences — `matched` says nothing, `not_recorded` IS said),
+`useOpenTranche` / `useCloseTranche` (the close write guarded with
+`.is("closed_at", null)`), `TranchesPanel` above the orders panel. A
+closed tranche keeps its opened quantity; the remainder is the fills'
+record. 1583 → 1620.
+
+### #231 — every live quote carries its provenance (§B.2; PORT-002, CONST-004, DATA-002)
+
+`lib/quoteProvenance.ts`: provider, the quote's OWN time
+(`regularMarketTime`), retrieval time, session from the provider's
+trading periods (null when none — never "closed" as a guess), delay
+(null: Yahoo's chart endpoint does not state it, and zero would claim
+real-time). Freshness against the MARKET clock: 1 h in a regular
+session, the last close is current across a weekend (96 h), an unknown
+session takes the strict rule, no as-of is UNKNOWN. Banner above the
+holdings table; caption beside any price that is not current; a
+`quoteProvenanceLine` at the top of HOLDINGS in the brief. The refresh
+button now writes `last_price_at` as the quote's own time, null when
+not stated — never the click. `getPricesFn` / `fetchPrices` had no
+other caller and are gone. UNVERIFIED live: Yahoo is unreachable from
+the sandbox (proxy 403); every reader returns null for an unexpected
+shape. 1620 → 1606 on its own base, 1650 with #230.
+
+### Dependabot — #219, #220, #222, #223 merged; #221 left open
+
+Amir: *"I see PR's 219, 220, 221, 222, and 223. who is working on
+them?"* Nobody — Dependabot opened all five at 05:24Z. Four were green
+on the same boot gate and were merged one at a time (each rewrites
+`bun.lock`). **#221 (react 19.2.8 → 19.3.0) is red for a real reason:**
+Dependabot bumped `react` and `@types/react` but not `react-dom`, and
+`react-dom` refuses to load beside a different `react` version — every
+component test fails at import. Not merged, not closed: a proper bump
+moves `react` and `react-dom` together, and whether to take a React
+minor is a dependency decision left to Amir. Local gate on `main` after
+the four merges: 1620 pass, tsc clean.
+
+### #232 — the gate names the missing reconciliation input (rule 17, §23.2)
+
+Live feedback, the first since the schema caught up: *"Not available:
+Reconciliation (An input is missing, so the comparison did not run.)"*
+and no reason given for the five meeting sections. The engine's
+`blockedBy` named the input all along; `readinessInputFor` carried only
+the status. `ReadinessInput.reconciliationBlockedBy` now travels with
+it and the detail names each reason with its remedy ("paste a balance
+block on Settings to record one"). And the v6 brief said only "TODAY'S
+MEETING TYPE: Morning CIO Meeting"; `MEETING_PURPOSE` carries the
+universal template's own "Purpose:" line into the v6 header and onto
+the tab, pinned by test. Gate policy unchanged: DATA_INCOMPLETE still
+blocks a recommendation; the holder is now told which input to supply.
+On the deployed account it is almost certainly the broker balance —
+nothing has been pasted on Settings since the schema caught up.
+1620 → 1650.
+
+### #233 — domain events, audit log, import batches, order links; the first schema test (§19, §20.2, §12.1–12.2, SYS-004, §26.1)
+
+Forward migration `20260917150000_events_audit_imports_orders.sql`:
+`audit_log` (whole rows before and after, owner from the row, changer
+from `auth.uid()`), `domain_events` (the fourteen §19.1 names as outbox
+rows pointing at their audit row; `consumed_at` NULL — no consumer
+yet), ONE SECURITY DEFINER trigger function `record_change()` on nine
+tables deriving the event from table + op + changed columns,
+`import_batches` + `sync_log.batch_id`, `orders.decision_id` /
+`tranche_id`, and `orders_vocabulary` replaced whole to admit
+`untriggered` and `superseded` (the TS vocabulary follows).
+
+**The first schema test.** `src/lib/__tests__/schema/replay.ts` replays
+every migration into PGlite (Postgres 18.3 in WebAssembly, new
+devDependency) with `auth.uid()` and the three roles stubbed. Finding:
+Lovable's five duplicate files (`20260909144407`, `…144443`, `…144513`,
+`…144540`, `20260910003712`) are NOT idempotent — each fails on replay
+with "policy … already exists". Production ran each once, so the replay
+tolerates that one error class and pins the five by name; a sixth is a
+finding. `eventsAudit.test.ts` applies the candidate twice and runs the
+§A.3 lifecycle: 12 of 14 events raised from real writes, every event
+linked to its audit row, the CHECKs refusing what they should. Six
+fault injections against the SQL itself, each reddened. This is the
+"disposable DB in CI" item from the matrix's Phase 1, in its first
+form — it runs in `bun test`, so the boot gate carries it.
+
+**Applied in production: NO, until Lovable runs it.** The paste-ready
+line is in the PR body. Until then the app is unchanged.
+
+### Open — Amir's
+
+As before, plus: #221 (React minor, with `react-dom`); telling Lovable
+to apply `20260917150000`; pasting a balance block on Settings so the
+reconciliation can run (the Committee page will now say so itself).
+
+### Buildable next
+
+Wire `import_batches` into the import screen (write the batch, stamp
+`sync_log.batch_id`) once the migration is applied · alerts persisted
+with acknowledgement (needs a table — same migration pattern, now
+testable) · a first consumer of `domain_events` (Phase 2 gate: the
+event record exists as of #233) · the daily-close job (Supabase-side).
