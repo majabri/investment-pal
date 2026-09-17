@@ -3669,3 +3669,17 @@ pasting a balance block on Settings; the D-20 catalog query.
 Alerts persisted with acknowledgement (migration + schema test, then
 the panel) · a first `domain_events` consumer · the daily-close job
 (Supabase-side).
+
+### #238 — alerts persisted with acknowledgement (§23.1, §16.1, §19.1)
+
+Forward migration `20260917180000_alerts.sql`, schema test in the same
+PR (23 schema tests now): `alerts` with first/last-raised, resolved and
+acknowledged timestamps, scoped per account or household via a stored
+generated `scope_key`, one row per fingerprint per scope; `raise_alerts()`
+as the one write path (raised / refreshed / RE-RAISED with the
+acknowledgement cleared / resolved, in one invoker call under RLS);
+`record_change()` replaced whole so an insert or re-raise raises
+`AlertRaised` — the fourteenth event name has a source. Six SQL fault
+injections reddened. 1676 → 1686. **Not applied until Lovable runs it**
+(paste-ready line in the #238 body); the dashboard wiring is the PR after
+that, the #233 → #236 sequence again.

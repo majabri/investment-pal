@@ -119,7 +119,7 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
   test in the same PR as the migration from now on.**
 - Events and audit (#233, applied by Lovable 2026-09-17): `domain_events`
   (fourteen §19.1 names, outbox; no consumer yet), `audit_log`, one trigger
-  `record_change()` on nine tables; `import_batches` (written by the CSV
+  `record_change()` on nine tables (ten with `alerts`, #238, once applied); `import_batches` (written by the CSV
   import since #236, `lib/importBatch.ts`); `orders.decision_id`/`tranche_id`;
   order states `untriggered`/`superseded`.
 - Lovable applies migrations through Drizzle now: `drizzle.config.ts`,
@@ -135,9 +135,10 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 
 ## Current state (2026-09-17, evening)
 
-**HEAD on `main`:** `77be890`. Suite **1676 pass / 0 fail** (13 of them the
-schema replay); tsc and `test:typecheck` clean; boot 200 on `/auth`, `/`,
-`/portfolio`, `/decisions`, `/goals`, `/prompt-center`, `/settings`.
+**HEAD on `main`:** the merge of #238. Suite **1686 pass / 0 fail** (23 of
+them the schema replay); tsc and `test:typecheck` clean; boot 200 on
+`/auth`, `/`, `/portfolio`, `/decisions`, `/goals`, `/prompt-center`,
+`/settings`.
 
 **The execution ledger is fully on screen** (#212 → #216, applied by Lovable
 2026-09-12) **and written from it** (#230 tranches; #216 fills).
@@ -193,6 +194,8 @@ reconciliation can run; 86 merged remote branches the git proxy will not
 let Claude Code delete; the D-20 catalog query (now also for the three new
 tables).
 
-**Buildable without a decision:** alerts persisted with acknowledgement
-(migration + schema test in one PR, then the panel) · a first
+**Waiting on Lovable:** `20260917180000_alerts.sql` (#238; paste-ready line
+in its body). **Then buildable:** the alerts panel wired to `raise_alerts`
+and `acknowledged_at` (fingerprint = type + message with figures blanked;
+acknowledged alerts shown as acknowledged, never hidden) · a first
 `domain_events` consumer · the daily-close job (Supabase-side).
