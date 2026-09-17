@@ -22,6 +22,7 @@ import {
   riskToExpectedReturn,
 } from "@/lib/finance";
 import { buildV6Prompt, type MeetingType, type PromptContext } from "@/lib/prompts";
+import { goalAgreement, goalOnScreen, goalVersionLine } from "@/lib/goalAgreement";
 import { useAccountContext, useAccountScope } from "@/contexts/AccountContext";
 import { AccountNotice } from "@/components/app/AccountNotice";
 import { scorecardByAction, formatScorecardLines } from "@/lib/committeeScorecard";
@@ -62,7 +63,7 @@ export const Route = createFileRoute("/_authenticated/prompt-center")({
 });
 
 function PromptCenter() {
-  const { data: goal, latestVersionId: goalVersionId } = useGoal();
+  const { data: goal, latestVersionId: goalVersionId, history: goalHistory } = useGoal();
   const { selectedAccount, status: accountStatus } = useAccountContext();
   // The prompt describes one account to the committee. `useAccount()` — the
   // household aggregate — was read here and passed into the memo's dependency
@@ -258,6 +259,10 @@ function PromptCenter() {
       objective,
       requiredCagr: cagr,
       probability: prob,
+      // GOAL-001: whether the goal the brief reads is the goal the decision
+      // will cite. The stamp below carries `goalVersionId`; this line tells
+      // the model when the row behind that id and the goal above disagree.
+      goalVersionLine: goalVersionLine(goalAgreement(goalOnScreen(goal ?? null), goalHistory)),
       ipsPositionCapPct: ipsLite.position_cap_pct,
       ipsPositionCapHard: ipsLite.position_cap_hard,
       ipsMarginCapPct: ipsLite.margin_cap_pct,
@@ -304,6 +309,7 @@ function PromptCenter() {
     selectedAccount,
     balance,
     goal,
+    goalHistory,
     priorities,
     ipsLite,
     userNotes,

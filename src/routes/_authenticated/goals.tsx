@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useGoal, useScopedHoldings, useScopedAccount } from "@/hooks/useAppData";
+import { goalAgreement, goalAgreementSentence, goalOnScreen } from "@/lib/goalAgreement";
 import { accountTotals, scopeLabel,
   livePriceOf,
 } from "@/lib/accountTotals";
@@ -63,6 +64,12 @@ function GoalsPage() {
   const historyLoading = versionsQuery.data === undefined;
   const historyKnown = history.coverage === "known";
   const versions = historyKnown ? history.rows : null;
+  // GOAL-001: whether the SAVED goal (not the form) matches its latest
+  // version. Null while the history loads and when they agree — a notice on
+  // every visit is a notice nobody reads.
+  const agreementNotice = historyLoading
+    ? null
+    : goalAgreementSentence(goalAgreement(goalOnScreen(goal ?? null), history));
 
   const [name, setName] = useState("");
   const [starting, setStarting] = useState<number | null>(null);
@@ -490,6 +497,18 @@ function GoalsPage() {
           Every save appends a version and nothing is ever edited. Each decision records the version
           it was taken under.
         </p>
+        {agreementNotice ? (
+          // The goal on screen and the goal on record disagree (or whether
+          // they do is not known). Which one wins is the owner's call; that
+          // they differ is a fact the holder must see before the next save
+          // silently makes the screen the record.
+          <p
+            className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+            role="status"
+          >
+            {agreementNotice}
+          </p>
+        ) : null}
         {historyLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : versions === null ? (

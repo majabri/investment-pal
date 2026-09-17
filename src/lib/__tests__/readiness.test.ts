@@ -271,6 +271,7 @@ describe("the dependency table is the rule", () => {
 // data is not a gate — rule 17 is about what gets PRODUCED.
 const ctxFor = (checks: ReadinessCheck[]): PromptContext => ({
     accountName: "Growth Brokerage",
+    goalVersionLine: "Goal version: recorded 2026-09-01 — matches the goal above.",
     portfolioValue: 72_500,
     cash: 2_500,
     marginUsed: 0,

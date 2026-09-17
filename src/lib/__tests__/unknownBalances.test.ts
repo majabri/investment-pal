@@ -167,6 +167,7 @@ describe("what a number box means when the figure may be unknown", () => {
 describe("an unknown balance reaches the committee as unknown", () => {
   const base: PromptContext = {
     accountName: "Growth Brokerage",
+    goalVersionLine: "Goal version: recorded 2026-09-01 — matches the goal above.",
     portfolioValue: null,
     grossValue: null,
     cash: null,
