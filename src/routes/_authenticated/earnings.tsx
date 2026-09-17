@@ -92,7 +92,7 @@ function Page() {
                     )}
                   </td>
                   <td className="text-right text-[11px] text-muted-foreground">
-                    {e.source === "live" ? "live" : "seed"}
+                    {e.source}
                   </td>
                 </tr>
               ))}
