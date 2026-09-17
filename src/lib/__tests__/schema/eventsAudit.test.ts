@@ -52,7 +52,7 @@ describe("every migration replays", () => {
     await db.exec(readFileSync(join(MIGRATIONS_DIR, MIGRATION), "utf8"));
     const after = await one<{ n: string }>(db, "SELECT count(*)::text n FROM pg_trigger WHERE tgname LIKE 'trg_%_record_change'");
     expect(after.n).toBe(before.n);
-    expect(Number(after.n)).toBe(9);
+    expect(Number(after.n)).toBe(10); // nine from this migration, alerts from 20260917180000
   });
 });
 
