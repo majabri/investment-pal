@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Field } from "@/components/app/Field";
 import { SourceHealthCard } from "@/components/app/SourceHealthCard";
 import { SecurityMasterCard } from "@/components/app/SecurityMasterCard";
+import { ActivityPanel } from "@/components/app/ActivityPanel";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -1128,6 +1129,10 @@ function SettingsPage() {
           </ul>
         )}
       </section>
+
+      {/* §24: the audit record, readable. Sited beside the syncs because
+          both answer "what did the app do, and when". */}
+      <ActivityPanel />
 
       <section className="mt-4 rounded-2xl border bg-card p-5">
         <div className="mb-3 text-sm font-medium">Account</div>
