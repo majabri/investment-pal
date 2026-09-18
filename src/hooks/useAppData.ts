@@ -31,6 +31,7 @@ import {
 } from "@/lib/trancheDraft";
 import type { TrancheDraft } from "@/lib/trancheDraft";
 import type { Tranche } from "@/lib/tranches";
+import { readActivity, type ActivityRead, type ActivityRow } from "@/lib/activityView";
 import type { DecisionOption } from "@/lib/tranchesView";
 import { readFills, type FillRead } from "@/lib/fillRows";
 import { canRecordFill, fillInsert, validateFillDraft } from "@/lib/fillDraft";
@@ -1481,6 +1482,28 @@ export function useSyncLog() {
       if (error) throw error;
       return data ?? [];
     },
+  });
+}
+
+/**
+ * The most recent domain events with the audit row that raised each (§19.1,
+ * §24). Read-only. The embed follows `domain_events_audit_id_fkey`; a
+ * pruned audit row comes back null and the sentence says so.
+ */
+export function useActivity(limit = 30) {
+  return useQuery({
+    queryKey: ["activity", limit],
+    queryFn: async (): Promise<ActivityRead> => {
+      const { data, error } = await supabase
+        .from("domain_events")
+        .select("id,event_type,aggregate_type,aggregate_id,account_id,occurred_at,payload,audit_log(op,old_row,new_row)")
+        .order("occurred_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return readActivity((data ?? []) as unknown as ActivityRow[]);
+    },
+    refetchInterval: 60 * 1000,
   });
 }
 
