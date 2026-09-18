@@ -1,6 +1,6 @@
 # OD-003 — Which denominator the position and margin caps are enforced against
 
-- **Status:** OPEN — needs the owner's line-item sign-off (OD-001)
+- **Status:** RESOLVED 2026-09-18 — A: net equity · B: net equity · C: ADR-APP-004 C2 amended (Amir Jabri, in session; recorded in ADR-APP-013)
 - **Raised:** 2026-09-10
 - **Area:** money-adjacent — position sizing, margin math, IPS thresholds
 - **Serves:** P0-05, RISK-001 (audit brief 2026-09-10)

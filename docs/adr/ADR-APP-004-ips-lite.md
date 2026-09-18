@@ -17,7 +17,7 @@ Investment OS IPS concept, at single-user scale.
 | # | Rule (approved) | Reasoning | What invalidates it |
 |---|---|---|---|
 | C1 | **Objective: grow Amir-TOD to $150,000 by 2027-03-31** (from ~$50K). Prompt injection includes the sentence: *"The objective never justifies overriding risk limits or the evidence contract."* | The stated goal (already the app's goal); the guard sentence stops the objective being used to rationalise breaking limits. | Amir changes target/date in Settings. |
-| C2 | **Max single-position weight 30% gross, SOFT enforcement** — the Constitution Check strip flags a breach; it does not block. | Concentration guardrail; soft because a high-conviction thesis may intentionally exceed it. | Amir sets it hard, or whitelists a specific core holding above the cap. |
+| C2 | **Max single-position weight 30% of net equity (amended from "gross", Amendment 1), SOFT enforcement** — the Constitution Check strip flags a breach; it does not block. | Concentration guardrail; soft because a high-conviction thesis may intentionally exceed it. | Amir sets it hard, or whitelists a specific core holding above the cap. |
 | C3 | **Margin utilization cap 25%** of account value, with a cost-awareness note when margin is used. | Bounds leverage ("used intelligently") while keeping a buffer from a Fidelity maintenance call; conservative on a $50K account pursuing an aggressive target. **Explicitly signed off by Amir.** | Amir's risk appetite / broker maintenance terms change; re-set in Settings. |
 | C4 | **Risk tolerance: above-average** (maps to existing `risk_preference`). | Matches the stated profile (comfortable with above-average risk, expects evidence-based recs). | Amir re-sets it. |
 
@@ -28,3 +28,14 @@ Investment OS IPS concept, at single-user scale.
   block orders here.
 - Hard controls, if any are later set hard, gate recommendations deterministically
   (never overridable by the committee) — consistent with the constitutions.
+
+## Amendment 1 (2026-09-18) — C2's denominator
+
+C2 was signed off as "30% gross". The dashboard has enforced 30% of **net
+equity** (investments + cash − margin debit) since the Constitution Check was
+written, which is the tighter reading on a levered account and what the
+broker's own "% of Acct" column means. On 2026-09-18 Amir chose net equity
+(ADR-APP-013 D1, OD-003 A); this amendment makes the written policy match the
+enforced code. No figure on screen changes. The margin cap C3 was already
+stated against net account value and is unchanged (ADR-APP-013 D2).
+

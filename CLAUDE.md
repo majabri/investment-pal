@@ -232,21 +232,25 @@ Dependabot #219/#220/#222/#223 merged.
   print are both wrong in a way the row cannot show afterwards.
 - **Always check whether the work was done already** before doing it.
 
-**Open, all Amir's:** OD-001 Amendment 2 (see *Merge authority*); ADR-APP-009
-–015 all `Proposed`; OD-003; ORD-001 a/b; the ADR-008 action vocabulary;
-the universe writer; `decisions.account_id` backfill; replacing §26.3 in
-the Drive blueprint; pasting a balance block on Settings so the
-reconciliation can run; 86 merged remote branches the git proxy will not
-let Claude Code delete; the D-20 catalog query for the three new tables (the `domain_events`
+**Decided by Amir 2026-09-18 (#253, his merge):** ADR-009–014 Accepted;
+OD-003 = net equity (ADR-004 C2 amended); ORD-001 = (a) reconciliation view
+(ADR-016); ADR-008 Amendment 1 = the blueprint's seven verbs; universe
+writer = import (ADR-017); `decisions.account_id` backfill, one-account
+users only (ADR-019). **Still open, Amir's:** OD-001 Amendment 2 (see
+*Merge authority*); ADR-APP-015 (navigation, by his instruction); ADR-APP-018
+(event consumers — drafted, for him to read); replacing §26.3 in the Drive
+blueprint; 86 merged remote branches the git proxy will not let Claude Code
+delete; the D-20 catalog query for the three new tables (the `domain_events`
 privilege question is answered, fixed and **confirmed in production**:
 #250, applied 2026-09-18, ACL re-read the same day).
 
 **Lovable applied `20260917180000_alerts.sql` on 2026-09-18** (verified
 against git; it also widened `isIncomingRequestAbort` in `error-capture.ts`,
-untested). The alerts record is wired (#248). **Needs a shape decision
-first (Amir's):** a first `domain_events` consumer — the table has ONE
-`consumed_at`; the first consumer to set it burns the event for every
-later one, so v1 needs either a single owning consumer or a per-consumer
-cursor (a forward migration). The session log's closing note has the
-reasoning. **Supabase-side:** the daily-close schedule (the
+untested). The alerts record is wired (#248). **Buildable now (decided
+2026-09-18):** the seven-verb vocabulary (ADR-008 Am. 1) · the fill-vs-holding
+reconciliation view (ADR-016) · the universe import (ADR-017) · the
+`decisions.account_id` backfill migration + schema test (ADR-019, then
+Lovable) · `marginUtilisation` cleanup (ADR-013 D2). **Waits on Amir reading
+ADR-018:** the first `domain_events` consumer (per-consumer cursor
+recommended). **Supabase-side:** the daily-close schedule (the
 recorder writes only true closes since #243; the schedule is what is missing).

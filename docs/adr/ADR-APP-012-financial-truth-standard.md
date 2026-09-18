@@ -1,6 +1,6 @@
 # ADR-APP-012 — Adopting the financial truth & reconciliation standard
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-09-18, Amir Jabri — decided in session, recorded by Claude Code)
 - **Date:** 2026-09-05
 - **Deciders:** Amir (product owner)
 - **Money-adjacent:** **Yes** — it governs every money-adjacent decision that follows

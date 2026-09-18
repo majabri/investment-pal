@@ -35,3 +35,17 @@ settle it: **don't infer.** File `../open-decisions/OD-xxx.md` and ask in chat.
 | ADR-APP-003 | Buy-back zones (re-entry ladder after a trim/sell) | Accepted |
 | ADR-APP-004 | IPS-lite (single-user policy record) | Accepted |
 | ADR-APP-005 | Standing merge policy (self-merge authority) | Accepted |
+| ADR-APP-006 | Server-function access controls and input limits | Accepted |
+| ADR-APP-007 | The margin rate is IPS policy, and unset suppresses | Accepted |
+| ADR-APP-008 | Canonical recommendation contract and its divergences | Accepted |
+| ADR-APP-009 | The canonical balance model | Accepted |
+| ADR-APP-010 | The broker adapter contract | Accepted |
+| ADR-APP-011 | The reconciliation engine | Accepted |
+| ADR-APP-012 | Adopting the financial truth & reconciliation standard | Accepted |
+| ADR-APP-013 | Concentration denominators (D1–D3 decided: net equity) | Accepted |
+| ADR-APP-014 | Lovable's direct-to-`main` write path | Accepted |
+| ADR-APP-015 | Navigation information architecture | Proposed |
+| ADR-APP-016 | Fill to holding: a reconciliation view, never a projection | Accepted |
+| ADR-APP-017 | Who writes the investment universe | Accepted |
+| ADR-APP-018 | How `domain_events` are consumed | Proposed |
+| ADR-APP-019 | Backfilling `decisions.account_id` on pre-scope rows | Accepted |
