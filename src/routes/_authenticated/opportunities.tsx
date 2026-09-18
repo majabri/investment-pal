@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
 import { MoverList } from "@/components/app/MoverList";
+import { UniverseImportPanel } from "@/components/app/UniverseImportPanel";
 import { getQuotesFn } from "@/lib/marketServer";
 import { useAllHoldings, useUniverse } from "@/hooks/useAppData";
 import { resolveUniverse, universeEmptyReason, heldSymbolSet } from "@/lib/universe";
@@ -36,6 +37,9 @@ function Page() {
       title="Opportunities"
       subtitle="Daily percentage movers across your holdings and investment universe. A price screen — not a committee view, and not ranked by conviction."
     >
+      {/* ADR-APP-017: the owner writes the universe, here. */}
+      <UniverseImportPanel current={universe} />
+
       {universeLoading || isLoading ? (
         <p className="text-sm text-muted-foreground">Scanning the universe…</p>
       ) : null}

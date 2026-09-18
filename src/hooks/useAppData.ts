@@ -1551,13 +1551,13 @@ export type IpsLite = {
 export function useUniverse() {
   return useQuery({
     queryKey: ["investment_universe"],
-    queryFn: async (): Promise<{ symbol: string }[]> => {
+    queryFn: async (): Promise<{ symbol: string; tier: string | null }[]> => {
       const { data, error } = await supabase
         .from("investment_universe")
-        .select("symbol")
+        .select("symbol,tier")
         .order("symbol");
       if (error) throw error;
-      return (data ?? []) as unknown as { symbol: string }[];
+      return (data ?? []) as unknown as { symbol: string; tier: string | null }[];
     },
   });
 }

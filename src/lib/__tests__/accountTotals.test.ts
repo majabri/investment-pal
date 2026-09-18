@@ -316,10 +316,15 @@ describe("the concepts every screen was computing for itself", () => {
     expect(t.leverage).toBeCloseTo(21, 4);
   });
 
-  test("margin utilisation is debt over gross — the figure the IPS cap uses", () => {
+  test("carries no margin-utilisation ratio of its own (ADR-APP-013 D2)", () => {
+    // Until 2026-09-18 this object carried debit ÷ gross, rendered nowhere,
+    // while the dashboard enforced debit ÷ net equity. The owner chose net
+    // equity; the ratio lives in `marginUtilisationOf` with its denominator
+    // named, and a third definition must not come back here unnoticed.
     const t = accountTotals(positions, balance);
-    // 20,000 / 10,500 — a breach, and the point is that it is ONE definition.
-    expect(t.marginUtilisation).toBeCloseTo(20_000 / 10_500, 6);
+    expect("marginUtilisation" in t).toBe(false);
+    // Negative control: the debit itself is still reported, as a figure.
+    expect(t.marginDebit).toBe(20_000);
   });
 
   test("every derived concept goes unknown when its inputs do", () => {
@@ -327,7 +332,6 @@ describe("the concepts every screen was computing for itself", () => {
     expect(t.liabilities).toBeNull();
     expect(t.availableWithoutBorrowing).toBeNull();
     expect(t.leverage).toBeNull();
-    expect(t.marginUtilisation).toBeNull();
     // ...and buying power is separately unknown, not inherited from the others.
     expect(t.availableCapital).toBeNull();
   });
