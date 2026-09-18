@@ -538,6 +538,30 @@ export type Database = {
           },
         ]
       }
+      event_consumers: {
+        Row: {
+          last_event_id: number
+          name: string
+          registered_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          last_event_id?: number
+          name: string
+          registered_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          last_event_id?: number
+          name?: string
+          registered_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       fills: {
         Row: {
           broker_ref: string | null
@@ -1727,6 +1751,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      advance_event_cursor: {
+        Args: { p_last_event_id: number; p_name: string }
+        Returns: number
+      }
       consume_provider_request_limit: {
         Args: { p_scope: string }
         Returns: {
@@ -1749,6 +1777,7 @@ export type Database = {
         Args: { p_account_id: string; p_alerts: Json }
         Returns: Json
       }
+      register_event_consumer: { Args: { p_name: string }; Returns: number }
     }
     Enums: {
       [_ in never]: never
