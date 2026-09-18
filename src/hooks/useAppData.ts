@@ -1,4 +1,5 @@
 // Central data hooks for the Investment Companion (all RLS-scoped to auth.uid()).
+import type { UniverseRowLike } from "@/lib/universeView";
 import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabaseClient";
@@ -1551,13 +1552,13 @@ export type IpsLite = {
 export function useUniverse() {
   return useQuery({
     queryKey: ["investment_universe"],
-    queryFn: async (): Promise<{ symbol: string; tier: string | null }[]> => {
+    queryFn: async (): Promise<UniverseRowLike[]> => {
       const { data, error } = await supabase
         .from("investment_universe")
-        .select("symbol,tier")
+        .select("symbol,tier,overall_conviction,last_scored_at,company_name")
         .order("symbol");
       if (error) throw error;
-      return (data ?? []) as unknown as { symbol: string; tier: string | null }[];
+      return (data ?? []) as unknown as UniverseRowLike[];
     },
   });
 }
