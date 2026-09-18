@@ -47,5 +47,5 @@ settle it: **don't infer.** File `../open-decisions/OD-xxx.md` and ask in chat.
 | ADR-APP-015 | Navigation information architecture | Proposed |
 | ADR-APP-016 | Fill to holding: a reconciliation view, never a projection | Accepted |
 | ADR-APP-017 | Who writes the investment universe | Accepted |
-| ADR-APP-018 | How `domain_events` are consumed | Proposed |
+| ADR-APP-018 | How `domain_events` are consumed | Accepted (2026-09-18: per-consumer cursor) |
 | ADR-APP-019 | Backfilling `decisions.account_id` on pre-scope rows | Accepted |

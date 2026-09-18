@@ -1,6 +1,6 @@
 # ADR-APP-018 — How `domain_events` are consumed
 
-- **Status:** Proposed <!-- for Amir to read; recommendation: option 2 -->
+- **Status:** Accepted 2026-09-18 — option 2, per-consumer cursor (Amir Jabri, in chat: "3 is cursor")
 - **Date:** 2026-09-18
 - **Deciders:** Amir Jabri
 - **Money-adjacent:** No — plumbing for follow-up work; no figure is produced.
@@ -52,3 +52,24 @@ moves onto it.
 - `consumed_at` is left in place, set by the dispatcher when every registered
   consumer has passed an event, so the activity panel's "consumed" reading
   keeps a meaning.
+
+## Decision (2026-09-18)
+
+Amir Jabri, in chat, with the three options and their consequences in front
+of him: **option 2, the per-consumer cursor** — *"3 is cursor"*.
+
+Executed the same day in `20260918210000_event_consumers.sql` (PR "Per-consumer
+cursors over domain_events"): `event_consumers (user_id, name, last_event_id)`
+with a SELECT-only policy; `register_event_consumer(name)` starts a new
+consumer at the owner's latest event; `advance_event_cursor(name, id)` never
+moves backwards or past an event that exists, then sets `consumed_at` on the
+events every registered consumer has passed (the minimum cursor). The client's
+direct `UPDATE (consumed_at)` is revoked: the function is the one writer. No
+consumer is registered by the migration. The first consumer — `GoalChanged` →
+the goal-derived caches — is wired in the app after Lovable applies the
+migration and regenerates the types.
+
+One refinement to the consequences above: a consumer that registers starts at
+the present and passes the history before it by declaration. A consumer that
+wants history (outcome measurement) is seeded at the cursor it wants by its
+own migration, not by replaying everything.
