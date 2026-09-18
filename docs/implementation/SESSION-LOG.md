@@ -3819,3 +3819,25 @@ owner could rewrite their own event's other columns. RLS still keeps it
 to their own rows. One query settles it:
 `SELECT grantee, privilege_type, column_name FROM information_schema.column_privileges WHERE table_name = 'domain_events'`.
 
+### State at the end of the session (2026-09-18, early)
+
+`main` at `147aea5` (the merge of #244); 1752 pass / 0 fail. Three PRs
+this stretch: #242 (docs), #243 (the daily close is a close), #244 (RLS
+exercised). The gap matrix artifact is at version 4 with both noted and
+an eighth item in its unverified register.
+
+**Open — Amir's:** as before (OD-001 Amendment 2; ADR-APP-009–015;
+OD-003; ORD-001 a/b; ADR-008; the universe writer;
+`decisions.account_id` backfill; §26.3 in the Drive blueprint; #221;
+pasting a balance block on Settings), plus the D-20 catalog query now
+also answering the `domain_events` column-privilege question.
+
+**Waiting on Lovable:** `20260917180000_alerts.sql` (#238). Then the
+alerts panel wiring.
+
+**Buildable next without a decision:** the import RPC's atomicity at the
+schema layer (§26.2 tests 6 and 7 — `import_account_positions` raising
+mid-loop leaves holdings unchanged; the same file twice changes nothing),
+which is the last "by reasoning" item in the matrix's risk list · a first
+`domain_events` consumer · the daily-close schedule (Supabase-side).
+
