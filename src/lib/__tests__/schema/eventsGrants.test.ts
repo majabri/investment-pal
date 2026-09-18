@@ -28,6 +28,10 @@ describe("the migration", () => {
   test("applies twice to the same state", async () => {
     const before = await tablePriv("authenticated", "domain_events", "INSERT");
     await db.exec(readFileSync(join(MIGRATIONS_DIR, MIGRATION), "utf8"));
+    // Forward only: re-applying this file alone would re-grant UPDATE
+    // (consumed_at), which 20260918210000 later revokes. The pair is what
+    // production holds, so the pair is what is applied twice.
+    await db.exec(readFileSync(join(MIGRATIONS_DIR, "20260918210000_event_consumers.sql"), "utf8"));
     expect(await tablePriv("authenticated", "domain_events", "INSERT")).toBe(before);
     expect(before).toBe(false);
   });
@@ -43,13 +47,12 @@ describe("the migration", () => {
 });
 
 describe("domain_events: the client reads its own rows and consumes them, nothing else", () => {
-  test("authenticated: SELECT yes; INSERT, DELETE, TRUNCATE no; UPDATE only on consumed_at", async () => {
+  test("authenticated: SELECT yes; INSERT, UPDATE, DELETE, TRUNCATE no — consumed_at moved behind advance_event_cursor() in 20260918210000", async () => {
     expect(await tablePriv("authenticated", "domain_events", "SELECT")).toBe(true);
-    for (const p of ["INSERT", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]) {
+    for (const p of ["INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]) {
       expect([p, await tablePriv("authenticated", "domain_events", p)]).toEqual([p, false]);
     }
-    expect(await columnPriv("authenticated", "domain_events", "consumed_at", "UPDATE")).toBe(true);
-    for (const c of ["event_type", "payload", "aggregate_id", "user_id", "occurred_at", "audit_id"]) {
+    for (const c of ["consumed_at", "event_type", "payload", "aggregate_id", "user_id", "occurred_at", "audit_id"]) {
       expect([c, await columnPriv("authenticated", "domain_events", c, "UPDATE")]).toEqual([c, false]);
     }
   });
@@ -83,7 +86,12 @@ describe("behaviour under the narrowed grants", () => {
     const acct = (await one<{ id: string }>(db, `INSERT INTO accounts (user_id, name) VALUES ('${A}', 'Acct') RETURNING id`)).id;
     await db.exec(`INSERT INTO holdings (user_id, account_id, symbol, quantity, cost_basis, current_price) VALUES ('${A}', '${acct}', 'SYMA', 1, 1, 1)`);
     const ev = await one<{ id: string }>(db, "SELECT id::text FROM domain_events WHERE event_type = 'HoldingsReconciled' ORDER BY id DESC LIMIT 1");
-    expect(await affected(db, `UPDATE domain_events SET consumed_at = now() WHERE id = ${ev.id}`)).toBe(1);
+    // The owner consumes through their cursor (eventConsumers.test.ts has the
+    // rules); the direct UPDATE is refused since 20260918210000.
+    expect(await affected(db, `UPDATE domain_events SET consumed_at = now() WHERE id = ${ev.id}`)).toBe("refused");
+    await db.exec("SELECT register_event_consumer('grants_probe')");
+    await db.exec(`SELECT advance_event_cursor('grants_probe', ${ev.id})`);
+    expect((await one<{ c: string | null }>(db, `SELECT consumed_at::text c FROM domain_events WHERE id = ${ev.id}`)).c).not.toBeNull();
     // The column the outbox must never let a client rewrite: refused outright, not "0 rows".
     expect(await affected(db, `UPDATE domain_events SET event_type = 'AlertRaised' WHERE id = ${ev.id}`)).toBe("refused");
     expect(await affected(db, `INSERT INTO domain_events (user_id, event_type, aggregate_type, aggregate_id) VALUES ('${A}', 'GoalChanged', 'goals', '${acct}')`)).toBe("refused");

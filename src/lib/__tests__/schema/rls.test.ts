@@ -82,6 +82,9 @@ async function seed(u: string, tag: string): Promise<Record<string, string>> {
   await db.exec(`INSERT INTO security_aliases (user_id, security_id, alias, alias_kind, source) VALUES ('${u}', '${id.sec}', 'ALIAS${tag}', 'ticker', 'user_entry')`);
   id.strat = (await one<{ id: string }>(db, `INSERT INTO strategies (user_id, name) VALUES ('${u}', 'Strategy ${tag}') RETURNING id`)).id;
   await db.exec(`INSERT INTO strategy_symbols (user_id, strategy_id, symbol, bucket) VALUES ('${u}', '${id.strat}', 'SYM${tag}', 'core')`);
+  // Written only through its RPC (20260918210000): the seed proves the client
+  // role can register, and the row lands under the caller.
+  await db.exec(`SELECT register_event_consumer('seed_${tag.toLowerCase()}')`);
   // No client policy exists for this one; only the superuser (standing in for
   // service_role's SECURITY DEFINER function) can write it.
   await actAsAdmin(db);
@@ -238,15 +241,28 @@ describe("3. the specific rules", () => {
     expect(await count(`audit_log WHERE user_id = '${A}'`)).toBe(0);
   });
 
-  test("domain_events: the owner can consume their own event; nobody else can", async () => {
+  test("domain_events: consumed only through the owner's own cursor; never directly, never by anyone else", async () => {
     await actAsAdmin(db);
-    const ev = await one<{ id: string }>(db, `SELECT id::text FROM domain_events WHERE user_id = '${A}' AND consumed_at IS NULL ORDER BY id LIMIT 1`);
+    const ev = await one<{ id: string }>(db, `SELECT id::text FROM domain_events WHERE user_id = '${A}' AND consumed_at IS NULL ORDER BY id DESC LIMIT 1`);
+    // Since 20260918210000 the client role has no UPDATE on the outbox at all:
+    // the direct consume path is refused, for the owner as much as for B.
     await actAs(db, "authenticated", B);
-    expect(await affected(db, `UPDATE domain_events SET consumed_at = now() WHERE id = ${ev.id}`)).toBe(0);
+    expect(none(await affected(db, `UPDATE domain_events SET consumed_at = now() WHERE id = ${ev.id}`))).toBe(0);
     await actAs(db, "authenticated", A);
-    expect(await affected(db, `UPDATE domain_events SET consumed_at = now() WHERE id = ${ev.id}`)).toBe(1);
+    expect(await affected(db, `UPDATE domain_events SET consumed_at = now() WHERE id = ${ev.id}`)).toBe("refused");
     // Events are raised by the trigger, never by the client directly.
     expect(await affected(db, `INSERT INTO domain_events (user_id, event_type, aggregate_type, aggregate_id) VALUES ('${A}', 'GoalChanged', 'goals', '${ids.g}')`)).toBe("refused");
+    // B advancing B's own cursor, even to A's event id, touches none of A's
+    // events: the function scopes to auth.uid(), and B's seed has events of
+    // its own with higher ids, so the call is a valid advance of B's cursor.
+    await actAs(db, "authenticated", B);
+    await db.exec(`SELECT advance_event_cursor('seed_b', ${ev.id})`);
+    await actAsAdmin(db);
+    expect((await one<{ c: string | null }>(db, `SELECT consumed_at::text c FROM domain_events WHERE id = ${ev.id}`)).c).toBeNull();
+    // A's seeded consumer registered at the present, so A's own advance to its
+    // latest event marks it consumed. The RPC is the one path that does.
+    await actAs(db, "authenticated", A);
+    await db.exec(`SELECT advance_event_cursor('seed_a', ${ev.id})`);
     await actAsAdmin(db);
     expect((await one<{ c: string | null }>(db, `SELECT consumed_at::text c FROM domain_events WHERE id = ${ev.id}`)).c).not.toBeNull();
   });
