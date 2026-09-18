@@ -3683,3 +3683,55 @@ acknowledgement cleared / resolved, in one invoker call under RLS);
 injections reddened. 1676 → 1686. **Not applied until Lovable runs it**
 (paste-ready line in the #238 body); the dashboard wiring is the PR after
 that, the #233 → #236 sequence again.
+
+## Session — 2026-09-18 — resumed: the decision link, the event record on screen, the matrix annotated (#240, #241)
+
+State on resume: `main` at `cf6c5b9`, the alerts migration (#238) **not
+yet applied** — `types.ts` carries no `alerts` table, so the panel wiring
+waits. #221 (Dependabot, React 19.3) rebased itself after yesterday's
+merges and is red for the same reason (`react-dom` not bumped). Nothing
+else open.
+
+### #240 — a tranche can name the decision that opened it (§A.3, §12.2)
+
+#230 had left `decision_id` explicitly null. `TrancheDraft.decisionId`
+(null = none named — a real answer for a tranche recorded from a
+statement); `trancheInsert` writes what the holder named and never
+guesses from the symbol; `useDecisionOptions` (fifty most recent, across
+accounts — a portfolio-level decision has no account); `tranchesView`
+gains `decisionOptionLabel` (no symbol invented for a portfolio-level
+decision) and `rankDecisionOptions` (typed symbol first, newest first,
+nothing dropped); the form shows the ranked list and says when decisions
+could not be read. 1686 → 1691. Four injections reddened (the commit
+message says 2 for the last; the run showed 1).
+
+### #241 — the event record on screen (§19.1, §24, SYS-004)
+
+The first reader of `domain_events` and `audit_log`. `lib/activityView.ts`:
+the fourteen names pinned to the migration's CHECK; `readActivity` keeps
+the known and counts the unknown; one sentence per event from the audit
+row that raised it (a quantity change names both figures; null fees say
+"fees not known"; a pruned audit row is said, not guessed around);
+newest first; an empty state that says the record is new, not that
+nothing happened. `useActivity` embeds the audit slice over
+`domain_events_audit_id_fkey`. `ActivityPanel` on `/settings` beside the
+syncs. Consumes nothing (`consumed_at` untouched). 1691 → 1706.
+
+Two things went sideways and were handled: GitHub never started CI on
+the PR's push (no workflow run at all for the branch), so `ci.yml` was
+dispatched by hand on the branch and passed; and the PR conflicted with
+#240 on one import line in `useAppData.ts` — `main` merged in, both
+imports kept, gate re-run.
+
+### The gap matrix, version 3
+
+The artifact gained a "landed since" note under the method section and
+a per-item note on every Phase 0 and Phase 1 item that has moved, with
+the PR numbers and the two corrections to its own record
+(`goal_version_id` was already stamped; `decisions` already carries the
+three outcome horizons). The 104 rows are as written on 2026-09-16; the
+phase lists carry the state.
+
+### Waiting on Lovable
+
+`20260917180000_alerts.sql` (#238). Then the alerts panel wiring.
