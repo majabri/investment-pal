@@ -210,7 +210,7 @@ describe("no approved universe is compiled into the source", () => {
       expect(words.length).toBeGreaterThan(3);
       for (const w of words) {
         expect(
-          ["BUY", "SELL", "HOLD", "REDUCE", "ADD", "REBALANCE", "ROTATE", "WAIT", "ESCALATE", "TRIM", "WATCH"],
+          ["BUY", "SELL", "HOLD", "REDUCE", "ADD", "REBALANCE", "ROTATE", "WAIT", "ESCALATE", "TRIM", "WATCH", "CANCEL", "REPLACE"],
         ).toContain(w);
       }
     }

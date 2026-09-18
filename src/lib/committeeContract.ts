@@ -29,8 +29,24 @@ const text = (max: number) => z.string().trim().min(1).max(max);
 
 /** One recommendation as the committee states it. */
 export const structuredDecisionSchema = z.object({
-  /** The contract's verb, or the committee's own if it insists — flagged downstream. */
-  action: z.string().trim().toUpperCase().min(1).max(20),
+  /** One of the seven contract verbs (ADR-APP-008 Am. 1). Anything else is
+   *  refused by name: the model was given the list, and a row that says
+   *  REDUCE or ROTATE would be written under a word the contract no longer
+   *  has. Stored history is a different matter and is left as written. */
+  action: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .min(1)
+    .max(20)
+    .superRefine((v, ctx) => {
+      if (!(RECOMMENDATION_ACTIONS as readonly string[]).includes(v)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `"${v}" is not one of the contract's verbs (${RECOMMENDATION_ACTIONS.join(", ")})`,
+        });
+      }
+    }),
   /** Ticker, or null for a portfolio-level action (margin, rotation, no action). */
   symbol: z
     .string()
@@ -67,7 +83,7 @@ export type CommitteeOutput = z.infer<typeof committeeOutputSchema>;
 export const EXTRACTION_INSTRUCTION = [
   "Now restate the committee's FINAL CIO ACTION SHEET as JSON and nothing else — no prose, no code fences.",
   "Schema: {\"decisions\": [{\"action\", \"symbol\", \"recommendation\", \"confidence\", \"evidence\", \"counterargument\", \"key_risks\", \"invalidation_conditions\"}], \"cio_summary\"}.",
-  `"action" must be one of: ${RECOMMENDATION_ACTIONS.join(", ")}. Map TRIM to REDUCE, BUY MORE to ADD, WATCH to WAIT.`,
+  `"action" must be one of: ${RECOMMENDATION_ACTIONS.join(", ")}. A partial sale is TRIM (never REDUCE); adding to a position is BUY (never ADD); watch is WAIT; a rotation is one SELL row and one BUY row; CANCEL and REPLACE act on a working order and must name it in "recommendation".`,
   "\"symbol\" is the ticker, or null for a portfolio-level action such as margin or cash.",
   "\"confidence\" is a number from 0 to 1, or null if you did not state one. Do not invent one.",
   "\"evidence\", \"key_risks\" and \"invalidation_conditions\" are arrays of short strings drawn from the review above. \"counterargument\" is the strongest case against, or null.",

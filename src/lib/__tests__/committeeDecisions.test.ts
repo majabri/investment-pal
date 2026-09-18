@@ -40,7 +40,7 @@ const BLOCKED: GateVerdict = { state: "BLOCKED", blocking: [check("positions", "
 const ERROR: GateVerdict = { state: "ERROR", blocking: [], degrading: [] };
 
 const d = (over: Partial<StructuredDecision> = {}): StructuredDecision => ({
-  action: "REDUCE",
+  action: "TRIM",
   symbol: "AAA",
   recommendation: "Trim a quarter.",
   confidence: 0.7,
@@ -122,7 +122,7 @@ describe("decisionInsert", () => {
     expect(row.decision).toBe("pending");
     expect(row.review_type).toBe("morning_review");
     expect(row.symbol).toBe("AAA");
-    expect(row.action).toBe("REDUCE");
+    expect(row.action).toBe("TRIM");
     expect(row.goal_version_id).toBe("gv-1");
     expect(row.ips_version).toBe(ipsVersionOf(ips));
     expect(row.model_version).toBe("gpt-4o-2026-01-01");
