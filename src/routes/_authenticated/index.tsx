@@ -1,3 +1,4 @@
+import { fillSummary } from "@/lib/ordersView";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { RefreshCw, Sparkles, Plus } from "lucide-react";
@@ -41,7 +42,7 @@ import { CommandCenterStrip } from "@/components/app/dashboard/CommandCenterStri
 import { AlertsPanel } from "@/components/app/AlertsPanel";
 import { AlertRecorder } from "@/components/app/AlertRecorder";
 import { useAcknowledgeAlert, useStoredAlerts } from "@/hooks/useAlertRecord";
-import { raiseAlerts } from "@/lib/alerts";
+import { raiseAlerts, countFillMismatches, type FillMismatchCount } from "@/lib/alerts";
 import type { AlertInput } from "@/lib/alerts";
 import { useReconciliation } from "@/hooks/useReconciliation";
 import { GoalOutlookPanel } from "@/components/app/dashboard/GoalOutlookPanel";
@@ -60,8 +61,7 @@ import {
   usePriorities,
   useRecommendedActions,
   useLogSync,
-  useIpsLite,
-} from "@/hooks/useAppData";
+  useIpsLite, useOrders, useFills } from "@/hooks/useAppData";
 import {
   requiredCAGRWithContrib,
   yearsBetween,
@@ -119,6 +119,18 @@ function Dashboard() {
   // `accounts.cash_flows_as_of`, which recording a flow deliberately does not
   // set — a partial history produces rows too.
   const { data: cashFlows } = useCashFlows(scope);
+  // §12.3: the ledger for the scoped account, so the alert set can say when
+  // recorded fills disagree with an order's own filled quantity.
+  const scopedAccountId = scope.kind === "account" ? scope.accountId : null;
+  const { data: scopedOrders = [], isLoading: ordersLoading } = useOrders(scopedAccountId);
+  const orderIds = useMemo(() => scopedOrders.map((o) => o.id), [scopedOrders]);
+  const { data: fillRead, isLoading: fillsLoading, isError: fillsError } = useFills(orderIds);
+  const fillMismatches = useMemo<FillMismatchCount | null>(() => {
+    if (scopedAccountId === null || ordersLoading) return null;
+    if (orderIds.length === 0) return { orders: 0, over: 0, under: 0, unknown: 0 };
+    if (fillsLoading || fillsError || !fillRead) return null;
+    return countFillMismatches(scopedOrders.map((o) => fillSummary(fillRead.byOrder.get(o.id) ?? [], o)));
+  }, [scopedAccountId, ordersLoading, orderIds.length, fillsLoading, fillsError, fillRead, scopedOrders]);
   const { data: unscopedCount = 0 } = useUnscopedSnapshotCount();
   const series = useMemo(() => balanceSeries(snapshots), [snapshots]);
   const { data: priorities = [], dismiss: dismissPriority } = usePriorities();
@@ -301,6 +313,7 @@ function Dashboard() {
     goalProbability: goalMetrics?.prob ?? null,
     upcomingEvents: alerts.map((a) => ({ date: a.date, text: a.text })),
     reconciliation: reconciliation.result?.status ?? null,
+    fillMismatches,
   };
   const liveAlerts = raiseAlerts(alertInput);
   // Every input to `alertInput` has finished loading. Until then the set is
@@ -311,7 +324,9 @@ function Dashboard() {
     !ipsLoading &&
     !econLoading &&
     !earningsLoading &&
-    !reconciliation.isLoading;
+    !reconciliation.isLoading &&
+    !ordersLoading &&
+    !(orderIds.length > 0 && fillsLoading);
 
   return (
     <AppShell

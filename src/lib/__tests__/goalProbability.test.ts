@@ -16,6 +16,7 @@ const quiet: AlertInput = {
   positionsStaleDays: 0,
   valuationUnknown: false,
   reconciliation: null,
+  fillMismatches: null,
   goalProbability: null,
   upcomingEvents: [],
 };

@@ -14,6 +14,7 @@ import {
   UNBUILT_ALERT_TYPES,
   alertCounts,
   raiseAlerts,
+  countFillMismatches,
 } from "@/lib/alerts";
 import type { AlertInput } from "@/lib/alerts";
 import { SOURCES } from "@/lib/sourceHealth";
@@ -24,6 +25,7 @@ const quiet: AlertInput = {
   positionsStaleDays: 0,
   valuationUnknown: false,
   reconciliation: null,
+  fillMismatches: null,
   goalProbability: 0.8,
   upcomingEvents: [],
 };
@@ -213,11 +215,69 @@ describe("the unbuilt types are declared, not omitted", () => {
       positionsStaleDays: null,
       valuationUnknown: true,
       reconciliation: "NOT_RECONCILED",
+      fillMismatches: null,
       goalProbability: 0.1,
       upcomingEvents: [{ date: "2026-09-12", text: "NVDA earnings" }],
     });
     for (const a of everything) {
       expect(UNBUILT_ALERT_TYPES[a.type]).toBeUndefined();
     }
+  });
+});
+
+describe("recorded fills against the orders' claims (§12.3)", () => {
+  const none = { orders: 3, over: 0, under: 0, unknown: 0 };
+
+  test("NULL is not evaluated: nothing is raised, and nothing is claimed", () => {
+    expect(raiseAlerts({ ...quiet, fillMismatches: null })).toEqual([]);
+  });
+
+  test("NEGATIVE CONTROL: every recorded order matching raises nothing", () => {
+    expect(raiseAlerts({ ...quiet, fillMismatches: none })).toEqual([]);
+  });
+
+  test("fills short of the order's claim: a warning naming the count", () => {
+    const [a] = raiseAlerts({ ...quiet, fillMismatches: { ...none, under: 2 } });
+    expect(a).toMatchObject({ type: "reconciliation_needed", severity: "warning", href: "/portfolio" });
+    expect(a!.message).toContain("2 orders'");
+    expect(a!.message).toContain("2 fall short");
+  });
+
+  test("fills EXCEEDING the order's claim is critical — the double-import signature", () => {
+    const [a] = raiseAlerts({ ...quiet, fillMismatches: { ...none, over: 1, under: 1 } });
+    expect(a!.severity).toBe("critical");
+    expect(a!.message).toContain("1 exceed it");
+    expect(a!.message).toContain("1 fall short");
+  });
+
+  test("could not be compared is said, as info — not silence", () => {
+    const [a] = raiseAlerts({ ...quiet, fillMismatches: { ...none, unknown: 1 } });
+    expect(a).toMatchObject({ type: "reconciliation_needed", severity: "info" });
+    expect(a!.message).toContain("could not be compared");
+  });
+
+  test("a mismatch outranks an unknown: one alert, the mismatch", () => {
+    const out = raiseAlerts({ ...quiet, fillMismatches: { ...none, under: 1, unknown: 2 } });
+    expect(out).toHaveLength(1);
+    expect(out[0]!.severity).toBe("warning");
+  });
+});
+
+describe("countFillMismatches", () => {
+  test("orders with no fills recorded are not mismatches and not counted", () => {
+    expect(countFillMismatches([{ state: "not_recorded" }, { state: "not_recorded" }])).toEqual({ orders: 0, over: 0, under: 0, unknown: 0 });
+  });
+
+  test("counts each recorded order once, by what its fills say", () => {
+    expect(
+      countFillMismatches([
+        { state: "recorded", reconciliation: "matched" },
+        { state: "recorded", reconciliation: "over" },
+        { state: "recorded", reconciliation: "under" },
+        { state: "recorded", reconciliation: "under" },
+        { state: "recorded", reconciliation: "unknown" },
+        { state: "not_recorded" },
+      ]),
+    ).toEqual({ orders: 5, over: 1, under: 2, unknown: 1 });
   });
 });
