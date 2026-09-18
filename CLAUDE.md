@@ -111,6 +111,10 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 - Quotes (#231): `quoteProvenance.ts` — §B.2 shape, freshness against the
   market clock; the brief's `quoteProvenanceLine`; the refresh button writes
   the quote's own time to `last_price_at`.
+- Daily closes (#243): `dailyClose.ts` — a quote is a close only outside
+  the regular session, dated by the exchange's calendar (`exchangeTimezone`
+  on the quote); skips carry reasons; `closeCoverage` shows gaps as gaps.
+  `PriceHistoryRecorder` writes only what it returns. Still client-triggered.
 - **Schema tests (#233):** `src/lib/__tests__/schema/replay.ts` replays every
   migration into PGlite (Postgres in WebAssembly, devDependency) with
   `auth.uid()` and the roles stubbed; `eventsAudit.test.ts` is the model for
@@ -206,4 +210,5 @@ tables).
 in its body). **Then buildable:** the alerts panel wired to `raise_alerts`
 and `acknowledged_at` (fingerprint = type + message with figures blanked;
 acknowledged alerts shown as acknowledged, never hidden) · a first
-`domain_events` consumer · the daily-close job (Supabase-side).
+`domain_events` consumer · the daily-close job (Supabase-side; the
+recorder writes only true closes since #243, the schedule is what is missing).

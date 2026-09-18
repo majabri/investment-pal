@@ -3735,3 +3735,42 @@ phase lists carry the state.
 ### Waiting on Lovable
 
 `20260917180000_alerts.sql` (#238). Then the alerts panel wiring.
+
+### #242 — session log for #240/#241; CLAUDE.md state at `5a18f6d`
+
+Docs only. Merged on green as `71cd761`.
+
+### #243 — the daily close is a close (OBS-001, §B.2, DATA-002)
+
+`PriceHistoryRecorder` had written whatever the live quote said whenever
+`/portfolio` was open, stamped with the USER'S calendar date: a 10:15
+print filed as the day's close, a Friday close seen on Sunday filed as
+Sunday's — and a row that looks exactly like a real close. `lib/dailyClose.ts`
+now decides: a quote is a close only when its session at retrieval is
+`pre`/`post`/`closed` (the provider's `regularMarketPrice` is then the
+last regular close and `regularMarketTime` when that session ended), and
+the row's date is the EXCHANGE'S calendar date of the quote's own time.
+For that the quote carries one more piece of provenance,
+`exchangeTimezone` (Yahoo's `exchangeTimezoneName`, validated by
+`exchangeZoneOf`; null, never a default). Every other quote is skipped
+with a reason — `intraday`, `session_unknown`, `no_as_of`,
+`no_exchange_zone`, `no_price` — and the skips are counted, not dropped.
+
+The recorder dedupes on `symbol@date` (a new trading day is a new write;
+a changed price on the same day refreshes the row via the existing upsert)
+and invalidates the swing-score read after writing. `/portfolio` gains one
+line under the quote provenance: how far the stored closes reach per held
+symbol (`closeCoverage`: current / behind with the oldest last close /
+no history / undetermined while no close is quoted), and when nothing is
+being recorded, why. A missed day is said to be missing; nothing carries
+the previous close forward.
+
+Four fault injections reddened (intraday accepted as a close: 5 tests;
+UTC date for the exchange date: 1; behind counted as current: 3; dedupe
+key without the date: 1). 1706 → **1736**.
+
+**Still open under OBS-001:** the recorder is client-triggered — a day
+nobody opens the page is a gap, now visible. The scheduled server job
+(§27.1; Supabase cron or an edge function calling the same rule) is a
+separate decision and needs the Supabase side, which this session cannot
+reach.

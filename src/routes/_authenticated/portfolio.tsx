@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Plus, Save, Trash2, Wallet, RefreshCw } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
@@ -55,6 +55,7 @@ import { ConcentrationBreakdown } from "@/components/app/ConcentrationBreakdown"
 import { CashFlowPanel } from "@/components/app/CashFlowPanel";
 import { RefreshPricesButton } from "@/components/app/RefreshPricesButton";
 import { PriceHistoryRecorder } from "@/components/app/PriceHistoryRecorder";
+import { closeCoverage, closeNotice as dailyCloseNotice, dailyCloseRows, expectedCloseDate } from "@/lib/dailyClose";
 import { SwingScoreBadge } from "@/components/app/SwingScoreBadge";
 import { ThesisDialog } from "@/components/app/ThesisDialog";
 import { MarginCard } from "@/components/app/MarginCard";
@@ -125,6 +126,10 @@ function PortfolioPage() {
     refetchInterval: 60 * 1000, // live: every 60s
   });
   const quoteNotice = quoteBanner(liveQuotes);
+  // OBS-001: which of the live quotes are closes (session ended, exchange
+  // date) and how far the stored daily closes reach. The recorder below
+  // writes the same batch; this is the reader's view of it.
+  const closeBatch = useMemo(() => dailyCloseRows(liveQuotes), [liveQuotes]);
 
   // Swing Score (ADR-APP-002): advisory trim signal from price_history + earnings.
   const swingSymbols = holdings.map((h) => h.symbol);
@@ -166,6 +171,16 @@ function PortfolioPage() {
     }
     return out;
   }, [swingHistory, swingEarnings, swingSymbolKey]);
+  // Pure and cheap (one pass over the stored closes); recomputed per render.
+  const closeNotice = dailyCloseNotice(
+    closeCoverage(swingHistory, swingSymbols, expectedCloseDate(closeBatch)),
+    closeBatch,
+  );
+  // After the recorder writes, the closes just written should be what the
+  // notice and the swing score read — not the pre-write fetch.
+  const onClosesRecorded = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: ["price-history-swing", swingSymbolKey] });
+  }, [qc, swingSymbolKey]);
   const swingFor = (sym: string): SwingResult =>
     swing.get(sym) ?? { insufficient: true, band: "none", suggestion: null };
 
@@ -259,7 +274,7 @@ function PortfolioPage() {
           arithmetic; this says whether the broker agrees with it. */}
       <ReconciliationPanel totals={totals} />
       {/* Invisible: records one daily close per held symbol into price_history. */}
-      <PriceHistoryRecorder quotes={liveQuotes} />
+      <PriceHistoryRecorder quotes={liveQuotes} onRecorded={onClosesRecorded} />
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard
           label="Gross — investments"
@@ -350,6 +365,10 @@ function PortfolioPage() {
               which session, and how many are not current. The "as of" above
               is when the app ASKED; this is what the provider SAID. */}
           {quoteNotice && <p className="mb-3 text-xs text-muted-foreground">{quoteNotice}</p>}
+          {/* OBS-001: how far the stored daily closes reach, and why nothing is
+              being recorded right now when that is the case. A missing day is
+              said to be missing, never filled from the day before. */}
+          {closeNotice && <p className="mb-3 text-xs text-muted-foreground">{closeNotice}</p>}
           {tranchesShort && (
             // Rows exist that could not be classified. The per-row captions
             // below are therefore understated, and saying so beats a silently

@@ -4,6 +4,7 @@
 
 import {
   isoFromUnixSeconds,
+  exchangeZoneOf,
   sessionOf,
   tradingPeriodsOf,
   type ProvenancedQuote,
@@ -64,6 +65,7 @@ async function quote(symbol: string): Promise<Quote | null> {
       // Yahoo's chart endpoint does not state its delay. NULL, not 0: zero
       // would claim real-time, which a free tier does not promise.
       delaySeconds: null,
+      exchangeTimezone: exchangeZoneOf(meta?.exchangeTimezoneName),
     };
   } catch {
     return null;
