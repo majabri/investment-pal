@@ -1,5 +1,5 @@
 // Prompt templates for ChatGPT morning + end-of-day reviews.
-import { fmtPct, fmtProbability, fmtUSD } from "./finance";
+import { PROBABILITY_BASIS, fmtPct, fmtProbability, fmtUSD } from "./finance";
 import { labelledPct, weightOf } from "./concentration";
 import type { Denominators } from "./concentration";
 import { marginRatePromptLine, MARGIN_POLICY_UNSET, type MarginPolicy } from "./marginCost";
@@ -208,8 +208,11 @@ function objectiveLine(ctx: PromptContext): string {
   const o = ctx.objective as Extract<Objective, { kind: "set" }>;
   // A set objective whose probability the model could not compute is still a
   // set objective; the probability alone is unknown, and is said to be.
+  // OD-004: the probability says what it is a probability of, every time.
   const probability =
-    ctx.probability === null ? "not computable (no current value to project from)" : fmtProbability(ctx.probability);
+    ctx.probability === null
+      ? "not computable (no current value to project from)"
+      : `${fmtProbability(ctx.probability)} (${PROBABILITY_BASIS.replace(/\.$/, "").toLowerCase()})`;
   return `${fmtUSD(o.targetValue)} by ${o.targetDate} | Required CAGR: ${fmtPct(ctx.requiredCagr)} | Model probability: ${probability}`;
 }
 
