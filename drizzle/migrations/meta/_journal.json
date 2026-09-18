@@ -15,6 +15,13 @@
       "when": 1789744597362,
       "tag": "0001_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789749927775,
+      "tag": "0002_events_audit_grants",
+      "breakpoints": true
     }
   ]
 }
