@@ -238,7 +238,8 @@ the universe writer; `decisions.account_id` backfill; replacing §26.3 in
 the Drive blueprint; pasting a balance block on Settings so the
 reconciliation can run; 86 merged remote branches the git proxy will not
 let Claude Code delete; the D-20 catalog query for the three new tables (the `domain_events`
-privilege question is answered and fixed: #250, applied 2026-09-18).
+privilege question is answered, fixed and **confirmed in production**:
+#250, applied 2026-09-18, ACL re-read the same day).
 
 **Lovable applied `20260917180000_alerts.sql` on 2026-09-18** (verified
 against git; it also widened `isIncomingRequestAbort` in `error-capture.ts`,
