@@ -40,7 +40,7 @@ import { useRecordCommitteeDecisions } from "@/hooks/useCommittee";
 import { gateState } from "@/lib/readinessGate";
 import { ipsVersionOf } from "@/lib/committeeDecisions";
 import { PROMPT_VERSION, type CommitteeOutput } from "@/lib/committeeContract";
-import { objectiveOf } from "@/lib/objective";
+import { goalSourceSentence, governingGoal } from "@/lib/governingGoal";
 import { accountTotals } from "@/lib/accountTotals";
 import { coverageOf } from "@/lib/coverage";
 import { useReadiness } from "@/hooks/useReadiness";
@@ -210,7 +210,9 @@ function PromptCenter() {
     // An unset objective produces no required CAGR and no probability. These
     // used to fall back to 0, which reads as "no growth required" and "no
     // chance of success" — two confident claims made from missing data.
-    const objective = objectiveOf(goal);
+    // GOAL-001: the latest valid recorded version governs the brief, not the screen.
+    const governing = governingGoal(goalOnScreen(goal ?? null), goalHistory);
+    const objective = governing.objective;
     const years =
       objective.kind === "set"
         ? Math.max(yearsBetween(new Date(), new Date(objective.targetDate)), 0.01)
@@ -263,7 +265,7 @@ function PromptCenter() {
       // GOAL-001: whether the goal the brief reads is the goal the decision
       // will cite. The stamp below carries `goalVersionId`; this line tells
       // the model when the row behind that id and the goal above disagree.
-      goalVersionLine: goalVersionLine(goalAgreement(goalOnScreen(goal ?? null), goalHistory)),
+      goalVersionLine: `${goalVersionLine(goalAgreement(goalOnScreen(goal ?? null), goalHistory))} ${goalSourceSentence(governing)}`,
       ipsPositionCapPct: ipsLite.position_cap_pct,
       ipsPositionCapHard: ipsLite.position_cap_hard,
       ipsMarginCapPct: ipsLite.margin_cap_pct,

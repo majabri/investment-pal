@@ -50,6 +50,15 @@ describe("GoalOutlookPanel", () => {
     expect(text).toContain("1.55 yrs");
   });
 
+  test("says what the figures are computed from (GOAL-001), and nothing when not told", () => {
+    const { container } = render(
+      <GoalOutlookPanel goalName="Growth Brokerage" metrics={metrics} sourceNote="Figures use the goal version recorded 2026-09-01, not the screen." />,
+    );
+    expect(container.textContent).toContain("recorded 2026-09-01");
+    const bare = render(<GoalOutlookPanel goalName="Growth Brokerage" metrics={metrics} />);
+    expect(bare.container.textContent).not.toContain("recorded");
+  });
+
   test("the probability says what it is a probability of (OD-004: current value only)", () => {
     const { container } = render(
       <GoalOutlookPanel goalName="Growth Brokerage" metrics={metrics} />,
