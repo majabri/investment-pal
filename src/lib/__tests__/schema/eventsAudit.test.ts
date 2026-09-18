@@ -6,7 +6,7 @@ import type { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { MIGRATIONS_DIR, TEST_USER as U, one, refused, replayMigrations, signIn } from "./replay";
+import { MIGRATIONS_DIR, TEST_USER as U, actAs, actAsAdmin, affected, one, refused, replayMigrations, signIn } from "./replay";
 
 const MIGRATION = "20260917150000_events_audit_imports_orders.sql";
 
@@ -160,7 +160,18 @@ describe("the contracts are enforced by the schema, not by the app", () => {
   });
 
   test("audit rows cannot be written by the client role — only read", async () => {
-    const grants = (await db.query<{ privilege_type: string }>("SELECT privilege_type FROM information_schema.role_table_grants WHERE table_name = 'audit_log' AND grantee = 'authenticated'")).rows.map((r) => r.privilege_type);
-    expect(grants).toEqual(["SELECT"]);
+    // Behaviour, not the grant list: under Supabase's default privileges the
+    // client role holds ALL on every public table, so what stops a write here
+    // is that audit_log has a SELECT policy and no other (replay.ts explains).
+    await actAs(db, "authenticated", U);
+    const before = Number((await one<{ n: string }>(db, "SELECT count(*)::text n FROM audit_log")).n);
+    expect(before).toBeGreaterThan(0); // the trigger's rows are readable by their owner
+    expect(await affected(db, `INSERT INTO audit_log (user_id, table_name, row_id, op, new_row) VALUES ('${U}', 'holdings', gen_random_uuid(), 'INSERT', '{}'::jsonb)`)).toBe("refused");
+    expect(await affected(db, "UPDATE audit_log SET op = op")).toBe(0);
+    expect(await affected(db, "DELETE FROM audit_log")).toBe(0);
+    await actAsAdmin(db);
+    const after = Number((await one<{ n: string }>(db, "SELECT count(*)::text n FROM audit_log")).n);
+    expect(after).toBe(before);
+    await signIn(db);
   });
 });

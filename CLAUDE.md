@@ -115,12 +115,15 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
   the regular session, dated by the exchange's calendar (`exchangeTimezone`
   on the quote); skips carry reasons; `closeCoverage` shows gaps as gaps.
   `PriceHistoryRecorder` writes only what it returns. Still client-triggered.
-- **Schema tests (#233):** `src/lib/__tests__/schema/replay.ts` replays every
+- **Schema tests (#233, #244):** `src/lib/__tests__/schema/replay.ts` replays every
   migration into PGlite (Postgres in WebAssembly, devDependency) with
-  `auth.uid()` and the roles stubbed; `eventsAudit.test.ts` is the model for
-  testing a migration before Lovable applies it. Lovable's five duplicate
+  `auth.uid()`, the roles and Supabase's default privileges stubbed;
+  `eventsAudit.test.ts` is the model for testing a migration before Lovable
+  applies it; `rls.test.ts` has a second user try every table under
+  `actAs("authenticated", …)` — the superuser bypasses RLS, so a schema test
+  that never switches role proves nothing about it. Lovable's five duplicate
   files are not idempotent and are pinned by name there. **Write the schema
-  test in the same PR as the migration from now on.**
+  test (including the RLS sweep's seed row) in the same PR as the migration.**
 - Events and audit (#233, applied by Lovable 2026-09-17): `domain_events`
   (fourteen §19.1 names, outbox; read by `activityView.ts` / `ActivityPanel`
   since #241; no consumer yet), `audit_log`, one trigger

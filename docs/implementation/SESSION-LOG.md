@@ -3774,3 +3774,48 @@ nobody opens the page is a gap, now visible. The scheduled server job
 (§27.1; Supabase cron or an edge function calling the same rule) is a
 separate decision and needs the Supabase side, which this session cannot
 reach.
+
+### #244 — row-level security, exercised (§26.1, §27.2; the matrix's "proven by reasoning" risk)
+
+The matrix's highest-leverage test item: RLS on every table had been
+verified by reading the policy text. `schema/rls.test.ts` now has a second
+user try. `replay.ts` gains `actAs(role, userId)` — the Postgres role
+PostgREST would map a JWT to plus the `sub` claim — and `actAsAdmin`;
+until now every schema test ran as the superuser, whom RLS does not bind.
+The harness also models Supabase's ambient privileges (ALL on every new
+`public` table, sequence and function to `anon`/`authenticated`/
+`service_role` by default privileges), so a GRANT in a migration narrows
+nothing here either and a test cannot pass because a grant was missing.
+That turned #233's "audit rows cannot be written by the client role"
+from a grant-list assertion into a behavioural one.
+
+Three layers. **Catalog:** every public table has RLS on; every table but
+`server_request_limits` (deny-all by design, written only through a
+SECURITY DEFINER function) has a policy; every policy names `auth.uid()`,
+none is `true`, and every policy that admits a write constrains the new
+row. **Sweep**, generic over the catalog: both users own rows in all
+thirty-one tables (asserted, so the sweep is not vacuous), each sees
+exactly their own, the other user reads/updates/deletes zero of them
+(counts unchanged afterwards), the anonymous role sees none. **Specific:**
+WITH CHECK refuses a row planted under another user's id; ownership
+cannot be reassigned by UPDATE; `goal_versions` is append-only (update and
+delete touch nothing, the value stands); `audit_log` is read-only for its
+owner and invisible to others; an event is consumable by its owner alone
+and never inserted by the client; a balance cannot be filed against
+another user's account even under one's own id; `raise_alerts` as the
+other user plants nothing; the SECURITY DEFINER trigger files its rows
+under the row's owner.
+
+Four fault injections reddened, each restored and confirmed by `git
+status`: the holdings policy set to `USING (true)` (7 tests); RLS
+disabled on `journal_entries` (5); `actAs` never leaving the superuser
+(10 — the role switch is real); the `goal_versions` append policy widened
+to `FOR ALL` (1). 1736 → **1752** (39 of them the schema layer).
+
+One thing the model surfaces for the D-20 catalog query, UNVERIFIED in
+production: `GRANT UPDATE (consumed_at) ON domain_events` narrows nothing
+if Supabase's default privileges apply to the migration's author, so an
+owner could rewrite their own event's other columns. RLS still keeps it
+to their own rows. One query settles it:
+`SELECT grantee, privilege_type, column_name FROM information_schema.column_privileges WHERE table_name = 'domain_events'`.
+
