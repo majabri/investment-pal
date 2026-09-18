@@ -22,6 +22,13 @@
       "when": 1789749927775,
       "tag": "0002_events_audit_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789757428491,
+      "tag": "0003_decisions_account_backfill",
+      "breakpoints": true
     }
   ]
 }
