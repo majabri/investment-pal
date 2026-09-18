@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
 import { MoverList } from "@/components/app/MoverList";
 import { UniverseImportPanel } from "@/components/app/UniverseImportPanel";
+import { UniverseRankPanel } from "@/components/app/UniverseRankPanel";
 import { getQuotesFn } from "@/lib/marketServer";
 import { useAllHoldings, useUniverse } from "@/hooks/useAppData";
 import { resolveUniverse, universeEmptyReason, heldSymbolSet } from "@/lib/universe";
@@ -39,6 +40,8 @@ function Page() {
     >
       {/* ADR-APP-017: the owner writes the universe, here. */}
       <UniverseImportPanel current={universe} />
+      {/* UNIV-001 read side: what the owner entered, ordered. The movers below stay a price screen. */}
+      {!universeLoading ? <UniverseRankPanel rows={universe} /> : null}
 
       {universeLoading || isLoading ? (
         <p className="text-sm text-muted-foreground">Scanning the universe…</p>
