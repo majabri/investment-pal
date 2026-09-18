@@ -221,6 +221,9 @@ Dependabot #219/#220/#222/#223 merged.
   nothing about a policy; and under Supabase's default privileges a GRANT
   narrows nothing — model both (`replay.ts`) or the test passes for the
   wrong reason. Every new table needs a seed row in `rls.test.ts`.
+  **Confirmed in production 2026-09-18:** every table gets ALL for `anon`
+  and `authenticated` at creation. A migration that wants a narrower
+  client surface must REVOKE ALL first, then GRANT (#250).
 - A "close" is a price the provider's clock says the session ended on,
   dated by the exchange's calendar. The user's local date and an intraday
   print are both wrong in a way the row cannot show afterwards.
@@ -231,8 +234,9 @@ Dependabot #219/#220/#222/#223 merged.
 the universe writer; `decisions.account_id` backfill; replacing §26.3 in
 the Drive blueprint; pasting a balance block on Settings so the
 reconciliation can run; 86 merged remote branches the git proxy will not
-let Claude Code delete; the D-20 catalog query (now also for the three new
-tables, and the `domain_events` column-privilege question from #244).
+let Claude Code delete; the D-20 catalog query for the three new tables (the `domain_events`
+privilege question is answered: Supabase's defaults gave the client roles
+ALL; #250 narrows it — **awaiting Lovable**).
 
 **Lovable applied `20260917180000_alerts.sql` on 2026-09-18** (verified
 against git; it also widened `isIncomingRequestAbort` in `error-capture.ts`,

@@ -230,8 +230,10 @@ describe("3. the specific rules", () => {
     const mine = await count("audit_log");
     expect(mine).toBeGreaterThan(0);
     expect(await affected(db, `INSERT INTO audit_log (user_id, table_name, row_id, op, new_row) VALUES ('${A}', 'holdings', gen_random_uuid(), 'INSERT', '{}'::jsonb)`)).toBe("refused");
-    expect(await affected(db, "UPDATE audit_log SET op = op")).toBe(0);
-    expect(await affected(db, "DELETE FROM audit_log")).toBe(0);
+    // Since 20260918170000 the client role holds SELECT only, so these are
+    // refused outright rather than touching zero rows. Either is "nothing".
+    expect(none(await affected(db, "UPDATE audit_log SET op = op"))).toBe(0);
+    expect(none(await affected(db, "DELETE FROM audit_log"))).toBe(0);
     await actAs(db, "authenticated", B);
     expect(await count(`audit_log WHERE user_id = '${A}'`)).toBe(0);
   });

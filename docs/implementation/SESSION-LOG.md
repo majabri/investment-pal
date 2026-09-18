@@ -3973,3 +3973,44 @@ record is wired on the dashboard (#248), React is on 19.3 with its pair
 
 Everything else open is Amir's and unchanged.
 
+### The D-20 answer for `domain_events`, and #250 — the grants narrowed (§19.2, §24)
+
+Amir asked Lovable for the catalog (a read-only paste; Lovable's first
+reply was an unrelated code change to `src/start.ts` and `src/server.ts`
+returning 499 on a client abort — verified against git, gate and CI
+green, untested like its predecessor; the second reply was the table):
+
+    domain_events  table   {postgres=arwdDxtm, anon=arwdDxtm, authenticated=arwdDxtm,
+                            service_role=arwdDxtm, sandbox_exec=ar}
+    domain_events  column  consumed_at {authenticated=w}
+
+So the #244 suspicion held: Supabase's default privileges gave `anon` and
+`authenticated` ALL on the outbox (and, by the same mechanism, on
+`audit_log`), and #233's `GRANT SELECT, UPDATE (consumed_at)` was an
+addition to ALL, narrowing nothing. RLS still confined every user to
+their own rows and admitted no client insert, so no cross-user exposure
+existed. Two things RLS does not cover did: a user could UPDATE any
+column of their own events, and TRUNCATE (not subject to RLS; not
+reachable through PostgREST, so theoretical) was granted to `anon`.
+
+`20260918170000_events_audit_grants.sql`: REVOKE ALL from `anon` and
+`authenticated` on both tables, then GRANT SELECT and UPDATE
+(`consumed_at`) on `domain_events` and SELECT on `audit_log` to
+`authenticated`. `service_role` and Lovable's `sandbox_exec` untouched.
+Idempotent. `schema/eventsGrants.test.ts` asserts the surface with
+`has_table_privilege` / `has_column_privilege` under the replay's model
+of the defaults, with a negative control proving the model grants ALL to
+a fresh table (so the revoke has something to revoke), and the behaviour:
+the trigger still writes both tables, the owner still consumes, a
+whole-row UPDATE and a client INSERT are now refused outright. Two
+existing assertions that expected "0 rows" on `audit_log` writes now
+expect "refused", the stricter outcome. Four SQL fault injections
+reddened (3/2/1/2). 1786 → **1793**. **Not applied until Lovable runs
+it** (paste line in the #250 body).
+
+Also from Amir's Step 1: all nine dashboard alerts showed "seen
+2026-09-18". The only code path that sets `acknowledged_at` is the Mark
+seen button; whether he clicked nine times is asked and unanswered. And
+"Probability of reaching the goal is 0%" is on the list to check: an
+uncomputable plan must say not known, never 0%.
+
