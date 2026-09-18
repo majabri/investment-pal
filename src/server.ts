@@ -31,10 +31,11 @@ async function normalizeCatastrophicSsrResponse(
   const body = await response.clone().text();
   if (!isH3SwallowedErrorBody(body)) return response;
 
+  const capturedError = consumeLastCapturedError();
   // If the client went away while SSR was still running, h3 turns the abort
   // into a generic 500. Recover it to 499 so the blank-screen error page is
   // not rendered for a request nobody is listening to.
-  if (request.signal.aborted || isIncomingRequestAbort(consumeLastCapturedError())) {
+  if (request.signal.aborted || isIncomingRequestAbort(capturedError)) {
     return new Response(null, { status: 499 });
   }
   console.error(capturedError ?? new Error(`h3 swallowed SSR error: ${body}`));
