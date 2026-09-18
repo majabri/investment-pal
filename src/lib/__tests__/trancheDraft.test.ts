@@ -33,6 +33,7 @@ const draft = (over: Partial<TrancheDraft> = {}): TrancheDraft => ({
   target: null,
   invalidation: null,
   note: null,
+  decisionId: null,
   ...over,
 });
 
@@ -114,7 +115,8 @@ describe("trancheInsert", () => {
     expect(row.closed_at).toBeNull();
   });
 
-  test("the decision and security links are explicitly null — not offered yet, not guessed", () => {
+  test("the decision link is what the holder named, and null when they named none", () => {
+    expect(trancheInsert({ userId: "u", accountId: "a", draft: draft({ decisionId: "d-1" }) }).decision_id).toBe("d-1");
     const row = trancheInsert({ userId: "u", accountId: "a", draft: draft() });
     expect(row.decision_id).toBeNull();
     expect(row.security_id).toBeNull();

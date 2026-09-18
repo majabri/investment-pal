@@ -31,6 +31,7 @@ import {
 } from "@/lib/trancheDraft";
 import type { TrancheDraft } from "@/lib/trancheDraft";
 import type { Tranche } from "@/lib/tranches";
+import type { DecisionOption } from "@/lib/tranchesView";
 import { readFills, type FillRead } from "@/lib/fillRows";
 import { canRecordFill, fillInsert, validateFillDraft } from "@/lib/fillDraft";
 import type { FillDraft } from "@/lib/fillDraft";
@@ -720,6 +721,26 @@ export function useRecordFill() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fills"] });
+    },
+  });
+}
+
+/**
+ * The decisions the tranche form can name as the one that opened a tranche
+ * (§A.3). Recent, across the user's accounts: a decision written about the
+ * portfolio has no account and still opens tranches in one.
+ */
+export function useDecisionOptions() {
+  return useQuery({
+    queryKey: ["decision-options"],
+    queryFn: async (): Promise<DecisionOption[]> => {
+      const { data, error } = await supabase
+        .from("decisions")
+        .select("id,decided_on,symbol,action,recommendation,decision")
+        .order("decided_on", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as DecisionOption[];
     },
   });
 }
