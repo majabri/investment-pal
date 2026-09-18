@@ -213,6 +213,68 @@ export type Database = {
           },
         ]
       }
+      alerts: {
+        Row: {
+          account_id: string | null
+          acknowledged_at: string | null
+          created_at: string
+          fingerprint: string
+          first_raised_at: string
+          href: string
+          id: string
+          last_raised_at: string
+          message: string
+          resolved_at: string | null
+          scope_key: string | null
+          severity: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          acknowledged_at?: string | null
+          created_at?: string
+          fingerprint: string
+          first_raised_at?: string
+          href: string
+          id?: string
+          last_raised_at?: string
+          message: string
+          resolved_at?: string | null
+          scope_key?: string | null
+          severity: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          acknowledged_at?: string | null
+          created_at?: string
+          fingerprint?: string
+          first_raised_at?: string
+          href?: string
+          id?: string
+          last_raised_at?: string
+          message?: string
+          resolved_at?: string | null
+          scope_key?: string | null
+          severity?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           changed_at: string
@@ -1681,6 +1743,10 @@ export type Database = {
           p_rows: Json
           p_source?: string
         }
+        Returns: Json
+      }
+      raise_alerts: {
+        Args: { p_account_id: string; p_alerts: Json }
         Returns: Json
       }
     }
