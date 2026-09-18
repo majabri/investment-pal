@@ -118,7 +118,8 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
   files are not idempotent and are pinned by name there. **Write the schema
   test in the same PR as the migration from now on.**
 - Events and audit (#233, applied by Lovable 2026-09-17): `domain_events`
-  (fourteen §19.1 names, outbox; no consumer yet), `audit_log`, one trigger
+  (fourteen §19.1 names, outbox; read by `activityView.ts` / `ActivityPanel`
+  since #241; no consumer yet), `audit_log`, one trigger
   `record_change()` on nine tables (ten with `alerts`, #238, once applied); `import_batches` (written by the CSV
   import since #236, `lib/importBatch.ts`); `orders.decision_id`/`tranche_id`;
   order states `untriggered`/`superseded`.
@@ -133,17 +134,16 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
   <https://claude.ai/artifact/RDpasbToaZPehkbVzmJF4D>. Its Phase 1 list is
   the backlog; the session log says which rows have landed since.
 
-## Current state (2026-09-17, evening)
+## Current state (2026-09-18)
 
-**HEAD on `main`:** the merge of #238. Suite **1686 pass / 0 fail** (23 of
-them the schema replay); tsc and `test:typecheck` clean; boot 200 on
-`/auth`, `/`, `/portfolio`, `/decisions`, `/goals`, `/prompt-center`,
-`/settings`.
+**HEAD on `main`:** `5a18f6d`. Suite **1706 pass / 0 fail** (23 of them the
+schema replay); tsc and `test:typecheck` clean; boot 200 on `/auth`, `/`,
+`/portfolio`, `/decisions`, `/goals`, `/prompt-center`, `/settings`.
 
 **The execution ledger is fully on screen** (#212 → #216, applied by Lovable
 2026-09-12) **and written from it** (#230 tranches; #216 fills).
 
-**Since the gap matrix (#224 → #236):** calendar coverage · news relevance
+**Since the gap matrix (#224 → #241):** calendar coverage · news relevance
 from the caller's symbols · **the Committee runs in the app and records its
 own decisions** with all four versions and the readiness verdict stamped ·
 the reconciliation alert · goal-on-screen vs goal-on-record · tranche
@@ -151,7 +151,10 @@ open/close · quote provenance to §B.2 · the gate names the missing input
 and every meeting states its purpose (live feedback, #232) · the events /
 audit / import-batch / order-links migration with the first schema test,
 **applied in production by Lovable** · the lockfile back on the default
-registry · every CSV import recorded as a batch with its checksum.
+registry · every CSV import recorded as a batch with its checksum · the
+alerts migration (#238, awaiting Lovable) · a tranche names the decision
+that opened it (#240) · the event record on screen at `/settings` (#241,
+the first reader of `domain_events`/`audit_log`).
 Dependabot #219/#220/#222/#223 merged; **#221 (React 19.3) is red for a
 real reason** — `react-dom` not bumped with `react` — and is Amir's call.
 
@@ -184,6 +187,11 @@ real reason** — `react-dom` not bumped with `react` — and is Amir's call.
   by PID. Two commits were silently skipped that way before it was noticed.
 - Verify a vendor's account of what it did against git before building on
   it; Lovable's apply also added Drizzle and rewrote 91 lockfile entries.
+- GitHub sometimes starts no CI run for a PR's push; check the branch's
+  workflow runs, and dispatch `ci.yml` on the branch by hand when there are
+  none (it counts as the PR's check on that SHA). Never an empty commit.
+- Two PRs cut from the same `main` that both add an import to
+  `useAppData.ts` will conflict on the line; merge `main` in, keep both.
 - **Always check whether the work was done already** before doing it.
 
 **Open, all Amir's:** OD-001 Amendment 2 (see *Merge authority*); ADR-APP-009
