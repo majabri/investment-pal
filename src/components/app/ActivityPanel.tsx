@@ -11,6 +11,8 @@
 import { formatDistanceToNow } from "date-fns";
 
 import { useActivity } from "@/hooks/useAppData";
+import { useEventCursors } from "@/hooks/useEventConsumer";
+import { cursorSentence, GOAL_CACHE_CONSUMER } from "@/lib/eventConsumers";
 import {
   EMPTY_ACTIVITY,
   activitySentence,
@@ -21,12 +23,20 @@ import {
 
 export function ActivityPanel() {
   const { data, isLoading, isError } = useActivity();
+  const cursors = useEventCursors();
 
   return (
     <section className="mt-4 rounded-2xl border bg-card p-5" aria-label="Recent activity">
       <div className="mb-1 text-sm font-medium">Recent activity</div>
-      <p className="mb-3 text-xs text-muted-foreground">
+      <p className="mb-1 text-xs text-muted-foreground">
         Every material write, from the audit log. What changed and when, not what it means.
+      </p>
+      <p className="mb-3 text-xs text-muted-foreground" data-testid="consumer-cursor">
+        {cursors.isError
+          ? "Consumer cursors could not be read."
+          : cursors.data === undefined
+            ? "Reading consumer cursors…"
+            : cursorSentence(cursors.data.find((c) => c.name === GOAL_CACHE_CONSUMER) ?? null)}
       </p>
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>

@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { AccountSwitcher } from "./AccountSwitcher";
+import { EventConsumerRunner } from "./EventConsumerRunner";
 
 export function AppShell({
   title,
@@ -77,6 +78,8 @@ export function AppShell({
           </Button>
         </div>
 
+        {/* ADR-APP-018: the first domain_events consumer, in every open tab. */}
+        <EventConsumerRunner />
         <MarketTape />
         <header className="flex flex-col gap-2 border-b bg-background/80 px-6 py-5 backdrop-blur sm:flex-row sm:items-end sm:justify-between">
           <div>
