@@ -29,6 +29,13 @@
       "when": 1789757428491,
       "tag": "0003_decisions_account_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789758878077,
+      "tag": "0004_event_consumers",
+      "breakpoints": true
     }
   ]
 }
