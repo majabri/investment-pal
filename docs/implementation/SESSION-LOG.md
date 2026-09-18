@@ -4027,3 +4027,10 @@ asserts is one more read-only catalog query away (the same `relacl` /
 `main` at `a8b432f`; 1793 pass / 0 fail. Every migration in the repo is
 applied. Nothing waits on Lovable.
 
+**Confirmed in production** (read-only catalog query via Lovable, after
+the apply): `domain_events` table ACL
+`{postgres=arwdDxtm, service_role=arwdDxtm, sandbox_exec=ar, authenticated=r}`,
+column `consumed_at` `{authenticated=w}`. `anon` gone; `authenticated`
+read-only plus consume. The #244 question is closed end to end: asked,
+answered, fixed, applied, confirmed.
+
