@@ -50,6 +50,19 @@ describe("GoalOutlookPanel", () => {
     expect(text).toContain("1.55 yrs");
   });
 
+  test("an UNKNOWN probability is the em-dash and says why — never 0%", () => {
+    const { container } = render(
+      <GoalOutlookPanel goalName="Growth Brokerage" metrics={{ ...metrics, prob: null }} />,
+    );
+    const text = container.textContent ?? "";
+    expect(text).toContain("Not computable");
+    expect(text).toContain("—");
+    expect(text).not.toContain("0.0%");
+    // The other two projections are still there.
+    expect(text).toContain("14.0%");
+    expect(text).toContain("1.55 yrs");
+  });
+
   test("UNKNOWN progress renders NO bar — not a bar at 0%", () => {
     const { container } = render(
       <GoalOutlookPanel goalName="Growth Brokerage" metrics={{ ...metrics, progress: null }} />,

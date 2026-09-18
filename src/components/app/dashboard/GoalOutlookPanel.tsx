@@ -7,12 +7,14 @@
 // It renders nothing derived: `goalMetrics` is computed in the route from the
 // objective and the account value, and is null whenever either is missing.
 import { Link } from "@tanstack/react-router";
-import { fmtPct } from "@/lib/finance";
+import { fmtPct, fmtProbability } from "@/lib/finance";
 
 /** The projections, or null when the objective or the account value is unknown. */
 export type GoalMetrics = {
   cagr: number;
-  prob: number;
+  /** Model probability of reaching the target. NULL = the model could not
+   *  project (no current value to project from); never 0 for that. */
+  prob: number | null;
   years: number;
   /** Fraction of the way from the baseline to the target. NULL = not computable. */
   progress: number | null;
@@ -46,8 +48,11 @@ export function GoalOutlookPanel({
           <div>
             <div className="text-xs text-muted-foreground">Probability of success</div>
             <div className="mt-1 text-xl font-semibold tabular text-primary">
-              {fmtPct(metrics.prob)}
+              {fmtProbability(metrics.prob)}
             </div>
+            {metrics.prob === null ? (
+              <div className="text-xs text-muted-foreground">Not computable: nothing to project from.</div>
+            ) : null}
           </div>
           <div>
             <div className="text-xs text-muted-foreground">Time remaining</div>
