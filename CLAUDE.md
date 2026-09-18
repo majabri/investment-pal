@@ -152,15 +152,16 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 
 ## Current state (2026-09-18)
 
-**HEAD on `main`:** the merge of #249. Suite **1786 pass / 0 fail**
-(49 of them the schema layer: replay, events/audit, alerts, RLS, import RPC); tsc and
+**HEAD on `main`:** `a8b432f` (Lovable's apply of #250's migration). Suite
+**1793 pass / 0 fail** (56 of them the schema layer: replay, events/audit,
+alerts, RLS, import RPC, grants); tsc and
 `test:typecheck` clean; boot 200 on `/auth`, `/`, `/portfolio`, `/decisions`,
 `/goals`, `/prompt-center`, `/settings`.
 
 **The execution ledger is fully on screen** (#212 → #216, applied by Lovable
 2026-09-12) **and written from it** (#230 tranches; #216 fills).
 
-**Since the gap matrix (#224 → #249):** calendar coverage · news relevance
+**Since the gap matrix (#224 → #250):** calendar coverage · news relevance
 from the caller's symbols · **the Committee runs in the app and records its
 own decisions** with all four versions and the readiness verdict stamped ·
 the reconciliation alert · goal-on-screen vs goal-on-record · tranche
@@ -180,7 +181,9 @@ tests 6 and 7 — nothing in the matrix's "proven by reasoning" item is by
 reasoning any more) · **the alert record on the dashboard** (#248: standing,
 seen, one writer; Lovable applied the schema 2026-09-18) · **React 19.3
 with its pair** (#249; Dependabot #221 had bumped `react` alone and was
-closed as superseded).
+closed as superseded) · **the client roles' grants on `domain_events` and
+`audit_log` narrowed** (#250, after the production catalog showed ALL;
+applied by Lovable 2026-09-18).
 Dependabot #219/#220/#222/#223 merged.
 
 **Standing rules learnt the hard way:**
@@ -235,8 +238,7 @@ the universe writer; `decisions.account_id` backfill; replacing §26.3 in
 the Drive blueprint; pasting a balance block on Settings so the
 reconciliation can run; 86 merged remote branches the git proxy will not
 let Claude Code delete; the D-20 catalog query for the three new tables (the `domain_events`
-privilege question is answered: Supabase's defaults gave the client roles
-ALL; #250 narrows it — **awaiting Lovable**).
+privilege question is answered and fixed: #250, applied 2026-09-18).
 
 **Lovable applied `20260917180000_alerts.sql` on 2026-09-18** (verified
 against git; it also widened `isIncomingRequestAbort` in `error-capture.ts`,
