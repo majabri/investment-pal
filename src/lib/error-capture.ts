@@ -57,10 +57,16 @@ export function isIncomingRequestAbort(value: unknown): boolean {
   for (let depth = 0; depth < CAUSE_DEPTH_LIMIT && current != null; depth++) {
     if (current instanceof Error) {
       const stack = current.stack ?? "";
+      const code = (current as { code?: unknown }).code;
       if (
         current.message === "aborted" &&
-        stack.includes("abortIncoming") &&
-        stack.includes("socketOnClose")
+        // The Node HTTP server's own cancellation path, in any of the shapes
+        // it has been seen in: the frame names, the module, or the code.
+        (stack.includes("abortIncoming") ||
+          stack.includes("socketOnClose") ||
+          stack.includes("node:_http_server") ||
+          code === "ECONNABORTED" ||
+          code === "ECONNRESET")
       ) {
         return true;
       }
@@ -71,6 +77,7 @@ export function isIncomingRequestAbort(value: unknown): boolean {
   }
   return false;
 }
+
 
 // Wrap console.error so errors logged by any layer — including h3's internal
 // unhandled-error logging, which this file cannot hook directly — are both
