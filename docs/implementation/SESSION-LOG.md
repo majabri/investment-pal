@@ -4234,3 +4234,35 @@ Told him: Publish in Lovable, then reload. UNVERIFIED until he does.
 Amendment 2; ADR-APP-015; §26.3 in the Drive blueprint; the 86 remote
 branches; the daily-close schedule on the Supabase side; publishing the
 app from Lovable and looking at `/opportunities` and the Goal outlook.
+
+## Session — 2026-09-18 (late, continued) — the first consumer
+
+### Lovable applied `20260918210000_event_consumers.sql` (2026-09-18 19:15Z), verified against git
+
+Two commits by gpt-engineer-app[bot], `0b28967` ("Changes") and `12e5c0a`
+("Applied event_consumers migration"), identical in content: the Drizzle
+copy `0004_event_consumers.sql` byte-identical to the source but for a
+trailing newline, journal and snapshot, and `types.ts` regenerated (+29:
+`event_consumers` Row/Insert/Update, `register_event_consumer`,
+`advance_event_cursor`). The source migration untouched. Lovable's report
+matched. Amir published the app the same minute.
+
+### #265 — the first `domain_events` consumer: GoalChanged → the goal caches
+
+Wiring second, as promised in #262. `lib/eventConsumers.ts` (pure):
+`readOutboxRows` counts what it cannot read; `consumePlan` handles only
+events past the cursor, counts the ones behind, advances to the highest id
+handled and only when something was handled, invalidates `["goal"]` and
+`["goal_versions"]` only on a GoalChanged; `cursorSentence` for Settings.
+`hooks/useEventConsumer.ts`: register (the database starts at the
+present), poll `id > cursor` every 30 s, invalidate, advance through the
+RPC — the one writer; a failed advance leaves the cursor and the next pass
+retries; the same page is never handled twice. `EventConsumerRunner`,
+headless, in `AppShell`: every open tab. `/settings` shows the cursor line.
+11 lib tests; five fault injections reddened. **UNVERIFIED live** until
+Amir opens `/settings` after a goal edit and sees the cursor move.
+
+### #263 — still open
+
+Amir reported it merged; GitHub shows it open (`dd25fa9` is on no branch
+but its own). Asked again. ADRs are never self-merged.
