@@ -39,6 +39,7 @@ import {
   type Holding,
 } from "@/hooks/useAppData";
 import { OrdersPanel } from "@/components/app/OrdersPanel";
+import { FillHoldingPanel } from "@/components/app/FillHoldingPanel";
 import { TranchesPanel } from "@/components/app/TranchesPanel";
 import { aggregationNote, symbolPosition } from "@/lib/tranches";
 import { unreadableNote } from "@/lib/trancheRows";
@@ -804,6 +805,10 @@ function PortfolioPage() {
         <TranchesPanel account={selectedAccount ?? null} read={trancheRead} holdings={holdings} />
 
         <OrdersPanel account={selectedAccount ?? null} orders={orders} />
+        {/* ADR-APP-016 / ORD-001 (a): fills recorded since the previous import,
+            against what this import did to the holdings. A flag, never a
+            write — holdings change only by import. */}
+        <FillHoldingPanel accountId={selectedAccount?.id ?? null} orders={orders} />
 
         <CashFlowPanel
           accountId={scope.kind === "account" ? scope.accountId : null}
