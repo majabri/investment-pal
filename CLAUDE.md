@@ -142,7 +142,11 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
   the ONE write path to a cursor and to `consumed_at`; a consumer reads
   `id > cursor`, handles, advances. Register at the present; never backwards;
   never past the last event; `consumed_at` = every consumer has passed.
-  Schema test `eventConsumers.test.ts`. No app consumer until Lovable applies.
+  Schema test `eventConsumers.test.ts`. **First consumer (#265):**
+  `lib/eventConsumers.ts` (plan, pure), `hooks/useEventConsumer.ts`
+  (register → poll → invalidate → advance via RPC), `EventConsumerRunner`
+  in `AppShell`; the cursor line on `/settings`. GoalChanged → `["goal"]`,
+  `["goal_versions"]`. Other consumers register their own name.
 - Alerts (#210 rules, #238 schema, #248 record): `alerts.ts` decides what
   wants attention; `alertRecord.ts` is the identity (fingerprint = type +
   message with figures blanked), the write gate (`recordDecision`), the row
@@ -169,8 +173,8 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 
 ## Current state (2026-09-18)
 
-**HEAD on `main`:** `4e42de7` (#262, event consumers). Suite
-**1883 pass / 0 fail** (73 of them the schema layer: replay, events/audit,
+**HEAD on `main`:** `5573c72` (#265, the first consumer). Suite
+**1894 pass / 0 fail** (73 of them the schema layer: replay, events/audit,
 alerts, RLS, import RPC, grants, backfill, consumers); tsc and
 `test:typecheck` clean; boot 200 on `/auth`, `/`, `/portfolio`, `/decisions`,
 `/goals`, `/prompt-center`, `/opportunities`, `/settings`.
@@ -270,13 +274,15 @@ delete; the D-20 catalog query for the three new tables (the `domain_events`
 privilege question is answered, fixed and **confirmed in production**:
 #250, applied 2026-09-18, ACL re-read the same day).
 
-**Lovable applied `20260917180000_alerts.sql` and (2026-09-18 18:50Z)
-`20260918190000_decisions_account_backfill.sql`** (both verified against
-git; the backfill moved 0 rows — every decision already had an account).
-**Everything decided on 2026-09-18 is built** (#254 → #262): ADR-018 =
-per-consumer cursor (#262, **awaiting Lovable**: apply
-`20260918210000_event_consumers.sql`, then wire the first consumer,
-`GoalChanged` → the goal caches, through `register_event_consumer` /
-`advance_event_cursor`); OD-004 = label it (#261, done). **Amir's merge:**
-#263 (ADR-018 Accepted). **Supabase-side:** the daily-close schedule (the
-recorder writes only true closes since #243; the schedule is what is missing).
+**Lovable applied, 2026-09-18, all verified against git:** the alerts
+schema, the `decisions.account_id` backfill (0 rows moved — every decision
+already had an account) and `20260918210000_event_consumers.sql` (19:15Z).
+**Everything decided on 2026-09-18 is built and wired** (#254 → #265):
+ADR-018 = per-consumer cursor (#262 schema, #265 the first consumer,
+GoalChanged → the goal caches); OD-004 = label it (#261). **Nothing awaits
+Lovable.** **Amir's merge:** #263 (ADR-018 Accepted; reported merged, still
+open on GitHub). **UNVERIFIED live:** the universe paste box on
+`/opportunities`, the Goal outlook's probability line, the consumer cursor
+on `/settings` — Amir published 19:15Z and has not reported back.
+**Supabase-side:** the daily-close schedule (the recorder writes only true
+closes since #243; the schedule is what is missing).
