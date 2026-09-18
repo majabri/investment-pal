@@ -143,14 +143,15 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 
 ## Current state (2026-09-18)
 
-**HEAD on `main`:** `5a18f6d`. Suite **1706 pass / 0 fail** (23 of them the
-schema replay); tsc and `test:typecheck` clean; boot 200 on `/auth`, `/`,
-`/portfolio`, `/decisions`, `/goals`, `/prompt-center`, `/settings`.
+**HEAD on `main`:** `147aea5` (the merge of #244). Suite **1752 pass / 0 fail**
+(39 of them the schema layer: replay, events/audit, alerts, RLS); tsc and
+`test:typecheck` clean; boot 200 on `/auth`, `/`, `/portfolio`, `/decisions`,
+`/goals`, `/prompt-center`, `/settings`.
 
 **The execution ledger is fully on screen** (#212 → #216, applied by Lovable
 2026-09-12) **and written from it** (#230 tranches; #216 fills).
 
-**Since the gap matrix (#224 → #241):** calendar coverage · news relevance
+**Since the gap matrix (#224 → #244):** calendar coverage · news relevance
 from the caller's symbols · **the Committee runs in the app and records its
 own decisions** with all four versions and the readiness verdict stamped ·
 the reconciliation alert · goal-on-screen vs goal-on-record · tranche
@@ -161,7 +162,11 @@ audit / import-batch / order-links migration with the first schema test,
 registry · every CSV import recorded as a batch with its checksum · the
 alerts migration (#238, awaiting Lovable) · a tranche names the decision
 that opened it (#240) · the event record on screen at `/settings` (#241,
-the first reader of `domain_events`/`audit_log`).
+the first reader of `domain_events`/`audit_log`) · **the daily close is a
+close** (#243: session-ended quotes only, dated by the exchange; a missed
+day is a visible gap) · **RLS exercised** (#244: a second user tries every
+table under the client role in PGlite; the matrix's "proven by reasoning"
+risk is closed for RLS, still open for the import RPC's atomicity).
 Dependabot #219/#220/#222/#223 merged; **#221 (React 19.3) is red for a
 real reason** — `react-dom` not bumped with `react` — and is Amir's call.
 
@@ -199,6 +204,13 @@ real reason** — `react-dom` not bumped with `react` — and is Amir's call.
   none (it counts as the PR's check on that SHA). Never an empty commit.
 - Two PRs cut from the same `main` that both add an import to
   `useAppData.ts` will conflict on the line; merge `main` in, keep both.
+- The superuser bypasses RLS. A schema test that never `SET ROLE`s proves
+  nothing about a policy; and under Supabase's default privileges a GRANT
+  narrows nothing — model both (`replay.ts`) or the test passes for the
+  wrong reason. Every new table needs a seed row in `rls.test.ts`.
+- A "close" is a price the provider's clock says the session ended on,
+  dated by the exchange's calendar. The user's local date and an intraday
+  print are both wrong in a way the row cannot show afterwards.
 - **Always check whether the work was done already** before doing it.
 
 **Open, all Amir's:** OD-001 Amendment 2 (see *Merge authority*); ADR-APP-009
@@ -207,7 +219,7 @@ the universe writer; `decisions.account_id` backfill; replacing §26.3 in
 the Drive blueprint; #221; pasting a balance block on Settings so the
 reconciliation can run; 86 merged remote branches the git proxy will not
 let Claude Code delete; the D-20 catalog query (now also for the three new
-tables).
+tables, and the `domain_events` column-privilege question from #244).
 
 **Waiting on Lovable:** `20260917180000_alerts.sql` (#238; paste-ready line
 in its body). **Then buildable:** the alerts panel wired to `raise_alerts`
