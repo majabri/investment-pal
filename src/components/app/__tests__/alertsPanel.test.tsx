@@ -115,6 +115,77 @@ describe("what it renders when there is something", () => {
   });
 });
 
+describe("the record: standing and seen (§23.1 acknowledgement)", () => {
+  const breached: AlertInput = {
+    ...QUIET,
+    constitution: { ...checkable, breaches: ["AAA 42% net equity > 25% cap"] },
+    positionsStaleDays: 3,
+  };
+  const stored = {
+    id: "r1",
+    type: "stale_quote" as const,
+    severity: "warning" as const,
+    message: "Positions were last imported 2 days ago.",
+    href: "/settings",
+    fingerprint: "stale_quote:Positions were last imported # days ago.",
+    firstRaisedAt: "2026-09-15T14:00:00+00:00",
+    lastRaisedAt: "2026-09-18T14:00:00+00:00",
+    resolvedAt: null,
+    acknowledgedAt: null,
+  };
+
+  test("without a record prop the panel says nothing about standing or seen", () => {
+    const { container } = render(<AlertsPanel input={breached} today="2026-09-18" />);
+    const text = container.textContent ?? "";
+    expect(text).not.toContain("since");
+    expect(text).not.toContain("not yet recorded");
+    expect(text).not.toContain("Mark seen");
+  });
+
+  test("a recorded alert shows how long it has stood; an unrecorded one says so", () => {
+    const { container } = render(
+      <AlertsPanel input={breached} today="2026-09-18" record={{ state: "ready", alerts: [stored], unreadable: 0 }} onAcknowledge={() => {}} />,
+    );
+    const text = container.textContent ?? "";
+    expect(text).toContain("since 2026-09-15 (3 days)"); // the stale-positions alert, matched by fingerprint despite "3" vs "2"
+    expect(text).toContain("not yet recorded"); // the breach has no row yet
+    expect(text).toContain("Mark seen");
+  });
+
+  test("an acknowledged alert is SHOWN as seen — never hidden, and no button to mark it again", () => {
+    const { container } = render(
+      <AlertsPanel
+        input={breached}
+        today="2026-09-18"
+        record={{ state: "ready", alerts: [{ ...stored, acknowledgedAt: "2026-09-16T09:00:00+00:00" }], unreadable: 0 }}
+        onAcknowledge={() => {}}
+      />,
+    );
+    const text = container.textContent ?? "";
+    expect(text).toContain("Positions were last imported 3 days ago."); // still listed
+    expect(text).toContain("seen 2026-09-16");
+    // Only the unrecorded breach could be marked, and it has no row: no button at all.
+    expect(text).not.toContain("Mark seen");
+  });
+
+  test("Mark seen calls back with the ROW id, not the live alert's position", () => {
+    const calls: string[] = [];
+    const { getByText } = render(
+      <AlertsPanel input={breached} today="2026-09-18" record={{ state: "ready", alerts: [stored], unreadable: 0 }} onAcknowledge={(id) => calls.push(id)} />,
+    );
+    getByText("Mark seen").click();
+    expect(calls).toEqual(["r1"]);
+  });
+
+  test("an unreadable or unavailable record is said, and the live list still renders", () => {
+    const unavailable = render(<AlertsPanel input={breached} today="2026-09-18" record={{ state: "unavailable", alerts: [], unreadable: 0 }} />);
+    expect(unavailable.container.textContent).toContain("could not be read");
+    expect(unavailable.container.textContent).toContain("AAA 42%");
+    const short = render(<AlertsPanel input={breached} today="2026-09-18" record={{ state: "ready", alerts: [], unreadable: 2 }} />);
+    expect(short.container.textContent).toContain("2 stored alerts could not be read");
+  });
+});
+
 describe("accessibility", () => {
   test("no violations", async () => {
     const { container } = render(
@@ -124,6 +195,17 @@ describe("accessibility", () => {
           constitution: { ...checkable, breaches: ["AAA over cap"] },
           upcomingEvents: [{ date: "2026-09-15", text: "CPI" }],
         }}
+        today="2026-09-18"
+        record={{
+          state: "ready",
+          alerts: [{
+            id: "r1", type: "concentration_breach", severity: "critical", message: "AAA over cap", href: "/portfolio",
+            fingerprint: "concentration_breach:AAA over cap", firstRaisedAt: "2026-09-15T14:00:00+00:00",
+            lastRaisedAt: "2026-09-18T14:00:00+00:00", resolvedAt: null, acknowledgedAt: null,
+          }],
+          unreadable: 0,
+        }}
+        onAcknowledge={() => {}}
       />,
     );
     const results = await axe.run(container);

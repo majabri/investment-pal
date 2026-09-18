@@ -15,6 +15,16 @@ import { Link } from "@tanstack/react-router";
 
 import { UNBUILT_ALERT_TYPES, alertCounts, raiseAlerts } from "@/lib/alerts";
 import type { Alert, AlertInput, AlertSeverity } from "@/lib/alerts";
+import { acknowledgementSentence, decorateAlerts, recordNote, standingSentence } from "@/lib/alertRecord";
+import type { StoredAlert } from "@/lib/alertRecord";
+import { localIsoDate } from "@/lib/localDate";
+
+/** The stored side of the panel, when a caller has one to show. */
+export type AlertRecordView = {
+  state: "loading" | "ready" | "unavailable";
+  alerts: readonly StoredAlert[];
+  unreadable: number;
+};
 
 const ICON: Record<AlertSeverity, typeof ShieldAlert> = {
   critical: ShieldAlert,
@@ -45,9 +55,20 @@ export function AlertsPanel({
   input,
   /** True when the screen genuinely could not evaluate anything — §23.2's ERROR. */
   failed = false,
+  record,
+  onAcknowledge,
+  today = localIsoDate(),
 }: {
   input: AlertInput;
   failed?: boolean;
+  /** The alert record for this scope. Omitted = the caller keeps none (the
+   *  live list is all there is); the panel then says nothing about standing
+   *  or seen rather than implying a record it was not given. */
+  record?: AlertRecordView;
+  /** The holder's "seen". Only offered for an alert the record holds. */
+  onAcknowledge?: (id: string) => void;
+  /** The owner's local date; injectable so the standing sentence is testable at any hour. */
+  today?: string;
 }) {
   if (failed) {
     return (
@@ -67,6 +88,8 @@ export function AlertsPanel({
   const alerts: Alert[] = raiseAlerts(input);
   const counts = alertCounts(alerts);
   const checkedConstitution = input.constitution !== null && input.constitution.checkable;
+  const decorated = decorateAlerts(alerts, record?.state === "ready" ? record.alerts : []);
+  const note = record ? recordNote(record.state, record.unreadable) : null;
 
   return (
     <section aria-label="Alerts" className="mb-4 rounded-xl border bg-card px-4 py-3 text-xs">
@@ -87,8 +110,9 @@ export function AlertsPanel({
         <p className="text-muted-foreground">{emptyStateSentence(checkedConstitution)}</p>
       ) : (
         <ul className="space-y-1.5">
-          {alerts.map((a, i) => {
+          {decorated.map(({ alert: a, record: r }, i) => {
             const Icon = ICON[a.severity];
+            const seen = acknowledgementSentence(r);
             return (
               <li key={`${a.type}-${i}`} className="flex items-start gap-2">
                 {/* The icon is not the only carrier of severity — the word is
@@ -100,12 +124,36 @@ export function AlertsPanel({
                   <Link to={a.href} className="underline underline-offset-2">
                     Open
                   </Link>
+                  {/* The record's half: how long this has stood, and whether
+                      the holder has said "seen". Seen is SHOWN, never a reason
+                      to hide — the condition is still true. Only when the
+                      caller keeps a record and it has been read. */}
+                  {record && record.state === "ready" ? (
+                    <span className="text-muted-foreground">
+                      {" · "}
+                      {standingSentence(r, today)}
+                      {seen ? ` · ${seen}` : null}
+                      {r && !seen && onAcknowledge ? (
+                        <>
+                          {" · "}
+                          <button
+                            type="button"
+                            className="underline underline-offset-2"
+                            onClick={() => onAcknowledge(r.id)}
+                          >
+                            Mark seen
+                          </button>
+                        </>
+                      ) : null}
+                    </span>
+                  ) : null}
                 </span>
               </li>
             );
           })}
         </ul>
       )}
+      {note ? <p className="mt-2 text-muted-foreground">{note}</p> : null}
 
       {/* What this surface cannot raise, named rather than omitted. A list of
           seven that looks like a list of eleven is the same defect as a health

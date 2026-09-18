@@ -126,10 +126,17 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
   that never switches role proves nothing about it. Lovable's five duplicate
   files are not idempotent and are pinned by name there. **Write the schema
   test (including the RLS sweep's seed row) in the same PR as the migration.**
+- Alerts (#210 rules, #238 schema, #248 record): `alerts.ts` decides what
+  wants attention; `alertRecord.ts` is the identity (fingerprint = type +
+  message with figures blanked), the write gate (`recordDecision`), the row
+  boundary and the sentences; `hooks/useAlertRecord.ts` reads and writes
+  (`raise_alerts`, the one UPDATE for "seen"); `AlertRecorder` sends the set
+  once per change and only when the evaluation is complete; `AlertsPanel`
+  shows standing and seen — acknowledged is shown, never hidden.
 - Events and audit (#233, applied by Lovable 2026-09-17): `domain_events`
   (fourteen §19.1 names, outbox; read by `activityView.ts` / `ActivityPanel`
   since #241; no consumer yet), `audit_log`, one trigger
-  `record_change()` on nine tables (ten with `alerts`, #238, once applied); `import_batches` (written by the CSV
+  `record_change()` on ten tables (the tenth, `alerts`, since 2026-09-18); `import_batches` (written by the CSV
   import since #236, `lib/importBatch.ts`); `orders.decision_id`/`tranche_id`;
   order states `untriggered`/`superseded`.
 - Lovable applies migrations through Drizzle now: `drizzle.config.ts`,
@@ -225,11 +232,10 @@ reconciliation can run; 86 merged remote branches the git proxy will not
 let Claude Code delete; the D-20 catalog query (now also for the three new
 tables, and the `domain_events` column-privilege question from #244).
 
-**Waiting on Lovable:** `20260917180000_alerts.sql` (#238; paste-ready line
-in its body). **Then buildable:** the alerts panel wired to `raise_alerts`
-and `acknowledged_at` (fingerprint = type + message with figures blanked;
-acknowledged alerts shown as acknowledged, never hidden). **Buildable now
-but needing a shape decision first:** a first `domain_events` consumer
+**Lovable applied `20260917180000_alerts.sql` on 2026-09-18** (verified
+against git; it also widened `isIncomingRequestAbort` in `error-capture.ts`,
+untested). The alerts record is wired (#248). **Buildable now but needing a
+shape decision first:** a first `domain_events` consumer
 (the matrix names three for v1 — rerank on TrancheClosed waits on the
 universe writer; outcome measurement on DecisionCreated duplicates the
 refresh-time grading in `LearningLog` unless that moves; GoalChanged
