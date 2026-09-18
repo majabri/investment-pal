@@ -1,6 +1,6 @@
 # ADR-APP-013 — Concentration denominators, and which one policy is enforced against
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-09-18, Amir Jabri — decided in session, recorded by Claude Code)
 - **Date:** 2026-09-10
 - **Deciders:** Amir (product owner — line-item sign-off required), implementation agent
 - **Money-adjacent:** **Yes** — position sizing and margin math. Nothing here takes
@@ -51,7 +51,24 @@ decision has one site to land in rather than four.
 The labels are not contingent on this ADR. Whichever denominator wins, an
 unlabelled percentage remains the defect.
 
-## Decision required
+## Decision (2026-09-18)
+
+Amir Jabri, in session, with the three options and their consequences in
+front of him:
+
+- **D1 — position cap denominator: net equity.** What the code enforces
+  today; what the broker statement's "% of Acct" means; the tighter reading
+  on a levered account. No behaviour change on `main`.
+- **D2 — margin cap denominator: net equity**, explicitly. No behaviour
+  change. `accountTotals.marginUtilisation` (debit ÷ gross) is to be renamed
+  or removed in a follow-up so no third definition survives unrendered.
+- **D3 — ADR-APP-004 C2 is amended** to read "30% of net equity" (see its
+  Amendment 1). The code is unchanged.
+
+The recommendation and analysis below are as written on 2026-09-10 and are
+kept as the record of the choice.
+
+## Decision required (as drafted)
 
 ### D1 — the position cap's denominator
 

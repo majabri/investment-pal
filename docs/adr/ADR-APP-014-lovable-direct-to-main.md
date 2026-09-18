@@ -1,6 +1,6 @@
 # ADR-APP-014 — Lovable's direct-to-`main` write path
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-09-18, Amir Jabri — decided in session, recorded by Claude Code)
 - **Date:** 2026-09-10
 - **Deciders:** Amir (product owner), implementation agent
 - **Money-adjacent:** No directly — but it governs the path by which

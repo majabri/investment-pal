@@ -4034,3 +4034,39 @@ column `consumed_at` `{authenticated=w}`. `anon` gone; `authenticated`
 read-only plus consume. The #244 question is closed end to end: asked,
 answered, fixed, applied, confirmed.
 
+## Session — 2026-09-18 (evening) — the owner's decisions, recorded (#253, Amir merges)
+
+Amir answered the seven open decisions in chat, with the options and their
+consequences explained first. Recorded in a docs-only PR that Claude Code
+does not merge (ADR-APP-005 §2):
+
+1. **ADR-APP-009, 010, 011, 012, 014 → Accepted.** ADR-APP-015 (navigation)
+   left open at Amir's earlier instruction.
+2. **OD-003 / ADR-APP-013 → net equity** for the position cap (D1) and,
+   explicitly, for the margin cap (D2); ADR-APP-004 C2 amended to "30% of
+   net equity" (Amendment 1). No code change: the dashboard already
+   enforces net equity. Follow-up: rename or remove
+   `accountTotals.marginUtilisation` (debit ÷ gross, unrendered).
+3. **ORD-001 → option (a)**, ADR-APP-016: fills against holdings as a
+   reconciliation view; nothing applied.
+4. **ADR-APP-008 Amendment 1**: the blueprint's seven actions (BUY, SELL,
+   TRIM, CANCEL, REPLACE, HOLD, WAIT). Stored off-contract values stay as
+   stored and marked; `buybackZones` / `outcomeGrade` read TRIM going
+   forward and REDUCE on history, explicitly.
+5. **Universe writer → import** with manual edits, ADR-APP-017; the AI
+   boundary unchanged.
+6. **Event consumers → ADR-APP-018 drafted, Proposed**, recommending a
+   per-consumer cursor; Amir's answer echoed the options, so the proposal is
+   for him to read rather than a decision taken.
+7. **`decisions.account_id` → backfill**, ADR-APP-019: deterministic, only
+   for a user with exactly one account.
+
+Code that these unblock, each its own PR on a green gate: the seven-verb
+vocabulary (4); the fill-vs-holding reconciliation view (3); the universe
+import (5); the backfill migration with its schema test, then Lovable (7);
+`marginUtilisation` cleanup (2). The consumer cursor waits on Amir reading
+ADR-APP-018.
+
+Also confirmed today: the nine "seen" alerts on Amir's dashboard were nine
+clicks of Mark seen — the record behaved as designed, not a bug.
+

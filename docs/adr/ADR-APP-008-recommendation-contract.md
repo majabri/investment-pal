@@ -78,3 +78,27 @@ that the committee did not use.
 - B should be marked superseded in Drive. Claude Code has no write access to the
   certified repository, so that remains Amir's action; until then both files are still
   discoverable, which is the defect OD-008 identified.
+
+## Amendment 1 (2026-09-18) — the canonical action set
+
+The AIOS blueprint (DEC-001) names seven actions: **BUY, SELL, TRIM, CANCEL,
+REPLACE, HOLD, WAIT**. The contract this ADR adopted named nine, spelling TRIM
+as REDUCE, lacking CANCEL and REPLACE — the two verbs the manual-execution
+lifecycle needs for a working order — and adding ADD, REBALANCE, ROTATE and
+ESCALATE. On 2026-09-18 Amir chose the blueprint's seven.
+
+Consequences, to land in a code PR citing this amendment:
+
+- `RECOMMENDATION_ACTIONS` becomes the seven. The Committee prompt and the
+  contract parser emit and accept only these.
+- **Stored rows are never rewritten.** The rule above stands: an off-contract
+  value already in `decisions.action` (REDUCE, ADD, ROTATE, …) is shown
+  exactly as stored and marked off-contract. It is not mapped to TRIM or to
+  anything else; the committee did not use that word.
+- `buybackZones.ts` and `outcomeGrade.ts`, which read REDUCE today, read TRIM
+  going forward and keep reading REDUCE on historical rows, explicitly, so a
+  past trim still produces its zones and its grade.
+- The Committee's readiness contract treats CANCEL and REPLACE as actionable
+  verbs that must name the order they act on once `orders.decision_id` is
+  written from the disposition flow (UX-001, still open).
+

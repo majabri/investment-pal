@@ -1,6 +1,6 @@
 # ADR-APP-010 — The broker adapter contract
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-09-18, Amir Jabri — decided in session, recorded by Claude Code)
 - **Date:** 2026-09-05
 - **Deciders:** Amir (product owner)
 - **Money-adjacent:** No — governs where interpretation lives, not what any figure is
