@@ -4170,3 +4170,67 @@ tsc, `test:typecheck` and the boot check were green on every branch.
 (one consumer or a per-consumer cursor); OD-004; OD-001 Amendment 2;
 ADR-APP-015; §26.3 in the Drive blueprint; the 86 remote branches; the
 daily-close schedule on the Supabase side.
+
+## Session — 2026-09-18 (late) — #253 merged, #255 applied, ADR-018 and OD-004 decided and executed
+
+### #253 — merged by Amir (his ADRs)
+
+Merged 18:48Z by Amir. `main` carries ADR-009–014 Accepted, ADR-013's
+decision block, ADR-004 Amendment 1, ADR-008 Amendment 1, ADR-016/017/019
+Accepted, ADR-018 Proposed, OD-003 resolved. GitHub then reported the
+docs checkpoint (#260) as conflicting; a local merge of `main` into it was
+clean (criss-cross merge bases, GitHub's stale mergeability), the merge
+commit was pushed, the state cleared, and #260 merged on green.
+
+### #255 — applied by Lovable (2026-09-18 18:50Z), verified against git
+
+Commit `c82ab32` (gpt-engineer-app[bot]): `drizzle/migrations/0003_…sql`
+identical to the source file but for a trailing newline, plus journal and
+snapshot; the source migration untouched; `types.ts` unchanged in content
+(Lovable: "regenerated, no schema shape change" — git agrees). Lovable's
+NOTICE: **0 rows attached, 0 rows left NULL** — every existing decision
+already carried an account, so the backfill had nothing to move. ADR-019
+is closed end to end: decided, migrated, tested, applied, verified.
+
+### #261 — the goal probability names its basis (OD-004: label it)
+
+Amir: *"4 is label it."* `PROBABILITY_BASIS` ("Current value only;
+monthly contributions are not counted.") under the probability on the
+dashboard and `/goals`, and in parentheses on the brief's "Model
+probability:" line. The required-CAGR beside it carries no such label (it
+counts contributions) — the negative control. The model is unchanged.
+OD-004 → Approved; the open-decisions index rows for OD-003 and OD-004
+corrected. Two fault injections reddened.
+
+### #262 — per-consumer cursors over `domain_events` (ADR-018: cursor)
+
+Amir: *"3 is cursor."* `20260918210000_event_consumers.sql`:
+`event_consumers (user_id, name, last_event_id)`, SELECT-only policy, and
+two SECURITY DEFINER functions as the one write path —
+`register_event_consumer` starts a new consumer at the owner's latest
+event; `advance_event_cursor` never moves backwards (`GREATEST`), never
+past an event that exists, then sets `consumed_at` on the events **every**
+registered consumer has passed (the minimum cursor). The client's direct
+`UPDATE (consumed_at)` is revoked. No consumer registered; nothing
+consumed. Schema tests: `eventConsumers.test.ts` (13), the RLS sweep seeds
+a consumer per user through the RPC (32 tables), `eventsGrants.test.ts`
+follows the narrowed surface. Five SQL fault injections each reddened.
+**Awaiting Lovable.** The first consumer (`GoalChanged` → goal caches) is
+wired after the apply: migration first, wiring second.
+
+### #263 — ADR-APP-018 Accepted (docs, Amir's merge)
+
+Status and Decision block; index row. Not self-merged.
+
+### Live app
+
+Amir could not find the universe paste box: it is under Research →
+Opportunities, and the live site had not been republished since #257.
+Told him: Publish in Lovable, then reload. UNVERIFIED until he does.
+
+### Still Amir's
+
+#263 (merge); the #262 apply paste to Lovable once #262 merges; OD-001
+Amendment 2; ADR-APP-015; §26.3 in the Drive blueprint; the 86 remote
+branches; the daily-close schedule on the Supabase side; publishing the
+app from Lovable and looking at `/opportunities` and the Goal outlook.
