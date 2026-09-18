@@ -2,9 +2,12 @@
 import { describe, expect, test } from "bun:test";
 
 import type { Tranche } from "@/lib/tranches";
+import type { DecisionOption } from "@/lib/tranchesView";
 import {
   KIND_LABEL,
   coverageLines,
+  decisionOptionLabel,
+  rankDecisionOptions,
   coverageSentence,
   fmtQuantity,
   sortTranches,
@@ -123,5 +126,54 @@ describe("labels", () => {
   test("a null quantity is a dash, never 0", () => {
     expect(fmtQuantity(null)).toBe("—");
     expect(fmtQuantity(12.5)).toBe("12.5");
+  });
+});
+
+describe("decision options for the tranche form (§A.3)", () => {
+  const d = (over: Partial<DecisionOption> = {}): DecisionOption => ({
+    id: "d1",
+    decided_on: "2026-09-12",
+    symbol: "AAA",
+    action: "ADD",
+    recommendation: "Add a tactical tranche into the pullback.",
+    decision: "followed",
+    ...over,
+  });
+
+  test("the label carries date, action, symbol, disposition and the recommendation", () => {
+    expect(decisionOptionLabel(d())).toBe("2026-09-12 · ADD AAA · followed — Add a tactical tranche into the pullback.");
+  });
+
+  test("a portfolio-level decision has no symbol and the label does not invent one", () => {
+    expect(decisionOptionLabel(d({ symbol: null, action: "REDUCE" }))).toBe("2026-09-12 · REDUCE · followed — Add a tactical tranche into the pullback.");
+    expect(decisionOptionLabel(d({ symbol: null, action: null }))).toBe("2026-09-12 · followed — Add a tactical tranche into the pullback.");
+  });
+
+  test("a long recommendation is cut with an ellipsis, and the label stays one line", () => {
+    const label = decisionOptionLabel(d({ recommendation: "x".repeat(200) }));
+    expect(label.length).toBeLessThanOrEqual(96);
+    expect(label.endsWith("…")).toBe(true);
+  });
+
+  test("the draft's symbol ranks first, newest first within each group; nothing is dropped", () => {
+    const ranked = rankDecisionOptions(
+      [
+        d({ id: "old-other", symbol: "BBB", decided_on: "2026-09-01" }),
+        d({ id: "old-same", symbol: "AAA", decided_on: "2026-08-01" }),
+        d({ id: "new-other", symbol: "BBB", decided_on: "2026-09-15" }),
+        d({ id: "new-same", symbol: "aaa", decided_on: "2026-09-10" }),
+        d({ id: "portfolio", symbol: null, decided_on: "2026-09-16" }),
+      ],
+      " aaa ",
+    );
+    expect(ranked.map((x) => x.id)).toEqual(["new-same", "old-same", "portfolio", "new-other", "old-other"]);
+  });
+
+  test("NEGATIVE CONTROL: with no symbol typed, the order is simply newest first", () => {
+    const ranked = rankDecisionOptions(
+      [d({ id: "a", decided_on: "2026-09-01" }), d({ id: "b", symbol: "BBB", decided_on: "2026-09-15" })],
+      "",
+    );
+    expect(ranked.map((x) => x.id)).toEqual(["b", "a"]);
   });
 });

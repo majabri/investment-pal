@@ -94,3 +94,45 @@ export function trancheSummary(
 export function fmtQuantity(q: number | null): string {
   return q === null ? "—" : q.toLocaleString("en-US", { maximumFractionDigits: 4 });
 }
+
+/**
+ * A decision as the tranche form offers it (§A.3). Structural: the picker
+ * needs these six columns and nothing about where they came from.
+ */
+export type DecisionOption = {
+  id: string;
+  decided_on: string;
+  symbol: string | null;
+  action: string | null;
+  recommendation: string;
+  /** The holder's disposition: pending, followed, … */
+  decision: string;
+};
+
+const MAX_LABEL = 96;
+
+/** One line per option: date · ACTION SYMBOL · disposition — the recommendation, cut to fit. */
+export function decisionOptionLabel(d: DecisionOption): string {
+  const head = [d.decided_on.slice(0, 10), [d.action, d.symbol].filter(Boolean).join(" ") || null, d.decision]
+    .filter((x): x is string => x !== null && x !== "")
+    .join(" · ");
+  const rec = d.recommendation.trim().replace(/\s+/g, " ");
+  const room = Math.max(MAX_LABEL - head.length - 3, 12);
+  const tail = rec.length > room ? `${rec.slice(0, room - 1)}…` : rec;
+  return tail ? `${head} — ${tail}` : head;
+}
+
+/**
+ * The options in the order the picker shows them: the draft's symbol first,
+ * newest first within each group. Nothing is filtered out — a tranche in one
+ * symbol can be opened under a decision written about the portfolio.
+ */
+export function rankDecisionOptions(options: readonly DecisionOption[], symbol: string): DecisionOption[] {
+  const s = symbol.trim().toUpperCase();
+  return options.slice().sort((a, b) => {
+    const ma = s !== "" && (a.symbol ?? "").toUpperCase() === s ? 0 : 1;
+    const mb = s !== "" && (b.symbol ?? "").toUpperCase() === s ? 0 : 1;
+    if (ma !== mb) return ma - mb;
+    return a.decided_on < b.decided_on ? 1 : a.decided_on > b.decided_on ? -1 : 0;
+  });
+}

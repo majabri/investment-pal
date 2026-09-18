@@ -37,6 +37,12 @@ export type TrancheDraft = {
   target: number | null;
   invalidation: string | null;
   note: string | null;
+  /**
+   * The decision that opened it (§A.3, §12.2). NULL = none named. Optional
+   * deliberately: a tranche recorded from a statement may predate any
+   * decision the app holds, and forcing a link would invent one.
+   */
+  decisionId: string | null;
 };
 
 /** Why a draft cannot be stored, in the holder's terms. */
@@ -131,10 +137,9 @@ export function trancheInsert(input: {
     target: draft.target,
     invalidation: trimOrNull(draft.invalidation),
     note: trimOrNull(draft.note),
-    // Not offered by the form yet. Explicit rather than omitted so the gap is
-    // visible here: §A.3's chain from decision to tranche is a column that
-    // exists and a picker that does not.
-    decision_id: null,
+    // §A.3's chain from decision to tranche, as the holder named it. NULL
+    // when they named none — never guessed from the symbol.
+    decision_id: draft.decisionId,
     // The security master assigns this separately (DATA-001); a tranche must
     // not wait on it.
     security_id: null,
@@ -151,6 +156,7 @@ export function emptyTrancheDraft(symbol: string = "", now: Date = new Date()): 
     target: null,
     invalidation: null,
     note: null,
+    decisionId: null,
   };
 }
 
