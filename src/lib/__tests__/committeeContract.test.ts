@@ -11,7 +11,7 @@ import { RECOMMENDATION_ACTIONS } from "@/lib/decisionEvidence";
 const good = {
   decisions: [
     {
-      action: "REDUCE",
+      action: "TRIM",
       symbol: "AAA",
       recommendation: "Trim a quarter into strength; concentration above cap.",
       confidence: 0.7,
@@ -28,7 +28,7 @@ describe("parseCommitteeJson", () => {
   test("NEGATIVE CONTROL: clean JSON parses", () => {
     const r = parseCommitteeJson(JSON.stringify(good));
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.output.decisions[0].action).toBe("REDUCE");
+    if (r.ok) expect(r.output.decisions[0].action).toBe("TRIM");
   });
 
   test("a code fence is tolerated — models add them despite being told not to", () => {
@@ -76,12 +76,12 @@ describe("parseCommitteeJson", () => {
 
   test("symbol and action are normalised to uppercase; a null symbol is kept", () => {
     const mixed = {
-      decisions: [{ ...good.decisions[0], action: "reduce", symbol: "aaa" }, { ...good.decisions[0], symbol: null, action: "HOLD" }],
+      decisions: [{ ...good.decisions[0], action: "trim", symbol: "aaa" }, { ...good.decisions[0], symbol: null, action: "HOLD" }],
     };
     const r = parseCommitteeJson(JSON.stringify(mixed));
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.output.decisions[0].action).toBe("REDUCE");
+      expect(r.output.decisions[0].action).toBe("TRIM");
       expect(r.output.decisions[0].symbol).toBe("AAA");
       expect(r.output.decisions[1].symbol).toBeNull();
     }
@@ -93,11 +93,13 @@ describe("parseCommitteeJson", () => {
     if (r.ok) expect(r.output.decisions[0].confidence).toBeNull();
   });
 
-  test("an off-contract verb is ACCEPTED and left for parseAction to flag", () => {
-    // decisionEvidence's rule: never silently rename a governed decision.
+  test("an off-contract verb from the MODEL is refused, never renamed and never written", () => {
+    // Two different rules meet here. decisionEvidence never renames a
+    // governed decision already stored; this parser never lets a new one be
+    // stored under a word the contract does not have (ADR-APP-008 Am. 1).
     const r = parseCommitteeJson(JSON.stringify({ decisions: [{ ...good.decisions[0], action: "MARGIN" }] }));
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.output.decisions[0].action).toBe("MARGIN");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain("MARGIN");
   });
 });
 
@@ -119,5 +121,30 @@ describe("EXTRACTION_INSTRUCTION", () => {
 describe("PROMPT_VERSION", () => {
   test("is the v6 template's version", () => {
     expect(PROMPT_VERSION).toBe("os-v6.0");
+  });
+});
+
+describe("the verb is the contract's (ADR-APP-008 Amendment 1)", () => {
+  const withAction = (action: string) =>
+    JSON.stringify({
+      decisions: [{ action, symbol: "SYMA", recommendation: "x", confidence: null, evidence: [], counterargument: null, key_risks: [], invalidation_conditions: [] }],
+      cio_summary: null,
+    });
+  test("a pre-amendment word is refused by name — the model was given the list", () => {
+    const r = parseCommitteeJson(withAction("REDUCE"));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.reason).toContain("decisions.0.action");
+      expect(r.reason).toContain("TRIM");
+    }
+  });
+  test("an invented word is refused the same way", () => {
+    expect(parseCommitteeJson(withAction("MARGIN")).ok).toBe(false);
+  });
+  test("negative control: every contract verb is accepted, case-insensitively", () => {
+    for (const a of RECOMMENDATION_ACTIONS) {
+      const r = parseCommitteeJson(withAction(a.toLowerCase()));
+      expect([a, r.ok]).toEqual([a, true]);
+    }
   });
 });

@@ -20,19 +20,47 @@
 // summarised: a field the committee did not supply reads as absent, because
 // AIOS §27 forbids manufacturing sourced evidence.
 
-/** `action` enum from the canonical contract. */
+/**
+ * The `action` vocabulary: the AIOS blueprint's seven (DEC-001), adopted by
+ * ADR-APP-008 Amendment 1 on 2026-09-18. CANCEL and REPLACE act on a working
+ * order; HOLD and WAIT are decisions too (BR-012).
+ */
 export const RECOMMENDATION_ACTIONS = [
   "BUY",
   "SELL",
+  "TRIM",
+  "CANCEL",
+  "REPLACE",
   "HOLD",
-  "REDUCE",
-  "ADD",
-  "REBALANCE",
-  "ROTATE",
   "WAIT",
-  "ESCALATE",
 ] as const;
 export type RecommendationAction = (typeof RECOMMENDATION_ACTIONS)[number];
+
+/**
+ * The words the contract used before the amendment. Rows written with them
+ * are shown exactly as stored and marked off-contract — never rewritten
+ * (ADR-APP-008: the committee did not use the new word). Listed so a reader
+ * can tell "an old contract word" from "a word the committee invented".
+ */
+export const LEGACY_ACTIONS = ["REDUCE", "ADD", "REBALANCE", "ROTATE", "ESCALATE"] as const;
+export type LegacyAction = (typeof LEGACY_ACTIONS)[number];
+
+/**
+ * What a legacy word would be called today, for a caption beside the stored
+ * value — display only. NULL where there is no one-to-one equivalent: a
+ * ROTATE is a SELL and a BUY, a REBALANCE is several, an ESCALATE is not an
+ * action at all.
+ */
+export function legacyEquivalent(value: string): RecommendationAction | null {
+  switch (value.toUpperCase()) {
+    case "REDUCE":
+      return "TRIM";
+    case "ADD":
+      return "BUY";
+    default:
+      return null;
+  }
+}
 
 /**
  * The 14 required fields of the canonical contract, plus `objective_id`.
@@ -225,11 +253,12 @@ export type ActionValue = { value: string; inContract: boolean };
 /**
  * The action, preserving whatever is stored.
  *
- * Off-contract values exist in the table already — the shipped migration's own
- * comment lists `TRIM` and `MARGIN`, neither of which is in the enum. Those are
- * shown as written and flagged, never silently mapped onto a contract action:
- * quietly turning a stored `TRIM` into `REDUCE` would put a word on a governed
- * decision that the committee did not use.
+ * Off-contract values exist in the table: the pre-amendment contract's own
+ * words (`REDUCE`, `ADD`, …, see LEGACY_ACTIONS) and the committee's
+ * occasional inventions (`MARGIN`). Those are shown as written and flagged,
+ * never silently mapped onto a contract action: quietly turning a stored
+ * `REDUCE` into `TRIM` would put a word on a governed decision that the
+ * committee did not use. `legacyEquivalent` offers the caption instead.
  */
 export function parseAction(raw: unknown): ActionValue | null {
   const s = textOf(raw);

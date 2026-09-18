@@ -10,8 +10,10 @@ import { readFileSync } from "node:fs";
 
 import {
   CONTRACT_COLUMN_MAP,
+  LEGACY_ACTIONS,
   RECOMMENDATION_ACTIONS,
   RECOMMENDATION_REQUIRED_FIELDS,
+  legacyEquivalent,
   parseAction,
   readDecisionEvidence,
 } from "../decisionEvidence";
@@ -66,17 +68,8 @@ describe("decisions table satisfies the contract", () => {
 
 describe("action enum", () => {
   test("carries exactly the contract's nine actions", () => {
-    expect([...RECOMMENDATION_ACTIONS]).toEqual([
-      "BUY",
-      "SELL",
-      "HOLD",
-      "REDUCE",
-      "ADD",
-      "REBALANCE",
-      "ROTATE",
-      "WAIT",
-      "ESCALATE",
-    ]);
+    // ADR-APP-008 Amendment 1 (2026-09-18): the blueprint's seven.
+    expect([...RECOMMENDATION_ACTIONS]).toEqual(["BUY", "SELL", "TRIM", "CANCEL", "REPLACE", "HOLD", "WAIT"]);
   });
 
   test("recognises a contract action, case-insensitively", () => {
@@ -87,7 +80,11 @@ describe("action enum", () => {
     // TRIM is in the shipped migration's comment but not the contract. Silently
     // rewriting it to REDUCE would put a word on a governed decision that the
     // committee never used.
-    expect(parseAction("TRIM")).toEqual({ value: "TRIM", inContract: false });
+    expect(parseAction("TRIM")).toEqual({ value: "TRIM", inContract: true });
+    // The pre-amendment word is now the off-contract one, and is kept as
+    // written: a governed decision is never re-worded.
+    expect(parseAction("REDUCE")).toEqual({ value: "REDUCE", inContract: false });
+    expect(parseAction("reduce")).toEqual({ value: "reduce", inContract: false });
   });
 
   test("absent action is null, not an empty badge", () => {
@@ -133,5 +130,22 @@ describe("supporting_evidence keeps provenance", () => {
     // Rows written before the contract settled. Not an invented source.
     const ev = readDecisionEvidence({ evidence: ["Margins improving"] });
     expect(ev.evidence).toEqual([{ claim: "Margins improving" }]);
+  });
+});
+
+describe("legacy actions (ADR-APP-008 Amendment 1)", () => {
+  test("the five pre-amendment words are listed, and none is in the contract", () => {
+    expect([...LEGACY_ACTIONS]).toEqual(["REDUCE", "ADD", "REBALANCE", "ROTATE", "ESCALATE"]);
+    for (const w of LEGACY_ACTIONS) expect((RECOMMENDATION_ACTIONS as readonly string[]).includes(w)).toBe(false);
+  });
+  test("a caption exists only where the equivalence is one-to-one", () => {
+    expect(legacyEquivalent("REDUCE")).toBe("TRIM");
+    expect(legacyEquivalent("add")).toBe("BUY");
+    expect(legacyEquivalent("ROTATE")).toBeNull();
+    expect(legacyEquivalent("REBALANCE")).toBeNull();
+    expect(legacyEquivalent("ESCALATE")).toBeNull();
+    // Negative control: a contract verb and an invention have no legacy caption.
+    expect(legacyEquivalent("TRIM")).toBeNull();
+    expect(legacyEquivalent("MARGIN")).toBeNull();
   });
 });
