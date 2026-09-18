@@ -32,6 +32,7 @@
 //     reached, order/fill reconciliation needed, model health/calibration —
 //     are declared in `UNBUILT_ALERT_TYPES` below rather than omitted, so the
 //     gap is visible in the code rather than only in an audit.
+import { fmtProbability } from "./finance";
 import type { ConstitutionVerdict } from "./constitutionCheck";
 import type { ReconciliationStatus } from "./reconciliation";
 import type { SourceHealth } from "./sourceHealth";
@@ -182,7 +183,7 @@ export function raiseAlerts(input: AlertInput): Alert[] {
     out.push({
       type: "goal_pace",
       severity: "warning",
-      message: `Probability of reaching the goal is ${(input.goalProbability * 100).toFixed(0)}%.`,
+      message: `Probability of reaching the goal is ${fmtProbability(input.goalProbability, 0)}.`,
       href: "/goals",
     });
   }
