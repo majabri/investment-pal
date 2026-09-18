@@ -138,6 +138,13 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
   when it has nothing to project from or over; `fmtProbability` prints
   bounds, not `0%`/`100%`; `PROBABILITY_BASIS` names what it is a
   probability of (OD-004: current value only) on both screens and in the brief.
+- Governing goal (#267, GOAL-001): `governingGoal.ts` — the latest valid
+  `goal_versions` row governs the dashboard and the brief; the `goals` row
+  only with a carried reason; `/goals` previews what is typed. Never silent.
+- Universe read side (#268): `universeView.ts` `rankUniverse` (`rank-v1`:
+  tier, conviction desc, unscored last never zero), `UniverseRankPanel`.
+- Fill mismatch alert (#269): `countFillMismatches` in `alerts.ts`; the
+  dashboard feeds the scoped account's orders + fills; NULL = not evaluated.
 - Event consumers (#262, ADR-APP-018): `event_consumers` + the two RPCs are
   the ONE write path to a cursor and to `consumed_at`; a consumer reads
   `id > cursor`, handles, advances. Register at the present; never backwards;
@@ -173,8 +180,8 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 
 ## Current state (2026-09-18)
 
-**HEAD on `main`:** `5573c72` (#265, the first consumer). Suite
-**1894 pass / 0 fail** (73 of them the schema layer: replay, events/audit,
+**HEAD on `main`:** `77a67f9` (#269, the fill-mismatch alert). Suite
+**1926 pass / 0 fail** (73 of them the schema layer: replay, events/audit,
 alerts, RLS, import RPC, grants, backfill, consumers); tsc and
 `test:typecheck` clean; boot 200 on `/auth`, `/`, `/portfolio`, `/decisions`,
 `/goals`, `/prompt-center`, `/opportunities`, `/settings`.
@@ -268,7 +275,7 @@ OD-003 = net equity (ADR-004 C2 amended); ORD-001 = (a) reconciliation view
 writer = import (ADR-017); `decisions.account_id` backfill, one-account
 users only (ADR-019). **Still open, Amir's:** OD-001 Amendment 2 (see
 *Merge authority*); ADR-APP-015 (navigation, by his instruction); ADR-APP-018
-(Accepted 2026-09-18, #263 his merge); replacing §26.3 in the Drive
+(Accepted, merged by Amir 22:30Z); replacing §26.3 in the Drive
 blueprint; 86 merged remote branches the git proxy will not let Claude Code
 delete; the D-20 catalog query for the three new tables (the `domain_events`
 privilege question is answered, fixed and **confirmed in production**:

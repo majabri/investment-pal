@@ -4266,3 +4266,61 @@ Amir opens `/settings` after a goal edit and sees the cursor move.
 
 Amir reported it merged; GitHub shows it open (`dd25fa9` is on no branch
 but its own). Asked again. ADRs are never self-merged.
+
+## Session — 2026-09-18 (night, resumed) — what was left, built
+
+Amir: *"resume all that is left, app is published."* #263 merged by him at
+22:30Z (`65949d2`), so ADR-018 is Accepted on `main`. Then the unblocked
+backlog, each its own PR on a green gate:
+
+### #267 — the recorded goal version governs the figures (GOAL-001, CONST-002)
+
+The matrix's Phase 1 item 3 waited on ADR-009; #253 accepted it.
+`governingGoal.ts`: the latest version governs when it yields a set
+objective; otherwise the `goals` row does and the reason is carried —
+history unreadable (never "no version"), no version, the version lacks a
+named field (a NULL baseline is not known, not zero). A non-monthly
+contribution plan is taken to its monthly equivalent for the arithmetic
+and says so. Dashboard and brief compute from the governing objective and
+say their source; `/goals` keeps its editor preview and says which goal
+the dashboard and the brief use. No new figure; the same functions read a
+different stored goal when screen and record disagree, per the blueprint.
+13 tests; five fault injections reddened. Suite 1908.
+
+### #268 — the universe ranked by what the owner entered (UNIV-001 read side)
+
+`universeView.ts`: tier (top25, top100, bench), then overall conviction
+descending, unscored LAST and never as zero, then symbol; rule and version
+named (`rank-v1`). A score outside 1–10 is unscored, not clamped; an
+unknown tier is shown last and counted, not defaulted. `UniverseRankPanel`
+on `/opportunities` under the import panel. No composite over the twelve
+dimensions (a weighting is a decision), no rerank consumer yet. 10 tests;
+four fault injections reddened.
+
+### #269 — alert when recorded fills disagree with an order's filled quantity
+
+The order/fill half of "reconciliation needed". `countFillMismatches` over
+`fillSummary` per order; exceeding is critical (double-import signature),
+short is a warning, could-not-compare is info, no fills is not a mismatch,
+NULL input is "not evaluated" and raises nothing. The dashboard reads the
+scoped account's orders and fills and the evaluation-complete gate waits
+for them. 8 tests; four fault injections reddened. Suite 1916.
+
+### Left, and why
+
+- **Rerank on `TrancheClosed` (BR-004):** needs a place to record the
+  rerank and the sold ticker's exclusion window — a migration and a small
+  design (own PR next; it now has a cursor to stand on and a ranking to
+  re-run).
+- **`decision_trigger` / `invalidation_reached` alerts:** need stored,
+  evaluable trigger conditions; the columns are free text.
+- **`model_registry`, calc registry (§14.3, DATA-006):** schema decisions
+  for Amir (an ADR each).
+- **`account_policies` / no-leverage for family strategies (BR-003,
+  BR-011):** a policy design, Amir's.
+- **Defer / Mark Executed dispositions (UX-001):** a disposition
+  vocabulary is a decision like ADR-008's; not invented here.
+- **Daily-close schedule:** Supabase-side.
+- **Live checks:** the universe box, the probability line, the consumer
+  cursor, and now the goal-source line and the ranked universe — Amir
+  published and has not reported back.
