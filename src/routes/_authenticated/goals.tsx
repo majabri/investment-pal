@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { useGoal, useScopedHoldings, useScopedAccount } from "@/hooks/useAppData";
 import { goalAgreement, goalAgreementSentence, goalOnScreen } from "@/lib/goalAgreement";
+import { goalSourceSentence, governingGoal } from "@/lib/governingGoal";
 import { accountTotals, scopeLabel,
   livePriceOf,
 } from "@/lib/accountTotals";
@@ -72,6 +73,9 @@ function GoalsPage() {
   const agreementNotice = historyLoading
     ? null
     : goalAgreementSentence(goalAgreement(goalOnScreen(goal ?? null), history));
+  // GOAL-001: which goal the dashboard and the brief compute from. The
+  // projections on THIS screen preview what is typed; they are not the record.
+  const sourceNotice = historyLoading ? null : goalSourceSentence(governingGoal(goalOnScreen(goal ?? null), history));
 
   const [name, setName] = useState("");
   const [starting, setStarting] = useState<number | null>(null);
@@ -501,14 +505,19 @@ function GoalsPage() {
         </p>
         {agreementNotice ? (
           // The goal on screen and the goal on record disagree (or whether
-          // they do is not known). Which one wins is the owner's call; that
-          // they differ is a fact the holder must see before the next save
-          // silently makes the screen the record.
+          // they do is not known). Since GOAL-001 the recorded version wins
+          // for the dashboard and the brief; that they differ is still a fact
+          // the holder must see before the next save makes the screen the record.
           <p
             className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
             role="status"
           >
             {agreementNotice}
+          </p>
+        ) : null}
+        {sourceNotice ? (
+          <p className="mb-3 text-xs text-muted-foreground" data-testid="goal-source">
+            {sourceNotice} The projections above preview what is typed here.
           </p>
         ) : null}
         {historyLoading ? (

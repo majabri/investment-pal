@@ -69,7 +69,8 @@ import {
   riskToVol,
   riskToExpectedReturn,
 } from "@/lib/finance";
-import { objectiveOf } from "@/lib/objective";
+import { goalOnScreen } from "@/lib/goalAgreement";
+import { goalSourceSentence, governingGoal } from "@/lib/governingGoal";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
@@ -91,7 +92,7 @@ const CATEGORY_META: Record<string, { label: string; className: string }> = {
 
 function Dashboard() {
   const navigate = useNavigate();
-  const { data: goal } = useGoal();
+  const { data: goal, history: goalHistory } = useGoal();
   const { data: profile } = useProfile();
   const displayName = profile?.display_name?.trim() ?? "";
   // Household-wide, and only for the quote request below — every figure on
@@ -244,7 +245,9 @@ function Dashboard() {
   // defaults. `new Date(null)` is the epoch, so a missing date used to produce
   // a required CAGR measured against 1970 — a confident, enormous, wrong
   // number (rule 13).
-  const objective = useMemo(() => objectiveOf(goal), [goal]);
+  // GOAL-001: the latest valid recorded version governs, not the screen.
+  const governing = useMemo(() => governingGoal(goalOnScreen(goal ?? null), goalHistory), [goal, goalHistory]);
+  const objective = governing.objective;
   const goalMetrics = useMemo(() => {
     // The current value is as load-bearing as the objective: every figure below
     // projects FROM it. Without it, `startVal` silently falls back to the
@@ -446,7 +449,7 @@ function Dashboard() {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <GoalOutlookPanel goalName={goal ? goal.name : null} metrics={goalMetrics} />
+        <GoalOutlookPanel goalName={goal ? goal.name : null} metrics={goalMetrics} sourceNote={goalSourceSentence(governing)} />
         <PrioritiesPanel priorities={priorities} onDismiss={(id) => dismissPriority.mutate(id)} />
       </div>
 

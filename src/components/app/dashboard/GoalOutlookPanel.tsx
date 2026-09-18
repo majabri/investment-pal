@@ -23,10 +23,13 @@ export type GoalMetrics = {
 export function GoalOutlookPanel({
   goalName,
   metrics,
+  sourceNote = null,
 }: {
   /** NULL = no goal is set at all, which is different from a goal with no metrics. */
   goalName: string | null;
   metrics: GoalMetrics | null;
+  /** GOAL-001: what the figures are computed from (the recorded version, or the screen and why). */
+  sourceNote?: string | null;
 }) {
   return (
     <section aria-label="Goal outlook" className="rounded-2xl border bg-card p-5 lg:col-span-2">
@@ -87,6 +90,7 @@ export function GoalOutlookPanel({
           to set your target.
         </p>
       )}
+      {sourceNote ? <p className="mt-3 text-xs text-muted-foreground">{sourceNote}</p> : null}
     </section>
   );
 }
