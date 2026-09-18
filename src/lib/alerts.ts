@@ -100,7 +100,46 @@ export type AlertInput = {
    * to ask it of.
    */
   reconciliation: ReconciliationStatus | null;
+  /**
+   * Recorded fills against each order's own filled quantity (§12.3; the
+   * order/fill half of "reconciliation needed"). NULL when the ledger was not
+   * evaluated — no single account in scope, or orders and fills not loaded —
+   * which raises nothing: not checked is not "checked and fine", and the
+   * evaluation-complete gate keeps a partial answer out of the record.
+   */
+  fillMismatches: FillMismatchCount | null;
 };
+
+/** How the fills compare with the orders' claims, counted per order. */
+export type FillMismatchCount = {
+  /** Orders that have at least one recorded fill. */
+  orders: number;
+  /** Σ fills exceeds the order's filled quantity: check for a double import. */
+  over: number;
+  /** Σ fills falls short of it: fills are missing or the order overstates. */
+  under: number;
+  /** A quantity on one side is not known; the comparison could not be made. */
+  unknown: number;
+};
+
+/**
+ * Count the mismatches from per-order fill summaries (`ordersView.fillSummary`).
+ * An order with no fills recorded yet is not a mismatch and not counted: that
+ * is every order's state until somebody records one.
+ */
+export function countFillMismatches(
+  summaries: readonly ({ state: "not_recorded" } | { state: "recorded"; reconciliation: "matched" | "over" | "under" | "unknown" })[],
+): FillMismatchCount {
+  const c: FillMismatchCount = { orders: 0, over: 0, under: 0, unknown: 0 };
+  for (const s of summaries) {
+    if (s.state !== "recorded") continue;
+    c.orders++;
+    if (s.reconciliation === "over") c.over++;
+    else if (s.reconciliation === "under") c.under++;
+    else if (s.reconciliation === "unknown") c.unknown++;
+  }
+  return c;
+}
 
 /** Below this, the goal is off pace enough to say so. */
 export const GOAL_PACE_FLOOR = 0.5;
@@ -174,6 +213,30 @@ export function raiseAlerts(input: AlertInput): Alert[] {
       severity: "warning",
       message: `Positions were last imported ${input.positionsStaleDays} days ago.`,
       href: "/settings",
+    });
+  }
+
+  const fm = input.fillMismatches;
+  if (fm !== null && (fm.over > 0 || fm.under > 0)) {
+    const parts: string[] = [];
+    if (fm.over > 0) parts.push(`${fm.over} exceed it`);
+    if (fm.under > 0) parts.push(`${fm.under} fall short`);
+    const n = fm.over + fm.under;
+    out.push({
+      type: "reconciliation_needed",
+      // Fills exceeding the broker's own figure is the double-import signature
+      // the fills index exists for; short is a gap in the record.
+      severity: fm.over > 0 ? "critical" : "warning",
+      message: `${n} ${n === 1 ? "order's" : "orders'"} recorded fills disagree with the broker's filled quantity: ${parts.join(", ")}. Reconcile the ledger before acting on a position figure.`,
+      href: "/portfolio",
+    });
+  } else if (fm !== null && fm.unknown > 0) {
+    // Could not be compared is not "compared and fine".
+    out.push({
+      type: "reconciliation_needed",
+      severity: "info",
+      message: `${fm.unknown} ${fm.unknown === 1 ? "order's" : "orders'"} recorded fills could not be compared with the broker's filled quantity — a quantity is not known.`,
+      href: "/portfolio",
     });
   }
 
