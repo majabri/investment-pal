@@ -4014,3 +4014,16 @@ seen button; whether he clicked nine times is asked and unanswered. And
 "Probability of reaching the goal is 0%" is on the list to check: an
 uncomputable plan must say not known, never 0%.
 
+### Lovable applied `20260918170000_events_audit_grants.sql` (2026-09-18)
+
+Verified against git (`ff57ef0`, `a8b432f`): the migration file untouched;
+`drizzle/migrations/0002_events_audit_grants.sql` identical to it but for
+a trailing newline; `types.ts` not changed (Lovable said "regenerated,
+content unchanged" — git agrees). Only Drizzle's journal and snapshot were
+added. Whether the privileges in production now read as the schema test
+asserts is one more read-only catalog query away (the same `relacl` /
+`attacl` query as before); asked of Amir.
+
+`main` at `a8b432f`; 1793 pass / 0 fail. Every migration in the repo is
+applied. Nothing waits on Lovable.
+
