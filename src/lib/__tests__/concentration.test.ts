@@ -11,6 +11,7 @@ import {
   DENOMINATOR_HEADING,
   DENOMINATOR_KEYS,
   DENOMINATOR_LABEL,
+  MARGIN_CAP_DENOMINATOR,
   POLICY_DENOMINATOR,
   UNKNOWN_PCT,
   denominatorState,
@@ -198,10 +199,15 @@ describe("marginUtilisationOf", () => {
     const againstNet = marginUtilisationOf(t.marginDebit, d, "netEquity");
     const againstGross = marginUtilisationOf(t.marginDebit, d, "grossAssets");
     expect(againstNet).toBeCloseTo(30_000 / 70_000, 10); // 42.9% — the dashboard cap
-    expect(againstGross).toBeCloseTo(0.3, 10); // 30.0% — accountTotals
+    expect(againstGross).toBeCloseTo(0.3, 10); // 30.0% — what accountTotals used to carry
     expect(againstNet).not.toBeCloseTo(againstGross as number, 3);
-    // And the gross one is what `accountTotals` already reports, unchanged.
-    expect(t.marginUtilisation).toBeCloseTo(againstGross as number, 10);
+    // ADR-APP-013 D2: the gross one is no longer reported anywhere by default;
+    // it exists only when a caller asks for that denominator by name.
+    expect("marginUtilisation" in t).toBe(false);
+  });
+
+  test("the enforced margin cap denominator is net equity (ADR-APP-013 D2)", () => {
+    expect(MARGIN_CAP_DENOMINATOR).toBe("netEquity");
   });
 
   test("unknown debit is unknown utilisation, not zero", () => {

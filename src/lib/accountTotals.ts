@@ -98,8 +98,12 @@ export type AccountTotals = {
   /** Gross ÷ equity. 1 means unlevered; NULL when either is unknown, or when
    *  equity is zero — leverage against nothing is undefined, not infinite. */
   leverage: number | null;
-  /** Debt ÷ gross. The figure the IPS margin cap is expressed against. */
-  marginUtilisation: number | null;
+  // There is deliberately no margin-utilisation ratio here. The IPS margin cap
+  // is enforced against NET EQUITY (ADR-APP-013 D2, 2026-09-18) through
+  // `marginUtilisationOf(marginDebit, denominators, MARGIN_CAP_DENOMINATOR)`
+  // in `concentration.ts`, with its denominator named. A debit ÷ gross figure
+  // lived here until then, rendered nowhere; a third definition that nothing
+  // shows is a number waiting to be read as the wrong one.
   /** Held positions carrying a usable price. */
   pricedPositions: number;
   /**
@@ -266,10 +270,6 @@ export function accountTotals<T extends PositionLike>(
     leverage:
       grossValue !== null && totalAccountValue !== null && totalAccountValue !== 0
         ? grossValue / totalAccountValue
-        : null,
-    marginUtilisation:
-      marginDebit !== null && grossValue !== null && grossValue > 0
-        ? marginDebit / grossValue
         : null,
     unrealizedPLPct: costBasis > 0 ? unrealizedPL / costBasis : null,
     equityPct:

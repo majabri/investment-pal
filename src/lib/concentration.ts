@@ -11,13 +11,15 @@
 // and `ADR-APP-004` C2 states the position cap as a fraction of GROSS. A 30%
 // cap therefore means three different position sizes depending on which screen
 // you read it on, and nothing on any of those screens says which. The margin
-// meter has the same split: `accountTotals.marginUtilisation` is debit ÷ gross,
+// meter had the same split: `accountTotals` carried a debit ÷ gross ratio,
 // while the cap actually enforced in `index.tsx` is debit ÷ net equity.
 //
-// This module does not resolve that conflict — resolving it is money-adjacent
-// (OD-001) and belongs to the owner, so it is filed as OD-003. What this module
-// does is make every ratio state its denominator, so a percentage on screen can
-// no longer be read as the wrong one.
+// This module did not resolve that conflict — resolving it was money-adjacent
+// (OD-001) and belonged to the owner, filed as OD-003 and decided in
+// ADR-APP-013 (2026-09-18): net equity for both caps, and the unrendered
+// debit ÷ gross figure removed so no third definition survives. What this
+// module does is make every ratio state its denominator, so a percentage on
+// screen can no longer be read as the wrong one.
 import { fmtPct } from "@/lib/finance";
 import type { AccountTotals } from "@/lib/accountTotals";
 
@@ -155,19 +157,19 @@ export const POLICY_DENOMINATOR: DenominatorKey = "netEquity";
  * Separate from `POLICY_DENOMINATOR` on purpose. Margin utilisation is not a
  * position weight and inherited the position cap's denominator only because
  * both were written inline in the same block. Giving it its own name means the
- * two can be decided independently — and `accountTotals.marginUtilisation`,
- * which is debit ÷ gross, is a third answer that this makes visible rather
- * than reconciling on its own authority.
+ * two can be decided independently. They were, the same way, by ADR-APP-013
+ * D1 and D2 (2026-09-18): net equity for both.
  */
 export const MARGIN_CAP_DENOMINATOR: DenominatorKey = "netEquity";
 
 /**
  * Margin utilisation, with its denominator named rather than assumed.
  *
- * `accountTotals.marginUtilisation` is debit ÷ gross. The cap enforced on the
- * dashboard is debit ÷ net equity. Both are defensible definitions and they
- * are not the same number; what was not defensible was printing either as
- * "Margin util 18.4%" with no denominator attached.
+ * The cap enforced on the dashboard is debit ÷ net equity (ADR-APP-013 D2).
+ * Debit ÷ gross is a defensible definition too, and not the same number;
+ * what was not defensible was printing either as "Margin util 18.4%" with no
+ * denominator attached — or carrying the other one unrendered, which
+ * `accountTotals` did until the decision.
  */
 export function marginUtilisationOf(
   marginDebit: number | null,
