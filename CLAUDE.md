@@ -181,7 +181,7 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 ## Current state (2026-09-18)
 
 **HEAD on `main`:** `77a67f9` (#269, the fill-mismatch alert). Suite
-**1916 pass / 0 fail** (73 of them the schema layer: replay, events/audit,
+**1926 pass / 0 fail** (73 of them the schema layer: replay, events/audit,
 alerts, RLS, import RPC, grants, backfill, consumers); tsc and
 `test:typecheck` clean; boot 200 on `/auth`, `/`, `/portfolio`, `/decisions`,
 `/goals`, `/prompt-center`, `/opportunities`, `/settings`.
