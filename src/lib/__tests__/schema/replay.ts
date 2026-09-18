@@ -47,6 +47,19 @@ export async function freshDatabase(): Promise<PGlite> {
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role; END IF;
       IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon; END IF;
     END $$;
+    -- Supabase's ambient privileges, modelled so the tests cannot pass for the
+    -- wrong reason. In a Supabase project every table, sequence and function
+    -- created in \`public\` is granted ALL to anon / authenticated / service_role
+    -- by default privileges; a GRANT in a migration therefore narrows nothing,
+    -- and ROW LEVEL SECURITY is the only thing between one user's rows and
+    -- another's. Without this stub a missing GRANT would make a cross-user
+    -- read fail with "permission denied", and a test would pass on a table
+    -- whose policy is wrong.
+    GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+    GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
   `);
   return db;
 }
@@ -77,6 +90,49 @@ export async function replayMigrations(dir: string = MIGRATIONS_DIR): Promise<Re
     }
   }
   return { db, applied, duplicates };
+}
+
+/** A second user. Every row of theirs is a row `TEST_USER` must not see. */
+export const OTHER_USER = "00000000-0000-0000-0000-000000000002";
+
+export type DbRole = "authenticated" | "anon" | "service_role";
+
+/**
+ * Become a role the way PostgREST does: the Postgres role the JWT maps to, and
+ * the `sub` claim `auth.uid()` reads. Unlike `signIn`, this leaves the
+ * superuser — RLS does not apply to the table owner, so a test that never
+ * switches role is not testing RLS at all.
+ */
+export async function actAs(db: PGlite, role: DbRole, userId: string | null): Promise<void> {
+  await db.exec("RESET ROLE;");
+  if (userId !== null) {
+    await db.exec(`INSERT INTO auth.users (id, email) VALUES ('${userId}', '${userId.slice(-4)}@example.com') ON CONFLICT DO NOTHING;`);
+  }
+  await db.exec(`SELECT set_config('request.jwt.claim.sub', '${userId ?? ""}', false);`);
+  await db.exec(`SELECT set_config('request.jwt.claim.role', '${role}', false);`);
+  await db.exec(`SET ROLE ${role};`);
+}
+
+/** Back to the superuser (the migrations' author), who bypasses RLS. */
+export async function actAsAdmin(db: PGlite): Promise<void> {
+  await db.exec("RESET ROLE;");
+  await db.exec("SELECT set_config('request.jwt.claim.sub', '', false);");
+  await db.exec("SELECT set_config('request.jwt.claim.role', '', false);");
+}
+
+/**
+ * How many rows a write touched, or `"refused"` when it errored. RLS makes an
+ * UPDATE or DELETE of another user's rows touch zero rows silently, and makes
+ * an INSERT or an ownership change error; both are the right answer, and the
+ * caller says which it expects.
+ */
+export async function affected(db: PGlite, writeSql: string): Promise<number | "refused"> {
+  try {
+    const r = await db.query(`${writeSql} RETURNING 1`);
+    return r.rows.length;
+  } catch {
+    return "refused";
+  }
 }
 
 /** Act as `TEST_USER` for RLS-aware functions (`auth.uid()`). */
