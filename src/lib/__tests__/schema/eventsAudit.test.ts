@@ -167,8 +167,9 @@ describe("the contracts are enforced by the schema, not by the app", () => {
     const before = Number((await one<{ n: string }>(db, "SELECT count(*)::text n FROM audit_log")).n);
     expect(before).toBeGreaterThan(0); // the trigger's rows are readable by their owner
     expect(await affected(db, `INSERT INTO audit_log (user_id, table_name, row_id, op, new_row) VALUES ('${U}', 'holdings', gen_random_uuid(), 'INSERT', '{}'::jsonb)`)).toBe("refused");
-    expect(await affected(db, "UPDATE audit_log SET op = op")).toBe(0);
-    expect(await affected(db, "DELETE FROM audit_log")).toBe(0);
+    // Refused outright since 20260918170000 narrowed the grant to SELECT.
+    expect(await affected(db, "UPDATE audit_log SET op = op")).toBe("refused");
+    expect(await affected(db, "DELETE FROM audit_log")).toBe("refused");
     await actAsAdmin(db);
     const after = Number((await one<{ n: string }>(db, "SELECT count(*)::text n FROM audit_log")).n);
     expect(after).toBe(before);
