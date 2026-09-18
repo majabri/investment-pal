@@ -119,7 +119,9 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
   migration into PGlite (Postgres in WebAssembly, devDependency) with
   `auth.uid()`, the roles and Supabase's default privileges stubbed;
   `eventsAudit.test.ts` is the model for testing a migration before Lovable
-  applies it; `rls.test.ts` has a second user try every table under
+  applies it; `importRpc.test.ts` (#246) calls `import_account_positions`
+  as the client role — atomic rollback, idempotent re-import, account
+  scope, narrative columns kept; `rls.test.ts` has a second user try every table under
   `actAs("authenticated", …)` — the superuser bypasses RLS, so a schema test
   that never switches role proves nothing about it. Lovable's five duplicate
   files are not idempotent and are pinned by name there. **Write the schema

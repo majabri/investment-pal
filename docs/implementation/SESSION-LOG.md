@@ -3841,3 +3841,30 @@ mid-loop leaves holdings unchanged; the same file twice changes nothing),
 which is the last "by reasoning" item in the matrix's risk list · a first
 `domain_events` consumer · the daily-close schedule (Supabase-side).
 
+### #246 — the import RPC, run for real (§26.2 tests 6 and 7; §20.3; rule 29)
+
+The last "proven by reasoning" item in the matrix's risk list.
+`schema/importRpc.test.ts` calls `import_account_positions` as the client
+role with a second account and a second user standing by. A successful
+import updates, inserts and removes in this account only, normalises the
+symbol, keeps every narrative column (`original_thesis`, `why_own`,
+`notes`) through the refresh, writes the cash figure with its provenance,
+and raises one `AccountImported` plus one `HoldingsReconciled` for the
+update, the insert and the delete. A NULL cash argument leaves the stored
+cash alone (IMP-002) and rewrites no provenance. **Test 7:** the same file
+twice changes no row, inserts nothing, removes nothing, and each of the
+two `HoldingsReconciled` events it raises says `changed: []` — the row was
+reconciled and nothing about it moved; no `AccountImported`, no
+`QuoteUpdated`. **Test 6:** a bad row mid-batch fails the whole call and
+leaves holdings (including `updated_at`), the account row, the audit log
+and the event record exactly as they were — the trigger's rows roll back
+with the write. Another user's call is refused and touches nothing; an
+unsigned caller and an unknown account are refused; a non-array payload
+is refused before anything is touched.
+
+Four fault injections on the applied migration's copy in the repo, each
+restored and confirmed by `diff` and `git status`: the delete without the
+account predicate (2 tests); `COALESCE(p_cash, cash)` reduced to `p_cash`
+(1); the UPDATE clearing `notes` (1); the symbol matched raw rather than
+`upper(btrim())` (3). 1752 → **1762** (49 in the schema layer).
+
