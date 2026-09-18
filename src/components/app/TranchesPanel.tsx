@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/table";
 import { Field } from "@/components/app/Field";
 import type { Account, Holding } from "@/hooks/useAppData";
-import { useCloseTranche, useOpenTranche } from "@/hooks/useAppData";
+import { useCloseTranche, useDecisionOptions, useOpenTranche } from "@/hooks/useAppData";
 import { fmtPrice } from "@/lib/finance";
 import { localIsoMinute } from "@/lib/fillDraft";
 import { closeRejection, emptyTrancheDraft, validateTrancheDraft } from "@/lib/trancheDraft";
@@ -44,7 +44,9 @@ import type { TrancheRead } from "@/lib/trancheRows";
 import {
   KIND_LABEL,
   coverageLines,
+  decisionOptionLabel,
   fmtQuantity,
+  rankDecisionOptions,
   sortTranches,
   trancheSummary,
 } from "@/lib/tranchesView";
@@ -273,6 +275,13 @@ function TrancheForm({
   const [draft, setDraft] = useState<TrancheDraft>(() => emptyTrancheDraft());
   const open = useOpenTranche();
   const listId = `tranche-symbols-${account.id}`;
+  // §A.3: which decision opened this. Ranked with the typed symbol first.
+  const { data: decisionOptions = [], isError: decisionsUnreadable } = useDecisionOptions();
+  const rankedDecisions = useMemo(
+    () => rankDecisionOptions(decisionOptions, draft.symbol),
+    [decisionOptions, draft.symbol],
+  );
+  const NO_DECISION = "__none__";
 
   const problems = useMemo(() => validateTrancheDraft(draft), [draft]);
   const problemFor = (field: TrancheProblem["field"]) =>
@@ -370,6 +379,31 @@ function TrancheForm({
             onChange={(e) => setDraft({ ...draft, target: num(e.target.value) })}
             aria-invalid={touched && problemFor("target") !== null}
           />
+        </Field>
+        <Field label="Opened by decision (optional)">
+          <Select
+            value={draft.decisionId ?? NO_DECISION}
+            onValueChange={(v) => setDraft({ ...draft, decisionId: v === NO_DECISION ? null : v })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="none named" />
+            </SelectTrigger>
+            <SelectContent>
+              {/* "None" is a real answer, not the absence of one: a tranche
+                  recorded from a statement may predate any decision here. */}
+              <SelectItem value={NO_DECISION}>None — not opened by a recorded decision</SelectItem>
+              {rankedDecisions.map((d) => (
+                <SelectItem key={d.id} value={d.id}>
+                  {decisionOptionLabel(d)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {decisionsUnreadable && (
+            <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+              Decisions could not be read; the list above is not empty by choice.
+            </p>
+          )}
         </Field>
         <Field label="Invalidation (optional)">
           <Input
