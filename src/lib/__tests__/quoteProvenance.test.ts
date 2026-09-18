@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   MARKET_CLOSED_WINDOW_HOURS,
+  exchangeZoneOf,
   isoFromUnixSeconds,
   quoteBanner,
   quoteCaption,
@@ -33,6 +34,7 @@ const quote = (over: Partial<ProvenancedQuote> = {}): ProvenancedQuote => ({
   retrievedAt: NOW.toISOString(),
   session: "regular",
   delaySeconds: null,
+  exchangeTimezone: "America/New_York",
   ...over,
 });
 
@@ -153,5 +155,20 @@ describe("quoteBanner", () => {
   });
   test("a stated common delay is said in minutes", () => {
     expect(quoteBanner({ AAA: quote({ delaySeconds: 900 }) }, NOW)).toContain("15 min delayed");
+  });
+});
+
+describe("exchangeZoneOf", () => {
+  test("a zone the runtime knows passes through unchanged", () => {
+    expect(exchangeZoneOf("America/New_York")).toBe("America/New_York");
+    expect(exchangeZoneOf("Asia/Tokyo")).toBe("Asia/Tokyo");
+  });
+  test("anything else is null, never a default zone", () => {
+    expect(exchangeZoneOf("Mars/Olympus")).toBeNull();
+    expect(exchangeZoneOf("")).toBeNull();
+    expect(exchangeZoneOf(undefined)).toBeNull();
+    expect(exchangeZoneOf(42)).toBeNull();
+    // Negative control: the output is never invented from a bad input.
+    expect(exchangeZoneOf("Mars/Olympus")).not.toBe("America/New_York");
   });
 });

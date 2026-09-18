@@ -41,7 +41,27 @@ export type QuoteProvenance = {
   session: MarketSession | null;
   /** How far behind real time the provider says it is. NULL = not stated. */
   delaySeconds: number | null;
+  /** The IANA zone the provider names for the exchange (`exchangeTimezoneName`).
+   *  It is what turns the quote's own time into the exchange's calendar date,
+   *  which is the date a close belongs to. NULL when not stated or not a zone
+   *  the runtime knows — never a default; a wrong zone files a close under the
+   *  wrong day. */
+  exchangeTimezone: string | null;
 };
+
+/**
+ * The provider's exchange timezone as a zone the runtime can use, or null.
+ * Validated here so every consumer downstream can trust the string.
+ */
+export function exchangeZoneOf(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.length === 0) return null;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: raw });
+    return raw;
+  } catch {
+    return null;
+  }
+}
 
 /** A quote as the app carries it: the figures, and where they came from. */
 export type ProvenancedQuote = {
