@@ -50,6 +50,16 @@ describe("GoalOutlookPanel", () => {
     expect(text).toContain("1.55 yrs");
   });
 
+  test("the probability says what it is a probability of (OD-004: current value only)", () => {
+    const { container } = render(
+      <GoalOutlookPanel goalName="Growth Brokerage" metrics={metrics} />,
+    );
+    const text = container.textContent ?? "";
+    expect(text).toContain("62.0%");
+    expect(text).toContain("Current value only");
+    expect(text).toContain("contributions are not counted");
+  });
+
   test("an UNKNOWN probability is the em-dash and says why — never 0%", () => {
     const { container } = render(
       <GoalOutlookPanel goalName="Growth Brokerage" metrics={{ ...metrics, prob: null }} />,

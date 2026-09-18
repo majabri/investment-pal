@@ -25,6 +25,7 @@ import { accountTotals, scopeLabel,
 import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import {
+  PROBABILITY_BASIS,
   fmtPct,
   fmtProbability,
   fmtUSD,
@@ -423,7 +424,7 @@ function GoalsPage() {
           <StatCard
             label="Probability of success"
             value={metrics ? fmtProbability(metrics.prob) : "—"}
-            hint={metrics && metrics.prob === null ? "Not computable: nothing to project from" : `Assumes ${risk} volatility profile`}
+            hint={metrics && metrics.prob === null ? "Not computable: nothing to project from" : `${PROBABILITY_BASIS} Assumes ${risk} volatility profile.`}
             tone={metrics && metrics.prob !== null ? (metrics.prob >= 0.5 ? "positive" : "warning") : "default"}
           />
         </div>

@@ -1,6 +1,6 @@
 # OD-004 — Whether the goal probability model should count monthly contributions
 
-- **Status:** Open
+- **Status:** Approved 2026-09-18 — Option 1, "label it" (Amir Jabri, in chat)
 - **Raised:** 2026-09-18
 - **Area:** scope (a projection shown to the owner; not money movement)
 
@@ -49,4 +49,13 @@ goal, and should be decided, not slipped in.
 
 ## Decision
 
-<!-- Filled in when resolved: what, by whom, when; link to the ADR/PR. -->
+**Option 1 — label it.** Amir Jabri, 2026-09-18, in chat: *"4 is label it"*, with
+the three options above in front of him.
+
+Recorded in code the same day: `PROBABILITY_BASIS` in `src/lib/finance.ts`
+("Current value only; monthly contributions are not counted.") is shown under
+the probability on the dashboard's Goal outlook and on `/goals`, and the
+Committee brief's `Model probability:` line carries it in parentheses. The
+model is unchanged. Options 2 and 3 remain available if the owner later wants
+the figure to mean the plan; either would be a new OD or an ADR, not a quiet
+change.

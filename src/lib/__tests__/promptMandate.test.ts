@@ -76,6 +76,14 @@ function ctx(overrides: Partial<PromptContext> = {}): PromptContext {
 }
 
 describe("mandateOf", () => {
+  test("the model probability names its basis (OD-004): current value only", () => {
+    const out = buildMorningPrompt(ctx());
+    expect(out).toContain("Model probability: 40.0% (current value only; monthly contributions are not counted)");
+    // Negative control: the required CAGR, which DOES count contributions, carries no such label.
+    expect(out).toMatch(/Required CAGR: 20\.0% \| Model probability/);
+    expect(out).not.toMatch(/Required CAGR: [\d.]+% \(current value only/);
+  });
+
   test("renders the objective from goal data", () => {
     const m = mandateOf(ctx());
     expect(m.account).toBe("Growth Brokerage");

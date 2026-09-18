@@ -102,6 +102,14 @@ export const fmtPct = (v: number, digits = 1) => {
 };
 
 /**
+ * What the goal probability is a probability OF (OD-004, decided 2026-09-18:
+ * label it). The model projects the current value alone; the required-CAGR
+ * figure beside it counts monthly contributions. Two figures, two questions;
+ * this sentence travels with the first wherever it is shown or briefed.
+ */
+export const PROBABILITY_BASIS = "Current value only; monthly contributions are not counted.";
+
+/**
  * A probability for the screen. NULL is the em-dash, never "0%". A value the
  * digits would round to 0% or 100% without being one is shown as a bound —
  * "<0.1%" is a small number; "0.0%" is a claim of impossibility.
