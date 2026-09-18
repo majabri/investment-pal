@@ -3884,3 +3884,54 @@ cannot reach. The first `domain_events` consumer needs a shape decision
 (see CLAUDE.md, *Then buildable*). Everything else open is Amir's, listed
 above and unchanged.
 
+## Session — 2026-09-18 (afternoon) — Lovable applies the alerts migration; the alerts record on the dashboard (#248)
+
+### Lovable applied `20260917180000_alerts.sql`
+
+Amir pasted the line from #238's body. Lovable's account: applied exactly
+as written, types regenerated, and a change of its own for an "aborted"
+crash on page load. Verified against git (commits `086b1a7`, `fe84771`,
+`737bb24`): the migration file is untouched; the Drizzle copy differs
+only by a trailing newline; `types.ts` gained the `alerts` table and
+`raise_alerts`; the one code change is `error-capture.ts` widening
+`isIncomingRequestAbort` to accept the Node abort by module name or by
+`ECONNABORTED`/`ECONNRESET` code. Small and plausible; **it has no test
+of its own** (`isIncomingRequestAbort` is called from `server.ts` only).
+CI on `main` green at `737bb24`; the gate green here (1762).
+
+### #248 — the alert record on the dashboard (§23.1 acknowledgement, §16.1)
+
+The #233 → #236 sequence again: schema (#238) then wiring. `lib/alertRecord.ts`
+is the pure half: `alertFingerprint` (type plus the message with every
+figure blanked — "3 days ago" and "4 days ago" are one alert whose wording
+moved), `raisePayload` (one item per fingerprint, worst first kept, the
+collapse counted), `evaluationKey`, `recordDecision` (named refusals:
+`no_account`, `failed`, `evaluation_incomplete`, `pending`, `unchanged`),
+`readAlertRows` (the eleven types and three severities validated at the
+boundary; unreadable rows counted), `decorateAlerts` (the live list is the
+truth about now; the record adds since-when and seen; a live alert with
+no row is "not yet recorded", not new), `standingSentence`,
+`acknowledgementSentence`, `acknowledgePatch`, `recordNote`.
+`hooks/useAlertRecord.ts`: `useStoredAlerts` (open rows for the account in
+scope), `useRaiseAlerts` (the RPC), `useAcknowledgeAlert` (the holder's
+one UPDATE, only an open unacknowledged row). `AlertRecorder` renders
+nothing and sends the set once per change, **only when every input has
+finished loading** — a half-loaded set would resolve real alerts and their
+re-raise would clear the holder's acknowledgements; that guard is the
+one FI-2 proves. `AlertsPanel` gains an optional `record` view: each live
+alert shows how long it has stood and whether it has been seen, with a
+"Mark seen" button for a recorded, unacknowledged one. **An acknowledged
+alert is shown as seen, never hidden** (FI-4). Without the prop the panel
+says nothing about standing, so a caller without a record implies none.
+The household scope (`account_id` NULL) has no caller yet: the dashboard
+records per account only.
+
+Four fault injections reddened: the fingerprint keeping the figure (9
+tests); the incomplete-evaluation guard removed (2); resolved rows
+decorating live alerts (1); the panel hiding acknowledged alerts (1).
+1762 → **1786**.
+
+What the record's `last_raised_at` means after this PR: the last time the
+set changed, or the page loaded — not every render. A figure moving
+inside an unchanged set does not reach the database.
+

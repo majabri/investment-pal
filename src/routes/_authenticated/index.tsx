@@ -39,6 +39,10 @@ import { HouseholdStrip } from "@/components/app/dashboard/HouseholdStrip";
 import { householdRollup } from "@/lib/householdTotals";
 import { CommandCenterStrip } from "@/components/app/dashboard/CommandCenterStrip";
 import { AlertsPanel } from "@/components/app/AlertsPanel";
+import { AlertRecorder } from "@/components/app/AlertRecorder";
+import { useAcknowledgeAlert, useStoredAlerts } from "@/hooks/useAlertRecord";
+import { raiseAlerts } from "@/lib/alerts";
+import type { AlertInput } from "@/lib/alerts";
 import { useReconciliation } from "@/hooks/useReconciliation";
 import { GoalOutlookPanel } from "@/components/app/dashboard/GoalOutlookPanel";
 import { PrioritiesPanel } from "@/components/app/dashboard/PrioritiesPanel";
@@ -92,9 +96,9 @@ function Dashboard() {
   const displayName = profile?.display_name?.trim() ?? "";
   // Household-wide, and only for the quote request below — every figure on
   // this page is scoped. Reading `allHoldings` into a total is the bug.
-  const { data: allHoldings = [] } = useAllHoldings();
+  const { data: allHoldings = [], isLoading: holdingsLoading } = useAllHoldings();
   const { data: accountsList = [] } = useAccounts();
-  const { data: ipsLite } = useIpsLite();
+  const { data: ipsLite, isLoading: ipsLoading } = useIpsLite();
   // The dashboard tracks the selected account only (each other account has its
   // own screen). An unresolved selection yields no holdings and an explicit
   // notice — it must never fall back to accountless rows or to the household
@@ -174,7 +178,7 @@ function Dashboard() {
       return h ? px(h) : null;
     }).values(),
   );
-  const { data: liveEcon = [] } = useQuery({
+  const { data: liveEcon = [], isLoading: econLoading } = useQuery({
     queryKey: ["econ-cal-office"],
     queryFn: () => getEconCalendarFn({ data: { days: 7 } }),
     refetchInterval: 60 * 60 * 1000,
@@ -217,6 +221,10 @@ function Dashboard() {
   // The same comparison the ReconciliationPanel below shows, so the alert
   // and the panel cannot disagree (rule 11).
   const reconciliation = useReconciliation(totals);
+  // §23.1: the record of the alerts below. Read for the account in scope;
+  // written by the recorder once the evaluation is complete.
+  const storedAlerts = useStoredAlerts(scope);
+  const acknowledge = useAcknowledgeAlert();
   const { cash, marginDebit: marginUsed, grossValue, totalAccountValue: portfolioValue } = totals;
   const scopeName = scopeLabel(scope);
   const noScope = scopeIsEmpty(scope) || balance === null;
@@ -275,6 +283,33 @@ function Dashboard() {
           ? "Good afternoon"
           : "Good evening";
 
+  // The one evaluation the panel renders and the recorder sends (§23.1).
+  const alertInput: AlertInput = {
+    constitution: noScope
+      ? null
+      : constitutionCheck(
+          holdings.map((h) => ({ symbol: h.symbol, quantity: h.quantity, price: px(h) })),
+          totals,
+          ipsLite,
+        ),
+    sources: [],
+    positionsStaleDays: positionsStaleDays(holdings),
+    valuationUnknown: totals.totalAccountValue === null,
+    goalProbability: goalMetrics?.prob ?? null,
+    upcomingEvents: alerts.map((a) => ({ date: a.date, text: a.text })),
+    reconciliation: reconciliation.result?.status ?? null,
+  };
+  const liveAlerts = raiseAlerts(alertInput);
+  // Every input to `alertInput` has finished loading. Until then the set is
+  // partial, and a partial set must not reach the record.
+  const alertEvaluationComplete =
+    accountStatus === "ready" &&
+    !holdingsLoading &&
+    !ipsLoading &&
+    !econLoading &&
+    !earningsLoading &&
+    !reconciliation.isLoading;
+
   return (
     <AppShell
       title={displayName ? `${greeting}, ${displayName}` : greeting}
@@ -323,21 +358,29 @@ function Dashboard() {
           probed in Settings and the panel says so, because an unprobed source
           must not read as a healthy one. */}
       <AlertsPanel
-        input={{
-          constitution: noScope
-            ? null
-            : constitutionCheck(
-                holdings.map((h) => ({ symbol: h.symbol, quantity: h.quantity, price: px(h) })),
-                totals,
-                ipsLite,
-              ),
-          sources: [],
-          positionsStaleDays: positionsStaleDays(holdings),
-          valuationUnknown: totals.totalAccountValue === null,
-          goalProbability: goalMetrics?.prob ?? null,
-          upcomingEvents: alerts.map((a) => ({ date: a.date, text: a.text })),
-          reconciliation: reconciliation.result?.status ?? null,
-        }}
+        input={alertInput}
+        record={
+          scope.kind === "account"
+            ? {
+                state: storedAlerts.isError ? "unavailable" : storedAlerts.isLoading ? "loading" : "ready",
+                alerts: storedAlerts.data?.alerts ?? [],
+                unreadable: storedAlerts.data?.unreadable ?? 0,
+              }
+            : undefined
+        }
+        onAcknowledge={
+          scope.kind === "account"
+            ? (id) => acknowledge.mutate({ id, accountId: scope.accountId })
+            : undefined
+        }
+      />
+      {/* Invisible: sends the same set to the alert record, once per change,
+          and only when every input above has finished loading — a half-loaded
+          set would resolve real alerts and clear their acknowledgements. */}
+      <AlertRecorder
+        alerts={liveAlerts}
+        accountId={scope.kind === "account" ? scope.accountId : null}
+        evaluationComplete={alertEvaluationComplete}
       />
       <CommandCenterStrip
         verdict={constitutionCheck(
