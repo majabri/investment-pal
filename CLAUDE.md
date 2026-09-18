@@ -134,9 +134,15 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
   (window = (previous import end, this import end]; excluded and outside
   fills are counted), `hooks/useFillHoldingReconciliation.ts`,
   `FillHoldingPanel` on `/portfolio`. Compares; never applies.
-- Goal probability (#259): `probabilityOfReachingTarget` is `null` when it
-  has nothing to project from or over; `fmtProbability` prints bounds, not
-  `0%`/`100%`. The model ignores contributions — OD-004.
+- Goal probability (#259, #261): `probabilityOfReachingTarget` is `null`
+  when it has nothing to project from or over; `fmtProbability` prints
+  bounds, not `0%`/`100%`; `PROBABILITY_BASIS` names what it is a
+  probability of (OD-004: current value only) on both screens and in the brief.
+- Event consumers (#262, ADR-APP-018): `event_consumers` + the two RPCs are
+  the ONE write path to a cursor and to `consumed_at`; a consumer reads
+  `id > cursor`, handles, advances. Register at the present; never backwards;
+  never past the last event; `consumed_at` = every consumer has passed.
+  Schema test `eventConsumers.test.ts`. No app consumer until Lovable applies.
 - Alerts (#210 rules, #238 schema, #248 record): `alerts.ts` decides what
   wants attention; `alertRecord.ts` is the identity (fingerprint = type +
   message with figures blanked), the write gate (`recordDecision`), the row
@@ -163,9 +169,9 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 
 ## Current state (2026-09-18)
 
-**HEAD on `main`:** `2cf80d8` (#259, goal probability). Suite
-**1868 pass / 0 fail** (60 of them the schema layer: replay, events/audit,
-alerts, RLS, import RPC, grants, backfill); tsc and
+**HEAD on `main`:** `4e42de7` (#262, event consumers). Suite
+**1883 pass / 0 fail** (73 of them the schema layer: replay, events/audit,
+alerts, RLS, import RPC, grants, backfill, consumers); tsc and
 `test:typecheck` clean; boot 200 on `/auth`, `/`, `/portfolio`, `/decisions`,
 `/goals`, `/prompt-center`, `/opportunities`, `/settings`.
 
@@ -258,20 +264,19 @@ OD-003 = net equity (ADR-004 C2 amended); ORD-001 = (a) reconciliation view
 writer = import (ADR-017); `decisions.account_id` backfill, one-account
 users only (ADR-019). **Still open, Amir's:** OD-001 Amendment 2 (see
 *Merge authority*); ADR-APP-015 (navigation, by his instruction); ADR-APP-018
-(event consumers — drafted, for him to read); OD-004 (goal probability and
-contributions); replacing §26.3 in the Drive
+(Accepted 2026-09-18, #263 his merge); replacing §26.3 in the Drive
 blueprint; 86 merged remote branches the git proxy will not let Claude Code
 delete; the D-20 catalog query for the three new tables (the `domain_events`
 privilege question is answered, fixed and **confirmed in production**:
 #250, applied 2026-09-18, ACL re-read the same day).
 
-**Lovable applied `20260917180000_alerts.sql` on 2026-09-18** (verified
-against git; it also widened `isIncomingRequestAbort` in `error-capture.ts`,
-untested). The alerts record is wired (#248). **Everything decided on
-2026-09-18 is built** (#254 → #259). **Awaiting Lovable:**
-`20260918190000_decisions_account_backfill.sql` (#255; the paste is in
-chat). **Waits on Amir reading ADR-018:** the first `domain_events`
-consumer (per-consumer cursor recommended). **Waits on Amir, OD-004:**
-whether the goal probability counts monthly contributions. **Supabase-side:**
-the daily-close schedule (the recorder writes only true closes since #243;
-the schedule is what is missing).
+**Lovable applied `20260917180000_alerts.sql` and (2026-09-18 18:50Z)
+`20260918190000_decisions_account_backfill.sql`** (both verified against
+git; the backfill moved 0 rows — every decision already had an account).
+**Everything decided on 2026-09-18 is built** (#254 → #262): ADR-018 =
+per-consumer cursor (#262, **awaiting Lovable**: apply
+`20260918210000_event_consumers.sql`, then wire the first consumer,
+`GoalChanged` → the goal caches, through `register_event_consumer` /
+`advance_event_cursor`); OD-004 = label it (#261, done). **Amir's merge:**
+#263 (ADR-018 Accepted). **Supabase-side:** the daily-close schedule (the
+recorder writes only true closes since #243; the schedule is what is missing).
