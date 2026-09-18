@@ -3868,3 +3868,19 @@ account predicate (2 tests); `COALESCE(p_cash, cash)` reduced to `p_cash`
 (1); the UPDATE clearing `notes` (1); the symbol matched raw rather than
 `upper(btrim())` (3). 1752 → **1762** (49 in the schema layer).
 
+### State at the end of the session (2026-09-18, later)
+
+`main` at `b66bc41` (the merge of #246); 1762 pass / 0 fail, 49 in the
+schema layer. Five PRs this stretch: #242 (docs), #243 (the daily close is
+a close), #244 (RLS exercised), #245 (docs), #246 (the import RPC run for
+real). The gap matrix artifact is at version 5: Phase 1 item 1 (the
+disposable-DB / schema / RLS / RPC test layers) is complete in its PGlite
+form, and §26.2 tests 6 and 7 are marked written.
+
+**What remains and why it stops here:** the alerts panel waits on Lovable
+applying `20260917180000_alerts.sql` (#238; paste-ready line in its body).
+The daily-close schedule needs the Supabase side, which this session
+cannot reach. The first `domain_events` consumer needs a shape decision
+(see CLAUDE.md, *Then buildable*). Everything else open is Amir's, listed
+above and unchanged.
+

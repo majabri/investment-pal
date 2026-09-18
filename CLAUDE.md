@@ -145,15 +145,15 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 
 ## Current state (2026-09-18)
 
-**HEAD on `main`:** `147aea5` (the merge of #244). Suite **1752 pass / 0 fail**
-(39 of them the schema layer: replay, events/audit, alerts, RLS); tsc and
+**HEAD on `main`:** `b66bc41` (the merge of #246). Suite **1762 pass / 0 fail**
+(49 of them the schema layer: replay, events/audit, alerts, RLS, import RPC); tsc and
 `test:typecheck` clean; boot 200 on `/auth`, `/`, `/portfolio`, `/decisions`,
 `/goals`, `/prompt-center`, `/settings`.
 
 **The execution ledger is fully on screen** (#212 → #216, applied by Lovable
 2026-09-12) **and written from it** (#230 tranches; #216 fills).
 
-**Since the gap matrix (#224 → #244):** calendar coverage · news relevance
+**Since the gap matrix (#224 → #246):** calendar coverage · news relevance
 from the caller's symbols · **the Committee runs in the app and records its
 own decisions** with all four versions and the readiness verdict stamped ·
 the reconciliation alert · goal-on-screen vs goal-on-record · tranche
@@ -168,7 +168,9 @@ the first reader of `domain_events`/`audit_log`) · **the daily close is a
 close** (#243: session-ended quotes only, dated by the exchange; a missed
 day is a visible gap) · **RLS exercised** (#244: a second user tries every
 table under the client role in PGlite; the matrix's "proven by reasoning"
-risk is closed for RLS, still open for the import RPC's atomicity).
+risk is closed for RLS) · **the import RPC run for real** (#246: §26.2
+tests 6 and 7 — nothing in the matrix's "proven by reasoning" item is by
+reasoning any more).
 Dependabot #219/#220/#222/#223 merged; **#221 (React 19.3) is red for a
 real reason** — `react-dom` not bumped with `react` — and is Amir's call.
 
@@ -226,6 +228,10 @@ tables, and the `domain_events` column-privilege question from #244).
 **Waiting on Lovable:** `20260917180000_alerts.sql` (#238; paste-ready line
 in its body). **Then buildable:** the alerts panel wired to `raise_alerts`
 and `acknowledged_at` (fingerprint = type + message with figures blanked;
-acknowledged alerts shown as acknowledged, never hidden) · a first
-`domain_events` consumer · the daily-close job (Supabase-side; the
-recorder writes only true closes since #243, the schedule is what is missing).
+acknowledged alerts shown as acknowledged, never hidden). **Buildable now
+but needing a shape decision first:** a first `domain_events` consumer
+(the matrix names three for v1 — rerank on TrancheClosed waits on the
+universe writer; outcome measurement on DecisionCreated duplicates the
+refresh-time grading in `LearningLog` unless that moves; GoalChanged
+invalidation is trivial). **Supabase-side:** the daily-close schedule (the
+recorder writes only true closes since #243; the schedule is what is missing).
