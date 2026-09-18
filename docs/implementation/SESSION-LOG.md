@@ -3935,3 +3935,41 @@ What the record's `last_raised_at` means after this PR: the last time the
 set changed, or the page loaded — not every render. A figure moving
 inside an unchanged set does not reach the database.
 
+### #249 — React 19.3 with its pair (supersedes Dependabot #221)
+
+Dependabot's #221 bumped `react` to 19.3.0 and `@types/react` alone, and
+every component test went red because `react-dom` stayed at 19.2.8 (the
+renderer refuses a mismatched `react`). This PR bumps the four together —
+`react`, `react-dom`, `@types/react`, `@types/react-dom`, all `^19.3.0`,
+published 2026-09-09 so the 24-hour supply-chain guard in `bunfig.toml`
+admits them — and the lockfile moves `scheduler` 0.27 → 0.28 with it.
+No entry points at Lovable's private registry. Gate green: tsc,
+`test:typecheck`, **1786 pass / 0 fail** (unchanged count: a dependency
+bump adds no test), boot 200 on the five routes. #221 closed as
+superseded once this merged (CLAUDE.md merge authority: superseded PRs
+may be closed).
+
+### State at the end of the session (2026-09-18, afternoon)
+
+`main` at the merge of #249; 1786 pass / 0 fail. Since the morning's
+closing note: Lovable applied the alerts migration (verified), the alert
+record is wired on the dashboard (#248), React is on 19.3 with its pair
+(#249). The gap matrix is at version 6.
+
+**Not built, and why, so the next session does not re-derive it:**
+- **A first `domain_events` consumer.** The table has one `consumed_at`
+  column. Whichever consumer sets it first burns the event for every
+  later one — a GoalChanged cache invalidation marking events consumed
+  would hide them from the goal-change cascade §A.2 wants. The v1 list
+  needs either one consumer that owns the column or a per-consumer cursor
+  (a `consumed_by` column or a small `event_consumers` table: a forward
+  migration and a decision). That is an ADR-sized shape question, not a
+  PR; it is Amir's, and a proposal can be drafted on request.
+- **The daily-close schedule.** Needs the Supabase side (pg_cron + an edge
+  function, or pg_net to a server endpoint carrying a shared secret in
+  Vault). Both need access this session does not have and a secret
+  decision (CLAUDE.md: never in code). `dailyClose.ts` is what the job
+  would call.
+
+Everything else open is Amir's and unchanged.
+

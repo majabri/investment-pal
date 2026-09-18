@@ -152,7 +152,7 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 
 ## Current state (2026-09-18)
 
-**HEAD on `main`:** `b66bc41` (the merge of #246). Suite **1762 pass / 0 fail**
+**HEAD on `main`:** the merge of #249. Suite **1786 pass / 0 fail**
 (49 of them the schema layer: replay, events/audit, alerts, RLS, import RPC); tsc and
 `test:typecheck` clean; boot 200 on `/auth`, `/`, `/portfolio`, `/decisions`,
 `/goals`, `/prompt-center`, `/settings`.
@@ -160,7 +160,7 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 **The execution ledger is fully on screen** (#212 → #216, applied by Lovable
 2026-09-12) **and written from it** (#230 tranches; #216 fills).
 
-**Since the gap matrix (#224 → #246):** calendar coverage · news relevance
+**Since the gap matrix (#224 → #249):** calendar coverage · news relevance
 from the caller's symbols · **the Committee runs in the app and records its
 own decisions** with all four versions and the readiness verdict stamped ·
 the reconciliation alert · goal-on-screen vs goal-on-record · tranche
@@ -177,9 +177,11 @@ day is a visible gap) · **RLS exercised** (#244: a second user tries every
 table under the client role in PGlite; the matrix's "proven by reasoning"
 risk is closed for RLS) · **the import RPC run for real** (#246: §26.2
 tests 6 and 7 — nothing in the matrix's "proven by reasoning" item is by
-reasoning any more).
-Dependabot #219/#220/#222/#223 merged; **#221 (React 19.3) is red for a
-real reason** — `react-dom` not bumped with `react` — and is Amir's call.
+reasoning any more) · **the alert record on the dashboard** (#248: standing,
+seen, one writer; Lovable applied the schema 2026-09-18) · **React 19.3
+with its pair** (#249; Dependabot #221 had bumped `react` alone and was
+closed as superseded).
+Dependabot #219/#220/#222/#223 merged.
 
 **Standing rules learnt the hard way:**
 - Unknown ≠ zero ≠ empty ≠ error ≠ stale. `not_recorded` is its own state.
@@ -227,17 +229,17 @@ real reason** — `react-dom` not bumped with `react` — and is Amir's call.
 **Open, all Amir's:** OD-001 Amendment 2 (see *Merge authority*); ADR-APP-009
 –015 all `Proposed`; OD-003; ORD-001 a/b; the ADR-008 action vocabulary;
 the universe writer; `decisions.account_id` backfill; replacing §26.3 in
-the Drive blueprint; #221; pasting a balance block on Settings so the
+the Drive blueprint; pasting a balance block on Settings so the
 reconciliation can run; 86 merged remote branches the git proxy will not
 let Claude Code delete; the D-20 catalog query (now also for the three new
 tables, and the `domain_events` column-privilege question from #244).
 
 **Lovable applied `20260917180000_alerts.sql` on 2026-09-18** (verified
 against git; it also widened `isIncomingRequestAbort` in `error-capture.ts`,
-untested). The alerts record is wired (#248). **Buildable now but needing a
-shape decision first:** a first `domain_events` consumer
-(the matrix names three for v1 — rerank on TrancheClosed waits on the
-universe writer; outcome measurement on DecisionCreated duplicates the
-refresh-time grading in `LearningLog` unless that moves; GoalChanged
-invalidation is trivial). **Supabase-side:** the daily-close schedule (the
+untested). The alerts record is wired (#248). **Needs a shape decision
+first (Amir's):** a first `domain_events` consumer — the table has ONE
+`consumed_at`; the first consumer to set it burns the event for every
+later one, so v1 needs either a single owning consumer or a per-consumer
+cursor (a forward migration). The session log's closing note has the
+reasoning. **Supabase-side:** the daily-close schedule (the
 recorder writes only true closes since #243; the schedule is what is missing).
