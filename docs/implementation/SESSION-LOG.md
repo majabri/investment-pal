@@ -4070,3 +4070,103 @@ ADR-APP-018.
 Also confirmed today: the nine "seen" alerts on Amir's dashboard were nine
 clicks of Mark seen — the record behaved as designed, not a bug.
 
+
+## Session — 2026-09-18 (night) — the decided work, built (#254 → #259)
+
+Everything the seven decisions unblocked, each its own PR, each merged on
+a green gate under the standing merge authority. The session-log entries
+were deferred to this checkpoint because #253 (Amir's, docs) appends to
+the same file tail; the checkpoint branch sits on #253 and is merged only
+after it.
+
+### #254 — the blueprint's seven action verbs (ADR-APP-008 Amendment 1)
+
+`RECOMMENDATION_ACTIONS` = BUY, SELL, TRIM, CANCEL, REPLACE, HOLD, WAIT.
+The committee contract refuses any other verb by name (`superRefine`, so
+the message can say which verb); the extraction instruction maps the
+model's synonyms onto the seven. Stored REDUCE/ADD/REBALANCE/ROTATE/ESCALATE
+rows stay as stored and are marked `LEGACY_ACTIONS`; `legacyEquivalent`
+reads REDUCE as TRIM and ADD as BUY, explicitly, and nothing else.
+
+### #255 — `decisions.account_id` backfill (ADR-APP-019) — **awaiting Lovable**
+
+`20260918190000_decisions_account_backfill.sql`: for every user with
+exactly one account, every decision with a NULL `account_id` takes that
+account; a user with two accounts is left alone (the migration cannot know
+which). `(array_agg(id))[1]` because `min(uuid)` does not exist — the PGlite
+replay caught it before Lovable would have. `decisionsBackfill.test.ts`
+applies it twice and snapshots the whole row (`to_jsonb`) to prove the
+second run changes nothing. **Not applied yet**: the paste for Lovable is
+in chat, awaiting Amir; nothing in the app depends on it.
+
+### #256 — fills against holdings, the reconciliation view (ADR-APP-016, ORD-001 a)
+
+`fillHoldingReconciliation.ts`: per symbol, per committed import, expected
+= Σ signed fills in the window (previous import's end, this import's end]
+on orders not cancelled/untriggered/superseded/rejected/expired; observed
+= the holding's quantity after minus before, from the `audit_log` rows the
+import wrote. Verdicts `explained` / `fills_not_reflected` /
+`change_unexplained` / `side_unknown`; excluded and out-of-window fills
+are counted, never dropped; no audit trail is `no_audit`, not an empty
+one. `FillHoldingPanel` on `/portfolio` under the orders panel, read-only:
+"Holdings change only by import. This compares; it never applies." §26.2
+test 8 is a real test. Imports before 2026-09-17 compare as `no_audit`,
+honestly.
+
+### #257 — the universe import (ADR-APP-017)
+
+`universeImport.ts` parses a paste (CSV, TSV or one symbol per line,
+header optional, columns by name and alias); a score outside 1–10 is
+skipped with its reason, never clamped; a tier outside top100/top25/bench
+is skipped, never defaulted; a repeated symbol is counted and the first
+wins; `last_scored_at` only where a score exists, and a row without scores
+carries no score keys so the upsert cannot zero an existing one.
+`useUniverseImport` is the one write: `import_batches` row `staged`
+before, upsert on `(user_id, symbol)`, `committed` / `failed` after.
+`UniverseImportPanel` on `/opportunities`; removal is the owner's own
+DELETE. `AI_WRITABLE_TABLES` unchanged. UNIV-001's write side is closed;
+the screen that screened an empty list can now be given a list.
+
+### #258 — the unrendered debit ÷ gross margin ratio removed (ADR-APP-013 D2)
+
+`accountTotals.marginUtilisation` is gone; the margin cap is enforced
+through `marginUtilisationOf(marginDebit, denominators,
+MARGIN_CAP_DENOMINATOR)` with its denominator named, and that path is
+untouched. No figure on any screen changed. Tests pin the field's absence
+and `MARGIN_CAP_DENOMINATOR = "netEquity"`.
+
+### #259 — goal probability: unknown is not 0%, and small is not 0% either
+
+The "Probability of reaching the goal is 0%" alert on Amir's dashboard,
+traced. `probabilityOfReachingTarget` returned 0 when it had nothing to
+project from or over, and that 0 passed the alert's null check. It returns
+`null` there now, carried to the panel ("Not computable: nothing to
+project from"), `/goals`, the alert (silent) and the brief ("Model
+probability: not computable", with the objective line kept). New
+`fmtProbability` prints a bound (`<1%`, `>99.9%`) where the digits would
+round to a certainty. The model is unchanged; that it ignores monthly
+contributions while the required-CAGR beside it counts them is **OD-004**,
+Amir's. Which defect produced his `0%` is UNVERIFIED; with priced
+positions the likelier one is a genuinely small probability, which now
+reads `<1%` and still alerts.
+
+### Counts
+
+| PR | Suite after | Fault injections |
+|---|---|---|
+| #254 | 1797 | 4 |
+| #255 | 1802 | 3 (SQL) |
+| #256 | 1818 | 4 |
+| #257 | 1850 | 5 |
+| #258 | 1851 | 2 |
+| #259 | 1868 | 5 |
+
+Every injection reddened and was restored with `diff` confirming it.
+tsc, `test:typecheck` and the boot check were green on every branch.
+
+### Still Amir's
+
+#253 (this checkpoint sits on it); the #255 paste to Lovable; ADR-APP-018
+(one consumer or a per-consumer cursor); OD-004; OD-001 Amendment 2;
+ADR-APP-015; §26.3 in the Drive blueprint; the 86 remote branches; the
+daily-close schedule on the Supabase side.

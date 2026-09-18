@@ -126,6 +126,17 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
   that never switches role proves nothing about it. Lovable's five duplicate
   files are not idempotent and are pinned by name there. **Write the schema
   test (including the RLS sweep's seed row) in the same PR as the migration.**
+- Universe write side (#257, ADR-APP-017): `universeImport.ts` (parser is
+  the boundary: skip with reason, never clamp or default; first duplicate
+  wins), `hooks/useUniverseImport.ts` (staged batch → upsert → committed),
+  `UniverseImportPanel` on `/opportunities`. The Committee never writes it.
+- Fills against holdings (#256, ADR-APP-016): `fillHoldingReconciliation.ts`
+  (window = (previous import end, this import end]; excluded and outside
+  fills are counted), `hooks/useFillHoldingReconciliation.ts`,
+  `FillHoldingPanel` on `/portfolio`. Compares; never applies.
+- Goal probability (#259): `probabilityOfReachingTarget` is `null` when it
+  has nothing to project from or over; `fmtProbability` prints bounds, not
+  `0%`/`100%`. The model ignores contributions — OD-004.
 - Alerts (#210 rules, #238 schema, #248 record): `alerts.ts` decides what
   wants attention; `alertRecord.ts` is the identity (fingerprint = type +
   message with figures blanked), the write gate (`recordDecision`), the row
@@ -152,11 +163,11 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 
 ## Current state (2026-09-18)
 
-**HEAD on `main`:** `a8b432f` (Lovable's apply of #250's migration). Suite
-**1793 pass / 0 fail** (56 of them the schema layer: replay, events/audit,
-alerts, RLS, import RPC, grants); tsc and
+**HEAD on `main`:** `2cf80d8` (#259, goal probability). Suite
+**1868 pass / 0 fail** (60 of them the schema layer: replay, events/audit,
+alerts, RLS, import RPC, grants, backfill); tsc and
 `test:typecheck` clean; boot 200 on `/auth`, `/`, `/portfolio`, `/decisions`,
-`/goals`, `/prompt-center`, `/settings`.
+`/goals`, `/prompt-center`, `/opportunities`, `/settings`.
 
 **The execution ledger is fully on screen** (#212 → #216, applied by Lovable
 2026-09-12) **and written from it** (#230 tranches; #216 fills).
@@ -185,6 +196,15 @@ closed as superseded) · **the client roles' grants on `domain_events` and
 `audit_log` narrowed** (#250, after the production catalog showed ALL;
 applied by Lovable 2026-09-18).
 Dependabot #219/#220/#222/#223 merged.
+
+**The decided work, built (#254 → #259, 2026-09-18 night):** the seven
+verbs with legacy values marked (#254) · the `decisions.account_id`
+backfill migration + schema test (#255, **awaiting Lovable**) · fills
+against holdings as a read-only reconciliation view on `/portfolio`
+(#256) · **the universe import** on `/opportunities` — the owner writes
+the universe, the Committee reads it (#257) · the unrendered debit ÷ gross
+ratio removed (#258) · **goal probability: unknown is `null`, small is a
+bound, never `0%`** (#259; the model itself is OD-004).
 
 **Standing rules learnt the hard way:**
 - Unknown ≠ zero ≠ empty ≠ error ≠ stale. `not_recorded` is its own state.
@@ -238,7 +258,8 @@ OD-003 = net equity (ADR-004 C2 amended); ORD-001 = (a) reconciliation view
 writer = import (ADR-017); `decisions.account_id` backfill, one-account
 users only (ADR-019). **Still open, Amir's:** OD-001 Amendment 2 (see
 *Merge authority*); ADR-APP-015 (navigation, by his instruction); ADR-APP-018
-(event consumers — drafted, for him to read); replacing §26.3 in the Drive
+(event consumers — drafted, for him to read); OD-004 (goal probability and
+contributions); replacing §26.3 in the Drive
 blueprint; 86 merged remote branches the git proxy will not let Claude Code
 delete; the D-20 catalog query for the three new tables (the `domain_events`
 privilege question is answered, fixed and **confirmed in production**:
@@ -246,11 +267,11 @@ privilege question is answered, fixed and **confirmed in production**:
 
 **Lovable applied `20260917180000_alerts.sql` on 2026-09-18** (verified
 against git; it also widened `isIncomingRequestAbort` in `error-capture.ts`,
-untested). The alerts record is wired (#248). **Buildable now (decided
-2026-09-18):** the seven-verb vocabulary (ADR-008 Am. 1) · the fill-vs-holding
-reconciliation view (ADR-016) · the universe import (ADR-017) · the
-`decisions.account_id` backfill migration + schema test (ADR-019, then
-Lovable) · `marginUtilisation` cleanup (ADR-013 D2). **Waits on Amir reading
-ADR-018:** the first `domain_events` consumer (per-consumer cursor
-recommended). **Supabase-side:** the daily-close schedule (the
-recorder writes only true closes since #243; the schedule is what is missing).
+untested). The alerts record is wired (#248). **Everything decided on
+2026-09-18 is built** (#254 → #259). **Awaiting Lovable:**
+`20260918190000_decisions_account_backfill.sql` (#255; the paste is in
+chat). **Waits on Amir reading ADR-018:** the first `domain_events`
+consumer (per-consumer cursor recommended). **Waits on Amir, OD-004:**
+whether the goal probability counts monthly contributions. **Supabase-side:**
+the daily-close schedule (the recorder writes only true closes since #243;
+the schedule is what is missing).
