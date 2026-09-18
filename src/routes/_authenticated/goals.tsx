@@ -26,6 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getQuotesFn } from "@/lib/marketServer";
 import {
   fmtPct,
+  fmtProbability,
   fmtUSD,
   periodicGrowth,
   probabilityOfReachingTarget,
@@ -421,9 +422,9 @@ function GoalsPage() {
           />
           <StatCard
             label="Probability of success"
-            value={metrics ? fmtPct(metrics.prob) : "—"}
-            hint={`Assumes ${risk} volatility profile`}
-            tone={metrics && metrics.prob >= 0.5 ? "positive" : "warning"}
+            value={metrics ? fmtProbability(metrics.prob) : "—"}
+            hint={metrics && metrics.prob === null ? "Not computable: nothing to project from" : `Assumes ${risk} volatility profile`}
+            tone={metrics && metrics.prob !== null ? (metrics.prob >= 0.5 ? "positive" : "warning") : "default"}
           />
         </div>
       </div>
@@ -472,7 +473,7 @@ function GoalsPage() {
         </div>
       </div>
 
-      {metrics && metrics.prob < 0.6 ? (
+      {metrics && metrics.prob !== null && metrics.prob < 0.6 ? (
         <div className="mt-4 rounded-2xl border border-warning/40 bg-warning/10 p-5">
           <div className="text-sm font-semibold text-warning">Ways to improve probability</div>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">

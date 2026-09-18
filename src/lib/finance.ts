@@ -101,6 +101,20 @@ export const fmtPct = (v: number, digits = 1) => {
   return `${(v * 100).toFixed(digits)}%`;
 };
 
+/**
+ * A probability for the screen. NULL is the em-dash, never "0%". A value the
+ * digits would round to 0% or 100% without being one is shown as a bound —
+ * "<0.1%" is a small number; "0.0%" is a claim of impossibility.
+ */
+export const fmtProbability = (v: number | null, digits = 1): string => {
+  if (v === null) return "—";
+  if (!Number.isFinite(v)) return BROKEN;
+  const unit = Math.pow(10, -digits);
+  if (v > 0 && v * 100 < unit) return `<${unit.toFixed(digits)}%`;
+  if (v < 1 && (1 - v) * 100 < unit) return `>${(100 - unit).toFixed(digits)}%`;
+  return fmtPct(v, digits);
+};
+
 export const fmtNumber = (v: number, digits = 2) => {
   if (!Number.isFinite(v)) return BROKEN;
   return v.toLocaleString("en-US", {
@@ -174,6 +188,16 @@ export const riskToExpectedReturn = (risk: string) => {
 /**
  * Log-normal probability that terminal value ≥ target.
  * P(V_T >= target) where log(V_T/V_0) ~ N((mu-vol^2/2)*T, vol^2*T)
+ *
+ * NULL when the model has nothing to project from or over: a non-positive
+ * current value has no log-return, and a non-positive horizon is not a
+ * projection. This used to return 0 there, which the dashboard then alerted
+ * as "Probability of reaching the goal is 0%" — a claim about the plan made
+ * from a missing input. Unknown is not zero.
+ *
+ * The model ignores monthly contributions (OD-004); `requiredCAGRWithContrib`
+ * beside it does not. A goal funded mostly by contributions reads lower here
+ * than it is.
  */
 export const probabilityOfReachingTarget = (
   current: number,
@@ -181,8 +205,9 @@ export const probabilityOfReachingTarget = (
   years: number,
   expectedReturn: number,
   vol: number,
-) => {
-  if (current <= 0 || years <= 0) return 0;
+): number | null => {
+  if (![current, target, years, expectedReturn, vol].every(Number.isFinite)) return null;
+  if (current <= 0 || years <= 0 || vol <= 0) return null;
   if (current >= target) return 1;
   const mu = expectedReturn;
   const sigma = vol;

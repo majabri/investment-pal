@@ -1,5 +1,5 @@
 // Prompt templates for ChatGPT morning + end-of-day reviews.
-import { fmtPct, fmtUSD } from "./finance";
+import { fmtPct, fmtProbability, fmtUSD } from "./finance";
 import { labelledPct, weightOf } from "./concentration";
 import type { Denominators } from "./concentration";
 import { marginRatePromptLine, MARGIN_POLICY_UNSET, type MarginPolicy } from "./marginCost";
@@ -202,11 +202,15 @@ function formatGoalDate(iso: string): string {
  * which is four fabricated facts in one line.
  */
 function objectiveLine(ctx: PromptContext): string {
-  if (!usable(ctx.objective) || ctx.requiredCagr === null || ctx.probability === null) {
+  if (!usable(ctx.objective) || ctx.requiredCagr === null) {
     return "NOT SET. No target, date or probability is available — do not assume one, and say so if a recommendation would depend on it.";
   }
   const o = ctx.objective as Extract<Objective, { kind: "set" }>;
-  return `${fmtUSD(o.targetValue)} by ${o.targetDate} | Required CAGR: ${fmtPct(ctx.requiredCagr)} | Model probability: ${fmtPct(ctx.probability)}`;
+  // A set objective whose probability the model could not compute is still a
+  // set objective; the probability alone is unknown, and is said to be.
+  const probability =
+    ctx.probability === null ? "not computable (no current value to project from)" : fmtProbability(ctx.probability);
+  return `${fmtUSD(o.targetValue)} by ${o.targetDate} | Required CAGR: ${fmtPct(ctx.requiredCagr)} | Model probability: ${probability}`;
 }
 
 function paceLine(cagr: number | null): string {
