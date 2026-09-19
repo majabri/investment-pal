@@ -145,6 +145,11 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
   tier, conviction desc, unscored last never zero), `UniverseRankPanel`.
 - Fill mismatch alert (#269): `countFillMismatches` in `alerts.ts`; the
   dashboard feeds the scoped account's orders + fills; NULL = not evaluated.
+- Rerank after a sale (#271, BR-004): `universe_reranks` + `record_universe_rerank`
+  the one writer (owner's TrancheClosed only, window 1–365 days, never
+  shortened, `rank-v2` computed in the database); `investment_universe.excluded_until`.
+  Schema test `universeReranks.test.ts`. **No app consumer until Lovable applies**;
+  the app will pass a 30-day window (a default, not Amir's figure).
 - Event consumers (#262, ADR-APP-018): `event_consumers` + the two RPCs are
   the ONE write path to a cursor and to `consumed_at`; a consumer reads
   `id > cursor`, handles, advances. Register at the present; never backwards;
@@ -180,9 +185,9 @@ Do **not** run `npm ci` (no npm lockfile) and do **not** commit a generated
 
 ## Current state (2026-09-18)
 
-**HEAD on `main`:** `77a67f9` (#269, the fill-mismatch alert). Suite
-**1926 pass / 0 fail** (73 of them the schema layer: replay, events/audit,
-alerts, RLS, import RPC, grants, backfill, consumers); tsc and
+**HEAD on `main`:** `d73510d` (#271, the rerank migration). Suite
+**1936 pass / 0 fail** (83 of them the schema layer: replay, events/audit,
+alerts, RLS, import RPC, grants, backfill, consumers, reranks); tsc and
 `test:typecheck` clean; boot 200 on `/auth`, `/`, `/portfolio`, `/decisions`,
 `/goals`, `/prompt-center`, `/opportunities`, `/settings`.
 
@@ -282,14 +287,16 @@ privilege question is answered, fixed and **confirmed in production**:
 #250, applied 2026-09-18, ACL re-read the same day).
 
 **Lovable applied, 2026-09-18, all verified against git:** the alerts
-schema, the `decisions.account_id` backfill (0 rows moved — every decision
-already had an account) and `20260918210000_event_consumers.sql` (19:15Z).
-**Everything decided on 2026-09-18 is built and wired** (#254 → #265):
-ADR-018 = per-consumer cursor (#262 schema, #265 the first consumer,
-GoalChanged → the goal caches); OD-004 = label it (#261). **Nothing awaits
-Lovable.** **Amir's merge:** #263 (ADR-018 Accepted; reported merged, still
-open on GitHub). **UNVERIFIED live:** the universe paste box on
-`/opportunities`, the Goal outlook's probability line, the consumer cursor
-on `/settings` — Amir published 19:15Z and has not reported back.
+schema, the `decisions.account_id` backfill (0 rows moved) and
+`20260918210000_event_consumers.sql`. **Everything decided on 2026-09-18 is
+built and wired** (#254 → #265), and the backlog items that needed no
+decision followed (#267 governing goal, #268 ranked universe, #269 fill
+mismatch alert, #271 rerank migration). **Awaiting Lovable:**
+`20260919000000_universe_reranks.sql` (#271), then the second consumer.
+**Amir's merge and answers:** #272 (ADR-020 dispositions, ADR-021
+registries, ADR-022 account policies — Proposed). **UNVERIFIED live:** the
+universe paste box and ranked list on `/opportunities`, the Goal outlook's
+probability and goal-source lines, the consumer cursor on `/settings` —
+Amir published 2026-09-18 19:15Z and has not reported back.
 **Supabase-side:** the daily-close schedule (the recorder writes only true
 closes since #243; the schedule is what is missing).

@@ -4324,3 +4324,44 @@ for them. 8 tests; four fault injections reddened. Suite 1916.
 - **Live checks:** the universe box, the probability line, the consumer
   cursor, and now the goal-source line and the ranked universe — Amir
   published and has not reported back.
+
+## Session — 2026-09-19 — "finish everything"
+
+Amir: *"finish everything."* What could be finished without a decision of
+his was finished; what is a decision was drafted as an ADR for him.
+
+### #271 — rerank after a sale; never auto-rebuy the same ticker (BR-004): the migration
+
+`20260919000000_universe_reranks.sql`: `investment_universe.excluded_until`
+/ `excluded_reason`; `universe_reranks` (one per TrancheClosed event,
+UNIQUE event_id, SELECT-only); `record_universe_rerank(event_id,
+exclude_days)` the one writer — only the owner's TrancheClosed events, a
+window of 1–365 days, the exclusion never shortened, a symbol not in the
+universe recorded as `in_universe = false`, the ranking computed in the
+database as `rank-v2` (excluded last, then tier, conviction desc, unscored
+last, symbol). **The window the app will pass is 30 days — a default
+chosen to finish the item, the same span as ADR-003's buy-back expiry;
+not Amir's figure; one constant to change.** 10 schema tests; the RLS
+sweep seeds a rerank per user (33 tables). Five SQL fault injections; the
+fourth (any event type accepted) did not redden until the test was made to
+read the refusal's own words — the tranche lookup had masked it. **Awaiting
+Lovable**; the second consumer (TrancheClosed → `record_universe_rerank`,
+then the ranked panel reads `excluded_until`) is wired after the apply.
+
+### #272 — ADR-APP-020, 021, 022 proposed (Amir's merge)
+
+Decision dispositions (Defer / Mark Executed, UX-001); model and calc
+registries (CONST-007, DATA-006); per-account policies with no leverage
+for family strategies (BR-003, BR-011). Each with options, a
+recommendation and consequences; nothing built on them.
+
+### What is left, and whose
+
+- Lovable: apply `20260919000000_universe_reranks.sql`.
+- Amir: merge #272 and answer its three questions; the live checks
+  (universe box, ranked list, probability and goal-source lines, consumer
+  cursor); OD-001 Amendment 2; ADR-015; §26.3 in the Drive blueprint; the
+  86 remote branches.
+- Supabase-side: the daily-close schedule.
+- Then Claude Code: the second consumer on the apply; whichever of
+  ADR-020–022 Amir accepts.
