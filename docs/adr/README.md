@@ -49,3 +49,6 @@ settle it: **don't infer.** File `../open-decisions/OD-xxx.md` and ask in chat.
 | ADR-APP-017 | Who writes the investment universe | Accepted |
 | ADR-APP-018 | How `domain_events` are consumed | Accepted (2026-09-18: per-consumer cursor) |
 | ADR-APP-019 | Backfilling `decisions.account_id` on pre-scope rows | Accepted |
+| ADR-APP-020 | Decision dispositions: Defer and Mark Executed (UX-001) | Proposed |
+| ADR-APP-021 | Model registry and calculation registry (CONST-007, DATA-006) | Proposed |
+| ADR-APP-022 | Per-account policies; no leverage for family strategies (BR-003, BR-011) | Proposed |
