@@ -85,6 +85,13 @@ async function seed(u: string, tag: string): Promise<Record<string, string>> {
   // Written only through its RPC (20260918210000): the seed proves the client
   // role can register, and the row lands under the caller.
   await db.exec(`SELECT register_event_consumer('seed_${tag.toLowerCase()}')`);
+  // universe_reranks (20260919000000): written only by its RPC, on a
+  // TrancheClosed event. A second tranche is closed for it so the seeded open
+  // one (id.t) stays open for the rules below.
+  const closed = (await one<{ id: string }>(db, `INSERT INTO tranches (user_id, account_id, symbol, kind, opened_at, opened_quantity, closed_at) VALUES ('${u}', '${id.acct}', 'SYM${tag}', 'tactical', now() - interval '2 days', 5, NULL) RETURNING id`)).id;
+  await db.exec(`UPDATE tranches SET closed_at = now() WHERE id = '${closed}'`);
+  const closeEvent = (await one<{ id: string }>(db, `SELECT max(id)::text id FROM domain_events WHERE user_id = '${u}' AND event_type = 'TrancheClosed'`)).id;
+  await db.exec(`SELECT record_universe_rerank(${closeEvent}, 30)`);
   // No client policy exists for this one; only the superuser (standing in for
   // service_role's SECURITY DEFINER function) can write it.
   await actAsAdmin(db);
